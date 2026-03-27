@@ -4,15 +4,18 @@ import com.example.demo.entity.Product;
 import com.example.demo.service.ProductService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Optional;
+
+import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 /**
  * 商品管理接口
  */
 @RestController
-@RequestMapping("/api/products")
+@RequestMapping("/products")
 public class ProductController {
     @Autowired
     private ProductService productService;
@@ -38,8 +41,10 @@ public class ProductController {
 
     // 查询商品列表
     @GetMapping
-    public List<Product> getAllProducts() {
-        return productService.getAllProducts();
+    public List<Product> getAllProducts(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Integer status) {
+        return productService.getAllProducts(keyword, status);
     }
 
     // 删除商品
@@ -63,6 +68,6 @@ public class ProductController {
             product.setImageUrl(imageUrl);
             return productService.updateProduct(product);
         }
-        throw new RuntimeException("商品不存在");
+        throw new ResponseStatusException(NOT_FOUND, "商品不存在");
     }
 }

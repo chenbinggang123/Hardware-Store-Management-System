@@ -1,0 +1,21 @@
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.5)
+
+2026-03-27T17:04:23.353+08:00  INFO 17484 --- [hardware-store-system] [           main] com.example.demo.DemoApplication         : Starting DemoApplication using Java 21.0.8 with PID 17484 (F:\Hardware-Store-Management-System\Hardware-Store-Management-System\springboot-demo\target\classes started by LENOVO in F:\Hardware-Store-Management-System\Hardware-Store-Management-System\springboot-demo)
+2026-03-27T17:04:23.358+08:00  INFO 17484 --- [hardware-store-system] [           main] com.example.demo.DemoApplication         : No active profile set, falling back to 1 default profile: "default"
+2026-03-27T17:04:32.214+08:00  INFO 17484 --- [hardware-store-system] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8081 (http)
+2026-03-27T17:04:32.226+08:00  INFO 17484 --- [hardware-store-system] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-03-27T17:04:32.226+08:00  INFO 17484 --- [hardware-store-system] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.20]
+2026-03-27T17:04:32.287+08:00  INFO 17484 --- [hardware-store-system] [           main] o.a.c.c.C.[Tomcat].[localhost].[/api]    : Initializing Spring embedded WebApplicationContext
+2026-03-27T17:04:32.288+08:00  INFO 17484 --- [hardware-store-system] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 8892 ms
+2026-03-27T17:04:32.692+08:00  INFO 17484 --- [hardware-store-system] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8081 (http) with context path '/api'
+2026-03-27T17:04:32.698+08:00  INFO 17484 --- [hardware-store-system] [           main] com.example.demo.DemoApplication         : Started DemoApplication in 9.657 seconds (process running for 9.942)
+2026-03-27T17:04:46.044+08:00  INFO 17484 --- [hardware-store-system] [nio-8081-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/api]    : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-03-27T17:04:46.045+08:00  INFO 17484 --- [hardware-store-system] [nio-8081-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-03-27T17:04:46.047+08:00  INFO 17484 --- [hardware-store-system] [nio-8081-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 2 ms
