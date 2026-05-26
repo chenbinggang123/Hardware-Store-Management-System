@@ -1,0 +1,35 @@
+<view class="screen">
+  <view class="hero-card">
+    <view class="hero-eyebrow">SUPPLIER FORM</view>
+    <view class="hero-title">{{mode === 'edit' ? '编辑供应商' : '新增供应商'}}</view>
+    <view class="hero-subtitle">把联系人、电话和合作备注整理好，采购流会更顺畅。</view>
+  </view>
+
+  <view class="form-card">
+    <view class="form-section-title">供应商信息</view>
+    <view class="form-group">
+      <view class="form-label">名称 *</view>
+      <input class="form-input" value="{{form.name}}" data-key="name" bindinput="updateField" placeholder="请输入供应商名称" />
+    </view>
+    <view class="form-group">
+      <view class="form-label">联系人</view>
+      <input class="form-input" value="{{form.contact}}" data-key="contact" bindinput="updateField" placeholder="请输入联系人" />
+    </view>
+    <view class="form-group">
+      <view class="form-label">电话</view>
+      <input class="form-input" value="{{form.phone}}" data-key="phone" bindinput="updateField" placeholder="请输入联系电话" />
+    </view>
+    <view class="form-group">
+      <view class="form-label">地址</view>
+      <input class="form-input" value="{{form.address}}" data-key="address" bindinput="updateField" placeholder="请输入地址" />
+    </view>
+    <view class="form-group">
+      <view class="form-label">备注</view>
+      <textarea class="form-textarea" value="{{form.remark}}" data-key="remark" bindinput="updateField" placeholder="请输入合作说明"></textarea>
+    </view>
+  </view>
+
+  <view class="bottom-actions">
+    <view class="btn btn-primary btn-block" bindtap="submit">保存供应商</view>
+  </view>
+</view>

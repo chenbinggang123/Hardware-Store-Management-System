@@ -1,0 +1,60 @@
+<view class="screen" wx:if="{{order}}">
+  <view class="hero-card">
+    <view class="hero-eyebrow">PURCHASE DETAIL</view>
+    <view class="hero-title">{{order.orderNumber}}</view>
+    <view class="hero-subtitle">供应商 {{supplierName}} · 状态 {{order.status}} · 经办人 {{order.operatorId}}</view>
+    <view class="top-actions">
+      <view class="btn btn-primary btn-sm" bindtap="openEdit">编辑采购单</view>
+      <view class="btn btn-outline btn-sm" wx:if="{{order.status !== '已入库'}}" bindtap="stockIn">确认入库</view>
+    </view>
+  </view>
+
+  <view class="stats-strip">
+    <view class="stat-item">
+      <view class="stat-value">¥{{order.totalAmount}}</view>
+      <view class="stat-label">总金额</view>
+    </view>
+    <view class="stat-item">
+      <view class="stat-value" style="font-size: 24rpx;">{{order.status}}</view>
+      <view class="stat-label">状态</view>
+    </view>
+    <view class="stat-item">
+      <view class="stat-value">{{order.items ? order.items.length : 0}}</view>
+      <view class="stat-label">明细行数</view>
+    </view>
+  </view>
+
+  <view class="form-card">
+    <view class="form-section-title">基础信息</view>
+    <view class="detail-grid">
+      <view class="detail-item"><view class="detail-label">下单时间</view><view class="detail-value">{{order.orderTime}}</view></view>
+      <view class="detail-item"><view class="detail-label">备注</view><view class="detail-value">{{order.remark || '--'}}</view></view>
+    </view>
+  </view>
+
+  <view class="form-card">
+    <view class="form-section-title">商品明细</view>
+    <view class="line-list">
+      <block wx:for="{{order.items}}" wx:key="productId">
+        <view class="line-card">
+          <view class="line-head">
+            <view class="line-title">{{item.productName}}</view>
+            <view class="tag tag-neutral">{{item.locationId || '待分配库位'}}</view>
+          </view>
+          <view class="line-meta">数量 {{item.quantity}} · 单价 ¥{{item.price}} · 金额 ¥{{item.amount}}</view>
+        </view>
+      </block>
+    </view>
+  </view>
+</view>
+
+<view class="screen" wx:elif="{{loading}}">
+  <view class="loading-state">采购单详情加载中...</view>
+</view>
+<view class="screen" wx:else>
+  <view class="empty-state">
+    <text class="empty-icon">📥</text>
+    <view class="empty-title">加载失败</view>
+    <view class="empty-desc">{{loadError || '采购单详情暂时无法打开'}}</view>
+  </view>
+</view>

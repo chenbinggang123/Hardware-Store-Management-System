@@ -7,6 +7,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -25,6 +26,7 @@ public class Customer {
     private String type; // 客户类型（零售/批发/老客户）
     private String phone; // 联系电话
     private String address; // 地址
+    private BigDecimal debt; // 当前欠款
     private String remark; // 备注
     private LocalDateTime createTime; // 创建时间
 }

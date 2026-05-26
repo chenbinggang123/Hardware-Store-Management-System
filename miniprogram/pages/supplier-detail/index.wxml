@@ -1,0 +1,61 @@
+<view class="screen" wx:if="{{supplier}}">
+  <view class="hero-card">
+    <view class="hero-eyebrow">SUPPLIER DETAIL</view>
+    <view class="hero-title">{{supplier.name}}</view>
+    <view class="hero-subtitle">{{supplier.contact}} · {{supplier.phone}} · {{supplier.address}}</view>
+    <view class="top-actions">
+      <view class="btn btn-primary btn-sm" bindtap="openEdit">编辑供应商</view>
+    </view>
+  </view>
+
+  <view class="form-card">
+    <view class="form-section-title">基础信息</view>
+    <view class="detail-grid">
+      <view class="detail-item"><view class="detail-label">联系人</view><view class="detail-value">{{supplier.contact}}</view></view>
+      <view class="detail-item"><view class="detail-label">电话</view><view class="detail-value">{{supplier.phone}}</view></view>
+      <view class="detail-item"><view class="detail-label">地址</view><view class="detail-value">{{supplier.address}}</view></view>
+      <view class="detail-item"><view class="detail-label">备注</view><view class="detail-value">{{supplier.remark || '--'}}</view></view>
+    </view>
+  </view>
+
+  <view class="form-card">
+    <view class="form-section-title">采购历史</view>
+    <view class="mini-list" wx:if="{{purchaseOrders.length}}">
+      <block wx:for="{{purchaseOrders}}" wx:key="id">
+        <view class="mini-row">
+          <view class="mini-title">{{item.orderNumber}} · {{item.status}}</view>
+          <view class="mini-desc">{{item.orderTime}} · 总金额 ¥{{item.totalAmount}}</view>
+        </view>
+      </block>
+    </view>
+    <view class="empty-state" wx:else style="margin-top: 14rpx; padding: 32rpx;">
+      <view class="empty-desc">暂无采购记录</view>
+    </view>
+  </view>
+
+  <view class="form-card">
+    <view class="form-section-title">价格趋势</view>
+    <view class="mini-list" wx:if="{{trends.length}}">
+      <block wx:for="{{trends}}" wx:key="orderNumber">
+        <view class="mini-row">
+          <view class="mini-title">{{item.productName}}</view>
+          <view class="mini-desc">{{item.orderNumber}} · ¥{{item.price}} · {{item.orderTime}}</view>
+        </view>
+      </block>
+    </view>
+    <view class="empty-state" wx:else style="margin-top: 14rpx; padding: 32rpx;">
+      <view class="empty-desc">暂无价格趋势数据</view>
+    </view>
+  </view>
+</view>
+
+<view class="screen" wx:elif="{{loading}}">
+  <view class="loading-state">供应商详情加载中...</view>
+</view>
+<view class="screen" wx:else>
+  <view class="empty-state">
+    <text class="empty-icon">🏭</text>
+    <view class="empty-title">加载失败</view>
+    <view class="empty-desc">{{loadError || '供应商详情暂时无法打开'}}</view>
+  </view>
+</view>

@@ -1,0 +1,76 @@
+<view class="screen" wx:if="{{customer}}">
+  <view class="hero-card">
+    <view class="hero-eyebrow">CUSTOMER DETAIL</view>
+    <view class="hero-title">{{customer.name}}</view>
+    <view class="hero-subtitle">{{customer.type}} 客户 · {{customer.phone}} · {{customer.address}}</view>
+    <view class="top-actions">
+      <view class="btn btn-primary btn-sm" bindtap="openEdit">编辑客户</view>
+    </view>
+  </view>
+
+  <view class="stats-strip">
+    <view class="stat-item">
+      <view class="stat-value" style="color: {{customer.debt > 0 ? '#BF4F1C' : '#29714C'}};">¥{{customer.debt || 0}}</view>
+      <view class="stat-label">当前欠款</view>
+    </view>
+    <view class="stat-item">
+      <view class="stat-value">{{orders.length}}</view>
+      <view class="stat-label">订单数量</view>
+    </view>
+    <view class="stat-item">
+      <view class="stat-value">{{accounts.length}}</view>
+      <view class="stat-label">欠款记录</view>
+    </view>
+  </view>
+
+  <view class="form-card">
+    <view class="form-section-title">客户资料</view>
+    <view class="detail-grid">
+      <view class="detail-item"><view class="detail-label">客户类型</view><view class="detail-value">{{customer.type}}</view></view>
+      <view class="detail-item"><view class="detail-label">联系电话</view><view class="detail-value">{{customer.phone}}</view></view>
+      <view class="detail-item"><view class="detail-label">地址</view><view class="detail-value">{{customer.address}}</view></view>
+      <view class="detail-item"><view class="detail-label">备注</view><view class="detail-value">{{customer.remark || '--'}}</view></view>
+    </view>
+  </view>
+
+  <view class="form-card">
+    <view class="form-section-title">订单历史</view>
+    <view class="mini-list" wx:if="{{orders.length}}">
+      <block wx:for="{{orders}}" wx:key="id">
+        <view class="mini-row">
+          <view class="mini-title">{{item.orderNumber}} · {{item.status}}</view>
+          <view class="mini-desc">总金额 ¥{{item.totalAmount}} · 已收 ¥{{item.receivedAmount}} · 欠款 ¥{{item.debtAmount}}</view>
+        </view>
+      </block>
+    </view>
+    <view class="empty-state" wx:else style="margin-top: 14rpx; padding: 32rpx;">
+      <view class="empty-desc">暂无销售订单</view>
+    </view>
+  </view>
+
+  <view class="form-card">
+    <view class="form-section-title">欠款记录</view>
+    <view class="mini-list" wx:if="{{accounts.length}}">
+      <block wx:for="{{accounts}}" wx:key="orderId">
+        <view class="mini-row">
+          <view class="mini-title">{{item.orderNumber}} · {{item.status}}</view>
+          <view class="mini-desc">应收 ¥{{item.totalAmount}} · 已收 ¥{{item.receivedAmount}} · 欠款 ¥{{item.debtAmount}}</view>
+        </view>
+      </block>
+    </view>
+    <view class="empty-state" wx:else style="margin-top: 14rpx; padding: 32rpx;">
+      <view class="empty-desc">当前没有欠款记录</view>
+    </view>
+  </view>
+</view>
+
+<view class="screen" wx:elif="{{loading}}">
+  <view class="loading-state">客户详情加载中...</view>
+</view>
+<view class="screen" wx:else>
+  <view class="empty-state">
+    <text class="empty-icon">👤</text>
+    <view class="empty-title">加载失败</view>
+    <view class="empty-desc">{{loadError || '客户详情暂时无法打开'}}</view>
+  </view>
+</view>

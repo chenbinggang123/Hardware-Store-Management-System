@@ -1,0 +1,45 @@
+<view class="screen">
+  <view class="hero-card">
+    <view class="hero-eyebrow">REPORT EXPORT</view>
+    <view class="hero-title">数据导出</view>
+    <view class="hero-subtitle">按条件导出经营数据，后续可直接接 Excel 或 CSV 文件下载。</view>
+  </view>
+
+  <view class="form-card">
+    <view class="form-section-title">导出条件</view>
+    <view class="form-group">
+      <view class="form-label">报表类型</view>
+      <picker mode="selector" range="{{typeOptions}}" value="{{typeIndex}}" bindchange="changeType">
+        <view class="form-picker">{{typeOptions[typeIndex]}}</view>
+      </picker>
+    </view>
+    <view class="form-group">
+      <view class="form-label">开始日期</view>
+      <picker mode="date" value="{{startDate}}" bindchange="changeDate" data-key="startDate">
+        <view class="form-picker">{{startDate || '请选择日期'}}</view>
+      </picker>
+    </view>
+    <view class="form-group">
+      <view class="form-label">结束日期</view>
+      <picker mode="date" value="{{endDate}}" bindchange="changeDate" data-key="endDate">
+        <view class="form-picker">{{endDate || '请选择日期'}}</view>
+      </picker>
+    </view>
+  </view>
+
+  <view class="bottom-actions">
+    <view class="btn btn-primary btn-block" bindtap="exportNow">生成导出结果</view>
+  </view>
+
+  <view class="form-card" wx:if="{{result}}">
+    <view class="form-section-title">导出结果</view>
+    <view class="detail-grid">
+      <view class="detail-item"><view class="detail-label">类型</view><view class="detail-value">{{result.type}}</view></view>
+      <view class="detail-item"><view class="detail-label">生成时间</view><view class="detail-value">{{result.generatedAt}}</view></view>
+    </view>
+    <view class="banner banner-success" style="margin-top: 16rpx;">
+      <text class="banner-icon">✅</text>
+      <view><view class="banner-desc">{{result.data}}</view></view>
+    </view>
+  </view>
+</view>

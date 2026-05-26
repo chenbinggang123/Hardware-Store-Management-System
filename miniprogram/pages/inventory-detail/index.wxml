@@ -1,0 +1,46 @@
+<view class="screen" wx:if="{{inventory}}">
+  <view class="hero-card">
+    <view class="hero-eyebrow">INVENTORY DETAIL</view>
+    <view class="hero-title">{{product ? product.name : '库存详情'}}</view>
+    <view class="hero-subtitle">库位 {{inventory.locationId}} · 当前库存 {{inventory.quantity}} · 预警阈值 {{inventory.warningThreshold}}</view>
+    <view class="top-actions">
+      <view class="btn btn-primary btn-sm" bindtap="openAdjust">盘点调整</view>
+    </view>
+  </view>
+
+  <view class="form-card">
+    <view class="form-section-title">库存信息</view>
+    <view class="detail-grid">
+      <view class="detail-item"><view class="detail-label">商品条码</view><view class="detail-value">{{product ? product.barcode : '--'}}</view></view>
+      <view class="detail-item"><view class="detail-label">库位</view><view class="detail-value">{{inventory.locationId}}</view></view>
+      <view class="detail-item"><view class="detail-label">当前库存</view><view class="detail-value" style="color: {{inventory.quantity <= inventory.warningThreshold ? '#BF4F1C' : '#1A1410'}}; font-size: 32rpx; font-weight: 800;">{{inventory.quantity}}</view></view>
+      <view class="detail-item"><view class="detail-label">最后更新</view><view class="detail-value">{{inventory.lastUpdateTime}}</view></view>
+    </view>
+  </view>
+
+  <view class="form-card">
+    <view class="form-section-title">库存日志</view>
+    <view class="mini-list" wx:if="{{logs.length}}">
+      <block wx:for="{{logs}}" wx:key="id">
+        <view class="mini-row">
+          <view class="mini-title">{{item.changeType}} · {{item.createTime}}</view>
+          <view class="mini-desc">调整 {{item.quantity}}，由 {{item.beforeQuantity}} 变为 {{item.afterQuantity}}。{{item.remark}}</view>
+        </view>
+      </block>
+    </view>
+    <view class="empty-state" wx:else style="margin-top: 14rpx; padding: 32rpx;">
+      <view class="empty-desc">暂无库存日志</view>
+    </view>
+  </view>
+</view>
+
+<view class="screen" wx:elif="{{loading}}">
+  <view class="loading-state">库存详情加载中...</view>
+</view>
+<view class="screen" wx:else>
+  <view class="empty-state">
+    <text class="empty-icon">📋</text>
+    <view class="empty-title">加载失败</view>
+    <view class="empty-desc">{{loadError || '库存详情暂时无法打开'}}</view>
+  </view>
+</view>

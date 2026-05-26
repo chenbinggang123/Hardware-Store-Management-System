@@ -1,0 +1,60 @@
+<view class="screen">
+  <view class="hero-card">
+    <view class="hero-eyebrow">PURCHASE FORM</view>
+    <view class="hero-title">{{mode === 'edit' ? '编辑采购单' : '新建采购单'}}</view>
+    <view class="hero-subtitle">先选供应商，再录商品明细和库位，保存后即可进入入库流程。</view>
+  </view>
+
+  <view class="form-card">
+    <view class="form-section-title">基础信息</view>
+    <view class="form-group">
+      <view class="form-label">供应商</view>
+      <picker mode="selector" range="{{suppliers}}" range-key="name" value="{{supplierIndex}}" bindchange="changeSupplier">
+        <view class="form-picker">{{suppliers.length ? suppliers[supplierIndex].name : '请选择供应商'}}</view>
+      </picker>
+    </view>
+    <view class="form-group">
+      <view class="form-label">备注</view>
+      <textarea class="form-textarea" value="{{form.remark}}" bindinput="updateRemark" placeholder="例如 重点补货 / 到店时间"></textarea>
+    </view>
+  </view>
+
+  <view class="form-card">
+    <view class="section-head">
+      <view class="form-section-title">商品明细</view>
+      <view class="btn btn-outline btn-sm" bindtap="addItem">＋ 新增一行</view>
+    </view>
+    <view class="line-list">
+      <block wx:for="{{form.items}}" wx:key="index">
+        <view class="line-card">
+          <view class="line-head">
+            <view class="line-title">明细 {{index + 1}}</view>
+            <view class="btn btn-danger btn-sm" bindtap="removeItem" data-index="{{index}}">删除</view>
+          </view>
+          <view class="form-group">
+            <view class="form-label">商品</view>
+            <picker mode="selector" range="{{products}}" range-key="name" bindchange="changeItemProduct" data-index="{{index}}">
+              <view class="form-picker">{{item.productId ? '已选择商品 ID ' + item.productId : '请选择商品'}}</view>
+            </picker>
+          </view>
+          <view class="form-group">
+            <view class="form-label">数量</view>
+            <input class="form-input" type="number" value="{{item.quantity}}" data-index="{{index}}" data-key="quantity" bindinput="updateItemField" />
+          </view>
+          <view class="form-group">
+            <view class="form-label">单价</view>
+            <input class="form-input" type="digit" value="{{item.price}}" data-index="{{index}}" data-key="price" bindinput="updateItemField" />
+          </view>
+          <view class="form-group">
+            <view class="form-label">库位</view>
+            <input class="form-input" value="{{item.locationId}}" data-index="{{index}}" data-key="locationId" bindinput="updateItemField" placeholder="例如 A-01" />
+          </view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <view class="bottom-actions">
+    <view class="btn btn-primary btn-block" bindtap="submit">保存采购单</view>
+  </view>
+</view>

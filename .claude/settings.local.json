@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "PowerShell($env:CLAUDE_CODE_GIT_BASH_PATH = \"D:\\\\git\\\\Git\\\\bin\\\\bash.exe\"; claude plugins marketplace add anthropics/claude-code)",
+      "PowerShell($env:CLAUDE_CODE_GIT_BASH_PATH = \"D:\\\\git\\\\Git\\\\bin\\\\bash.exe\"; claude plugins install frontend-design)",
+      "PowerShell($env:CLAUDE_CODE_GIT_BASH_PATH = \"D:\\\\git\\\\Git\\\\bin\\\\bash.exe\"; claude plugins list)",
+      "Bash(Get-ChildItem -Recurse -Depth 3 \"miniprogram\")",
+      "Bash(Select-Object Mode, FullName)"
+    ]
+  }
+}

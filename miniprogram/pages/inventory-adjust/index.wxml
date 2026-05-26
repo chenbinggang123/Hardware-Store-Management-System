@@ -1,0 +1,32 @@
+<view class="screen" wx:if="{{inventory}}">
+  <view class="hero-card">
+    <view class="hero-eyebrow">INVENTORY ADJUST</view>
+    <view class="hero-title">盘点调整</view>
+    <view class="hero-subtitle">系统库存 {{inventory.quantity}} · 库位 {{inventory.locationId}}。提交后会生成库存日志。</view>
+  </view>
+
+  <view class="form-card">
+    <view class="form-section-title">盘点信息</view>
+    <view class="form-group">
+      <view class="form-label">实盘数量</view>
+      <input class="form-input" type="number" value="{{actualQuantity}}" data-key="actualQuantity" bindinput="updateField" />
+    </view>
+    <view class="form-group">
+      <view class="form-label">调整原因</view>
+      <textarea class="form-textarea" value="{{reason}}" data-key="reason" bindinput="updateField" placeholder="例如 盘点差异 / 破损 / 调拨"></textarea>
+    </view>
+  </view>
+
+  <view class="banner banner-info">
+    <text class="banner-icon">💡</text>
+    <view><view class="banner-title">提示</view><view class="banner-desc">调整结果将记录在库存日志中，系统库存将从 {{inventory.quantity}} 更新为实盘数量。</view></view>
+  </view>
+
+  <view class="bottom-actions">
+    <view class="btn btn-primary btn-block" bindtap="submit">确认调整</view>
+  </view>
+</view>
+
+<view class="screen" wx:else>
+  <view class="loading-state">库存数据加载中...</view>
+</view>

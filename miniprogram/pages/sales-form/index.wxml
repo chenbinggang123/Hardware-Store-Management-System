@@ -1,0 +1,57 @@
+<view class="screen">
+  <view class="hero-card">
+    <view class="hero-eyebrow">SALES FORM</view>
+    <view class="hero-title">{{mode === 'edit' ? '编辑销售单' : '新建销售单'}}</view>
+    <view class="hero-subtitle">先确定客户，再录商品与收款金额，系统会按客户类型带出价格策略。</view>
+  </view>
+
+  <view class="form-card">
+    <view class="form-section-title">基础信息</view>
+    <view class="form-group">
+      <view class="form-label">客户</view>
+      <picker mode="selector" range="{{customers}}" range-key="name" value="{{customerIndex}}" bindchange="changeCustomer">
+        <view class="form-picker">{{customers.length ? customers[customerIndex].name : '请选择客户'}}</view>
+      </picker>
+      <view class="form-hint" wx:if="{{customers.length}}">类型：{{customers[customerIndex].type}}，将自动匹配对应价格策略</view>
+    </view>
+    <view class="form-group">
+      <view class="form-label">已收金额</view>
+      <input class="form-input" type="digit" value="{{form.receivedAmount}}" bindinput="updateReceived" placeholder="可先录部分收款" />
+    </view>
+  </view>
+
+  <view class="form-card">
+    <view class="section-head">
+      <view class="form-section-title">商品明细</view>
+      <view class="btn btn-outline btn-sm" bindtap="addItem">＋ 新增一行</view>
+    </view>
+    <view class="line-list">
+      <block wx:for="{{form.items}}" wx:key="index">
+        <view class="line-card">
+          <view class="line-head">
+            <view class="line-title">明细 {{index + 1}}</view>
+            <view class="btn btn-danger btn-sm" bindtap="removeItem" data-index="{{index}}">删除</view>
+          </view>
+          <view class="form-group">
+            <view class="form-label">商品</view>
+            <picker mode="selector" range="{{products}}" range-key="name" bindchange="changeItemProduct" data-index="{{index}}">
+              <view class="form-picker">{{item.productId ? '已选择商品 ID ' + item.productId : '请选择商品'}}</view>
+            </picker>
+          </view>
+          <view class="form-group">
+            <view class="form-label">数量</view>
+            <input class="form-input" type="number" value="{{item.quantity}}" data-index="{{index}}" data-key="quantity" bindinput="updateItemField" />
+          </view>
+          <view class="form-group">
+            <view class="form-label">单价</view>
+            <input class="form-input" type="digit" value="{{item.price}}" data-index="{{index}}" data-key="price" bindinput="updateItemField" />
+          </view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <view class="bottom-actions">
+    <view class="btn btn-primary btn-block" bindtap="submit">保存销售单</view>
+  </view>
+</view>

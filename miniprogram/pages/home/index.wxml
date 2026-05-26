@@ -1,0 +1,87 @@
+<view class="screen">
+  <!-- Hero -->
+  <view class="hero-card">
+    <view class="hero-eyebrow">HARDWARE STORE OS</view>
+    <view class="hero-title">早上好，{{currentUser.name || '老板'}}</view>
+    <view class="hero-subtitle">{{currentUser.role || '管理员'}} · 今天先处理哪一块业务？</view>
+  </view>
+
+  <!-- Quick Stats -->
+  <view class="stats-strip">
+    <view class="stat-item" bindtap="openModule" data-path="/pages/products/index">
+      <view class="stat-icon">📦</view>
+      <view class="stat-value">{{stats.productCount}}</view>
+      <view class="stat-label">商品</view>
+    </view>
+    <view class="stat-item" bindtap="openModule" data-path="/pages/purchase-orders/index">
+      <view class="stat-icon">📥</view>
+      <view class="stat-value">{{stats.purchaseCount}}</view>
+      <view class="stat-label">采购</view>
+    </view>
+    <view class="stat-item" bindtap="openModule" data-path="/pages/sales-orders/index">
+      <view class="stat-icon">📤</view>
+      <view class="stat-value">{{stats.salesCount}}</view>
+      <view class="stat-label">销售</view>
+    </view>
+    <view class="stat-item" bindtap="openModule" data-path="/pages/inventories/index">
+      <view class="stat-icon">📋</view>
+      <view class="stat-value">{{stats.warningCount}}</view>
+      <view class="stat-label">预警</view>
+    </view>
+  </view>
+
+  <!-- Revenue Cards -->
+  <view class="grid-2" style="margin-top: 20rpx;">
+    <view class="data-card">
+      <view class="metric-label">今日销售</view>
+      <view class="metric-value">¥{{report.sales || 0}}</view>
+      <view class="metric-change up" wx:if="{{report.sales > 0}}">正常运营中</view>
+    </view>
+    <view class="data-card">
+      <view class="metric-label">今日采购</view>
+      <view class="metric-value">¥{{report.purchase || 0}}</view>
+      <view class="metric-change down" wx:if="{{report.purchase === 0}}">暂无采购</view>
+    </view>
+  </view>
+
+  <!-- Module Grid -->
+  <view class="section">
+    <view class="section-head">
+      <view class="section-title">业务模块</view>
+      <view class="section-link" bindtap="openModule" data-path="/pages/analysis/index">经营分析 →</view>
+    </view>
+    <view class="grid-2" style="margin-top: 18rpx;">
+      <block wx:for="{{modules}}" wx:key="title">
+        <view class="module-card" bindtap="openModule" data-path="{{item.path}}">
+          <view class="module-icon {{item.iconClass}}">{{item.icon}}</view>
+          <view class="module-title">{{item.title}}</view>
+          <view class="module-desc">{{item.desc}}</view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <!-- Recent Activity -->
+  <view class="section">
+    <view class="section-head">
+      <view class="section-title">最近动态</view>
+      <view class="section-link" bindtap="openModule" data-path="/pages/system-logs/index">全部日志 →</view>
+    </view>
+    <view class="list" wx:if="{{recentLogs.length}}">
+      <block wx:for="{{recentLogs}}" wx:key="id">
+        <view class="list-card">
+          <view class="list-head">
+            <view class="list-title" style="font-size: 26rpx;">{{item.module}} · {{item.action}}</view>
+            <view class="tag tag-neutral">{{item.createTime}}</view>
+          </view>
+          <view class="list-meta">{{item.detail}}</view>
+        </view>
+      </block>
+    </view>
+    <view class="empty-state" wx:else>
+      <text class="empty-icon">📝</text>
+      <view class="empty-title">暂无操作记录</view>
+      <view class="empty-desc">开始使用系统后，关键操作会显示在这里</view>
+    </view>
+  </view>
+</view>

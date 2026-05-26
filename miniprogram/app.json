@@ -1,0 +1,60 @@
+{
+  "pages": [
+    "pages/login/index",
+    "pages/home/index",
+    "pages/products/index",
+    "pages/product-detail/index",
+    "pages/product-form/index",
+    "pages/suppliers/index",
+    "pages/supplier-detail/index",
+    "pages/supplier-form/index",
+    "pages/customers/index",
+    "pages/customer-detail/index",
+    "pages/customer-form/index",
+    "pages/purchase-orders/index",
+    "pages/purchase-detail/index",
+    "pages/purchase-form/index",
+    "pages/sales-orders/index",
+    "pages/sales-detail/index",
+    "pages/sales-form/index",
+    "pages/inventories/index",
+    "pages/inventory-detail/index",
+    "pages/inventory-adjust/index",
+    "pages/analysis/index",
+    "pages/report-center/index",
+    "pages/report-export/index",
+    "pages/settings/index",
+    "pages/system-users/index",
+    "pages/system-logs/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "五金店管理系统",
+    "navigationBarBackgroundColor": "#FFF9F2",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#F5EFE6",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "position": "top",
+    "color": "#A89880",
+    "selectedColor": "#B75A1A",
+    "backgroundColor": "#FFFCF7",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/home/index",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/analysis/index",
+        "text": "分析"
+      },
+      {
+        "pagePath": "pages/settings/index",
+        "text": "设置"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

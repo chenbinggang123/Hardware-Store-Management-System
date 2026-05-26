@@ -1,6 +1,6 @@
 param(
     [switch]$CompileOnly,
-    [int]$Port = 8080
+    [int]$Port = 8084
 )
 
 $ErrorActionPreference = "Stop"
@@ -67,6 +67,11 @@ if (-not $javaFiles) {
     throw "No Java source files were found."
 }
 
+$lombokJar = $jarPaths | Where-Object { $_ -match '\\org\\projectlombok\\lombok\\' } | Select-Object -First 1
+if (-not $lombokJar) {
+    throw "Lombok jar was not found in the local Maven cache."
+}
+
 $classPath = (($jarPaths + $classesRoot) | Sort-Object -Unique) -join ";"
 $javacArgsPath = Join-Path $argRoot "javac.args"
 $javaArgsPath = Join-Path $argRoot "java.args"
@@ -77,6 +82,10 @@ Set-Content -Path $javacArgsPath -Value @(
     "-encoding"
     "UTF-8"
     "-parameters"
+    "-processorpath"
+    $lombokJar
+    "-processor"
+    'lombok.launch.AnnotationProcessorHider$AnnotationProcessor'
     "-cp"
     $classPath
     "-d"

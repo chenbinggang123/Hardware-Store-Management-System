@@ -1,0 +1,76 @@
+<view class="screen" wx:if="{{product}}">
+  <view class="hero-card">
+    <view class="hero-eyebrow">PRODUCT DETAIL</view>
+    <view class="hero-title">{{product.name}}</view>
+    <view class="hero-subtitle">{{product.specText}} · {{product.unitText}} · 厂商 {{product.sourceFactoryText}}</view>
+    <view class="top-actions">
+      <view class="btn btn-primary btn-sm" bindtap="openEdit">编辑商品</view>
+      <view class="btn btn-outline btn-sm" bindtap="toggleStatus">{{product.toggleStatusText}}</view>
+      <view class="btn btn-danger btn-sm" bindtap="deleteProduct">删除</view>
+    </view>
+  </view>
+
+  <view class="form-card">
+    <view class="form-section-title">商品图片</view>
+    <view class="image-card">
+      <image wx:if="{{product.imageUrl}}" class="image-preview" src="{{product.imageUrl}}" mode="aspectFill" />
+      <view wx:else class="image-placeholder">
+        <view class="image-placeholder-icon">{{product.initial}}</view>
+        <view class="image-placeholder-text">当前未设置商品图片</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="stats-strip">
+    <view class="stat-item">
+      <view class="stat-value">¥{{product.retailPrice}}</view>
+      <view class="stat-label">零售价</view>
+    </view>
+    <view class="stat-item">
+      <view class="stat-value">{{product.stock}}</view>
+      <view class="stat-label">当前库存</view>
+    </view>
+    <view class="stat-item">
+      <view class="stat-value" style="font-size: 24rpx; color: {{product.status === 1 ? '#29714C' : '#A89880'}};">{{product.statusText}}</view>
+      <view class="stat-label">状态</view>
+    </view>
+  </view>
+
+  <view class="form-card">
+    <view class="form-section-title">基础信息</view>
+    <view class="detail-grid">
+      <view class="detail-item"><view class="detail-label">条码</view><view class="detail-value">{{product.barcodeText}}</view></view>
+      <view class="detail-item"><view class="detail-label">规格</view><view class="detail-value">{{product.specText}}</view></view>
+      <view class="detail-item"><view class="detail-label">单位</view><view class="detail-value">{{product.unitText}}</view></view>
+      <view class="detail-item"><view class="detail-label">单位换算</view><view class="detail-value">{{product.unitConvertText}}</view></view>
+      <view class="detail-item"><view class="detail-label">源头厂商</view><view class="detail-value">{{product.sourceFactoryText}}</view></view>
+      <view class="detail-item"><view class="detail-label">创建时间</view><view class="detail-value">{{product.createTimeText}}</view></view>
+    </view>
+  </view>
+
+  <view class="form-card">
+    <view class="form-section-title">价格策略</view>
+    <view class="detail-grid">
+      <view class="detail-item"><view class="detail-label">零售价</view><view class="detail-value">¥{{product.retailPrice}}</view></view>
+      <view class="detail-item"><view class="detail-label">批发价</view><view class="detail-value">¥{{product.wholesalePrice}}</view></view>
+      <view class="detail-item"><view class="detail-label">老客户价</view><view class="detail-value">¥{{product.oldCustomerPrice}}</view></view>
+      <view class="detail-item"><view class="detail-label">进价</view><view class="detail-value">¥{{product.costPrice}}</view></view>
+    </view>
+  </view>
+
+  <view class="form-card">
+    <view class="form-section-title">库存信息</view>
+    <view class="detail-grid">
+      <view class="detail-item"><view class="detail-label">库存数量</view><view class="detail-value">{{product.stock}}</view></view>
+      <view class="detail-item"><view class="detail-label">库位</view><view class="detail-value">{{product.locationText}}</view></view>
+    </view>
+    <view class="banner banner-warning" wx:if="{{product.lowStock}}" style="margin-top: 16rpx;">
+      <text class="banner-icon">⚠️</text>
+      <view><view class="banner-title">库存预警</view><view class="banner-desc">当前库存已进入低库存区间，建议尽快补货。</view></view>
+    </view>
+  </view>
+</view>
+
+<view class="screen" wx:else>
+  <view class="loading-state">商品详情加载中...</view>
+</view>

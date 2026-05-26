@@ -1,0 +1,42 @@
+<view class="screen">
+  <view class="hero-card">
+    <view class="hero-eyebrow">CUSTOMER FORM</view>
+    <view class="hero-title">{{mode === 'edit' ? '编辑客户' : '新增客户'}}</view>
+    <view class="hero-subtitle">客户类型决定价格策略，联系方式和备注用于后续跟单。</view>
+  </view>
+
+  <view class="form-card">
+    <view class="form-section-title">客户信息</view>
+    <view class="form-group">
+      <view class="form-label">客户名称 *</view>
+      <input class="form-input" value="{{form.name}}" data-key="name" bindinput="updateField" placeholder="请输入客户名称" />
+    </view>
+    <view class="form-group">
+      <view class="form-label">客户类型</view>
+      <picker mode="selector" range="{{typeOptions}}" value="{{typeIndex}}" bindchange="changeType">
+        <view class="form-picker">{{typeOptions[typeIndex]}}</view>
+      </picker>
+      <view class="form-hint">C端=零售价 / B端=批发价 / 老客户=老客户价</view>
+    </view>
+    <view class="form-group">
+      <view class="form-label">联系电话</view>
+      <input class="form-input" value="{{form.phone}}" data-key="phone" bindinput="updateField" placeholder="请输入联系电话" />
+    </view>
+    <view class="form-group">
+      <view class="form-label">地址</view>
+      <input class="form-input" value="{{form.address}}" data-key="address" bindinput="updateField" placeholder="请输入地址" />
+    </view>
+    <view class="form-group">
+      <view class="form-label">当前欠款</view>
+      <input class="form-input" type="digit" value="{{form.debt}}" data-key="debt" bindinput="updateField" placeholder="可为空，默认 0" />
+    </view>
+    <view class="form-group">
+      <view class="form-label">备注</view>
+      <textarea class="form-textarea" value="{{form.remark}}" data-key="remark" bindinput="updateField" placeholder="请输入客户备注"></textarea>
+    </view>
+  </view>
+
+  <view class="bottom-actions">
+    <view class="btn btn-primary btn-block" bindtap="submit">保存客户</view>
+  </view>
+</view>

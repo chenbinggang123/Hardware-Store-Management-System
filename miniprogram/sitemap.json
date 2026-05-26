@@ -1,0 +1,9 @@
+{
+  "desc": "Hardware Store Miniprogram Sitemap",
+  "rules": [
+    {
+      "action": "allow",
+      "page": "*"
+    }
+  ]
+}

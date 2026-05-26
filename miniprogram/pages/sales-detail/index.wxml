@@ -1,0 +1,63 @@
+<view class="screen" wx:if="{{order}}">
+  <view class="hero-card">
+    <view class="hero-eyebrow">SALES DETAIL</view>
+    <view class="hero-title">{{order.orderNumber}}</view>
+    <view class="hero-subtitle">客户 {{customerName}} · 出库 {{order.status}} · 收款 {{order.payStatus}}</view>
+    <view class="top-actions">
+      <view class="btn btn-primary btn-sm" bindtap="openEdit">编辑销售单</view>
+      <view class="btn btn-outline btn-sm" wx:if="{{order.status !== '已出库'}}" bindtap="stockOut">确认出库</view>
+    </view>
+  </view>
+
+  <view class="stats-strip">
+    <view class="stat-item">
+      <view class="stat-value">¥{{order.totalAmount}}</view>
+      <view class="stat-label">总金额</view>
+    </view>
+    <view class="stat-item">
+      <view class="stat-value" style="color: #29714C;">¥{{order.receivedAmount}}</view>
+      <view class="stat-label">已收</view>
+    </view>
+    <view class="stat-item">
+      <view class="stat-value" style="color: {{order.debtAmount > 0 ? '#BF4F1C' : '#29714C'}};">¥{{order.debtAmount}}</view>
+      <view class="stat-label">欠款</view>
+    </view>
+  </view>
+
+  <view class="form-card">
+    <view class="form-section-title">销售明细</view>
+    <view class="line-list">
+      <block wx:for="{{order.items}}" wx:key="productId">
+        <view class="line-card">
+          <view class="line-head">
+            <view class="line-title">{{item.productName}}</view>
+            <view class="tag {{order.payStatus === '已付' ? 'tag-success' : order.payStatus === '部分' ? 'tag-warning' : 'tag-danger'}}">{{order.payStatus}}</view>
+          </view>
+          <view class="line-meta">数量 {{item.quantity}} · 单价 ¥{{item.price}} · 金额 ¥{{item.amount}}</view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <view class="form-card">
+    <view class="form-section-title">收款登记</view>
+    <view class="form-group">
+      <view class="form-label">本次收款金额</view>
+      <input class="form-input" type="digit" value="{{paymentAmount}}" bindinput="updatePayment" placeholder="请输入本次收款金额" />
+    </view>
+    <view class="bottom-actions">
+      <view class="btn btn-primary btn-block" bindtap="registerPayment">登记收款</view>
+    </view>
+  </view>
+</view>
+
+<view class="screen" wx:elif="{{loading}}">
+  <view class="loading-state">销售单详情加载中...</view>
+</view>
+<view class="screen" wx:else>
+  <view class="empty-state">
+    <text class="empty-icon">📤</text>
+    <view class="empty-title">加载失败</view>
+    <view class="empty-desc">{{loadError || '销售单详情暂时无法打开'}}</view>
+  </view>
+</view>

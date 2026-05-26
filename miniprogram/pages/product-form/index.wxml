@@ -1,0 +1,86 @@
+<view class="screen">
+  <view class="hero-card">
+    <view class="hero-eyebrow">PRODUCT FORM</view>
+    <view class="hero-title">{{mode === 'edit' ? '编辑商品' : '新增商品'}}</view>
+    <view class="hero-subtitle">把名称、条码、价格、库存都补齐，商品模块就能支撑后续联动。</view>
+  </view>
+
+  <view class="form-card">
+    <view class="form-section-title">基础信息</view>
+    <view class="form-group">
+      <view class="form-label">商品名称 *</view>
+      <input class="form-input" value="{{form.name}}" data-key="name" bindinput="updateField" placeholder="请输入商品名称" />
+    </view>
+    <view class="form-group">
+      <view class="form-label">条码 *</view>
+      <input class="form-input" value="{{form.barcode}}" data-key="barcode" bindinput="updateField" placeholder="请输入商品条码" />
+    </view>
+    <view class="form-group">
+      <view class="form-label">规格 *</view>
+      <input class="form-input" value="{{form.spec}}" data-key="spec" bindinput="updateField" placeholder="例如 16oz / 680W / 20mm" />
+    </view>
+    <view class="form-group">
+      <view class="form-label">单位 *</view>
+      <input class="form-input" value="{{form.unit}}" data-key="unit" bindinput="updateField" placeholder="例如 把 / 台 / 根" />
+    </view>
+    <view class="form-group">
+      <view class="form-label">单位换算</view>
+      <input class="form-input" value="{{form.unitConvert}}" data-key="unitConvert" bindinput="updateField" placeholder="例如 1箱=12件" />
+    </view>
+    <view class="form-group">
+      <view class="form-label">源头厂商</view>
+      <input class="form-input" value="{{form.sourceFactory}}" data-key="sourceFactory" bindinput="updateField" placeholder="请输入源头厂商" />
+    </view>
+    <view class="form-group">
+      <view class="form-label">图片地址</view>
+      <input class="form-input" value="{{form.imageUrl}}" data-key="imageUrl" bindinput="updateField" placeholder="可先填网络图片地址" />
+    </view>
+  </view>
+
+  <view class="form-card">
+    <view class="form-section-title">价格信息</view>
+    <view class="form-group">
+      <view class="form-label">零售价</view>
+      <input class="form-input" type="digit" value="{{form.retailPrice}}" data-key="retailPrice" bindinput="updateField" placeholder="请输入零售价" />
+    </view>
+    <view class="form-group">
+      <view class="form-label">批发价</view>
+      <input class="form-input" type="digit" value="{{form.wholesalePrice}}" data-key="wholesalePrice" bindinput="updateField" placeholder="请输入批发价" />
+    </view>
+    <view class="form-group">
+      <view class="form-label">老客户价</view>
+      <input class="form-input" type="digit" value="{{form.oldCustomerPrice}}" data-key="oldCustomerPrice" bindinput="updateField" placeholder="请输入老客户价" />
+    </view>
+    <view class="form-group">
+      <view class="form-label">进价</view>
+      <input class="form-input" type="digit" value="{{form.costPrice}}" data-key="costPrice" bindinput="updateField" placeholder="请输入进价" />
+    </view>
+  </view>
+
+  <view class="form-card">
+    <view class="form-section-title">库存与状态</view>
+    <view class="form-group">
+      <view class="form-label">库存数量</view>
+      <input class="form-input" type="number" value="{{form.stock}}" data-key="stock" bindinput="updateField" placeholder="请输入库存数量" />
+    </view>
+    <view class="form-group">
+      <view class="form-label">库位</view>
+      <input class="form-input" value="{{form.locationId}}" data-key="locationId" bindinput="updateField" placeholder="例如 A-01" />
+    </view>
+    <view class="form-group">
+      <view class="form-label">状态</view>
+      <picker mode="selector" range="{{statusOptions}}" value="{{statusIndex}}" bindchange="changeStatus">
+        <view class="form-picker">{{statusOptions[statusIndex]}}</view>
+      </picker>
+    </view>
+  </view>
+
+  <view class="banner banner-info">
+    <text class="banner-icon">💡</text>
+    <view><view class="banner-title">填写建议</view><view class="banner-desc">名称、条码、规格、单位是必填项。库存数量会同步影响商品列表和库存模块展示。</view></view>
+  </view>
+
+  <view class="bottom-actions">
+    <view class="btn btn-primary btn-block" bindtap="submit">{{saving ? '保存中...' : '保存商品'}}</view>
+  </view>
+</view>
