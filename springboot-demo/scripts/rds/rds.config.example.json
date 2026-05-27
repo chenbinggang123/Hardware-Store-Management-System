@@ -1,0 +1,18 @@
+{
+  "provider": "aliyun-rds-mysql",
+  "region": "cn-hangzhou",
+  "connection": {
+    "host": "rm-xxxxxxxx.mysql.rds.aliyuncs.com",
+    "port": 3306,
+    "database": "hardware_store",
+    "username": "hardware_admin",
+    "password": "ChangeThisPassword123!"
+  },
+  "application": {
+    "serverPort": 8084
+  },
+  "notes": {
+    "usePublicEndpoint": true,
+    "whitelistHint": "将当前公网 IP 加入 RDS 白名单后，再执行连接与初始化脚本。"
+  }
+}

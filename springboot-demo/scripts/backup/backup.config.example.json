@@ -1,0 +1,45 @@
+{
+  "db": {
+    "host": "127.0.0.1",
+    "port": 3306,
+    "name": "hardware_store",
+    "user": "root",
+    "password": "root"
+  },
+  "paths": {
+    "outputRoot": "target/backups",
+    "binlogRoot": "target/mysql84/data"
+  },
+  "cloud": {
+    "type": "filesystem",
+    "bucket": "",
+    "path": "F:/cloud-backups/hardware-store",
+    "region": "",
+    "endpoint": "",
+    "accessKey": "",
+    "secretKey": ""
+  },
+  "tools": {
+    "mysqldumpPath": "",
+    "mysqlPath": "",
+    "awsCliPath": "",
+    "ossutilPath": "",
+    "coscliPath": "",
+    "obsutilPath": ""
+  },
+  "retention": {
+    "keepFullDays": 7,
+    "keepIncrementalDays": 7
+  },
+  "incremental": {
+    "mode": "snapshot",
+    "filePattern": "mysql-bin.*"
+  },
+  "restore": {
+    "host": "127.0.0.1",
+    "port": 3306,
+    "database": "hardware_store_restore",
+    "user": "root",
+    "password": "root"
+  }
+}
