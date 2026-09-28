@@ -1,6 +1,8 @@
 package com.example.demo.service;
 
+import com.example.demo.entity.AccountRecord;
 import com.example.demo.entity.Customer;
+import com.example.demo.entity.SalesOrder;
 import java.util.List;
 import java.util.Optional;
 
@@ -12,5 +14,7 @@ public interface CustomerService {
     Customer updateCustomer(Customer customer);
     void deleteCustomer(Long id);
     Optional<Customer> getCustomerById(Long id);
-    List<Customer> getAllCustomers();
+    List<Customer> getAllCustomers(String keyword, String type);
+    List<SalesOrder> getSalesOrdersByCustomer(Long customerId);
+    List<AccountRecord> getAccountsByCustomer(Long customerId);
 }

@@ -1,25 +1,42 @@
 package com.example.demo.service.impl;
 
+import com.example.demo.entity.AccountRecord;
 import com.example.demo.entity.Customer;
+import com.example.demo.entity.OperationLog;
+import com.example.demo.entity.SalesOrder;
+import com.example.demo.repository.CustomerRepository;
+import com.example.demo.repository.OperationLogRepository;
+import com.example.demo.repository.SalesOrderRepository;
 import com.example.demo.service.CustomerService;
-import com.example.demo.service.impl.support.InMemoryCrudStore;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * 客户业务逻辑实现类
  */
 @Service
+@Transactional
 public class CustomerServiceImpl implements CustomerService {
 
-    private final InMemoryCrudStore<Customer> store = new InMemoryCrudStore<>(Customer::getId, Customer::setId);
+    private final CustomerRepository customerRepository;
+    private final SalesOrderRepository salesOrderRepository;
+    private final OperationLogRepository operationLogRepository;
 
-    @Autowired
-    public CustomerServiceImpl() {
+    public CustomerServiceImpl(
+            CustomerRepository customerRepository,
+            SalesOrderRepository salesOrderRepository,
+            OperationLogRepository operationLogRepository) {
+        this.customerRepository = customerRepository;
+        this.salesOrderRepository = salesOrderRepository;
+        this.operationLogRepository = operationLogRepository;
     }
 
     @Override
@@ -27,7 +44,12 @@ public class CustomerServiceImpl implements CustomerService {
         if (customer.getCreateTime() == null) {
             customer.setCreateTime(LocalDateTime.now());
         }
-        return store.save(customer);
+        if (customer.getDebt() == null) {
+            customer.setDebt(BigDecimal.ZERO);
+        }
+        Customer saved = customerRepository.save(customer);
+        saveOperationLog("CUSTOMER", "CREATE", "新增客户：" + saved.getName(), 1L);
+        return saved;
     }
 
     @Override
@@ -39,21 +61,85 @@ public class CustomerServiceImpl implements CustomerService {
         existingCustomer.setPhone(customer.getPhone());
         existingCustomer.setAddress(customer.getAddress());
         existingCustomer.setRemark(customer.getRemark());
-        return store.save(existingCustomer);
+        if (customer.getDebt() != null) {
+            existingCustomer.setDebt(customer.getDebt());
+        }
+        Customer saved = customerRepository.save(existingCustomer);
+        saveOperationLog("CUSTOMER", "UPDATE", "更新客户：" + saved.getName(), 1L);
+        return saved;
     }
 
     @Override
     public void deleteCustomer(Long id) {
-        store.deleteById(id);
+        Customer customer = getCustomerById(id)
+                .orElseThrow(() -> new IllegalArgumentException("客户不存在，无法删除"));
+        customerRepository.deleteById(id);
+        saveOperationLog("CUSTOMER", "DELETE", "删除客户：" + customer.getName(), 1L);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<Customer> getCustomerById(Long id) {
-        return store.findById(id);
+        return customerRepository.findById(id);
     }
 
     @Override
-    public List<Customer> getAllCustomers() {
-        return store.findAll();
+    @Transactional(readOnly = true)
+    public List<Customer> getAllCustomers(String keyword, String type) {
+        return customerRepository.findAll().stream()
+                .filter(customer -> matchesKeyword(customer, keyword))
+                .filter(customer -> !StringUtils.hasText(type) || type.equalsIgnoreCase(customer.getType()))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<SalesOrder> getSalesOrdersByCustomer(Long customerId) {
+        return salesOrderRepository.findByCustomerId(customerId).stream()
+                .sorted(Comparator.comparing(SalesOrder::getOrderTime, Comparator.nullsLast(Comparator.reverseOrder())))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AccountRecord> getAccountsByCustomer(Long customerId) {
+        return getSalesOrdersByCustomer(customerId).stream()
+                .filter(order -> order.getDebtAmount() != null && order.getDebtAmount().compareTo(BigDecimal.ZERO) > 0)
+                .map(order -> {
+                    AccountRecord record = new AccountRecord();
+                    record.setCustomerId(customerId);
+                    record.setOrderId(order.getId());
+                    record.setOrderNumber(order.getOrderNumber());
+                    record.setTotalAmount(order.getTotalAmount());
+                    record.setReceivedAmount(order.getReceivedAmount());
+                    record.setDebtAmount(order.getDebtAmount());
+                    record.setStatus(order.getPayStatus());
+                    record.setCreateTime(order.getCreateTime());
+                    return record;
+                })
+                .collect(Collectors.toList());
+    }
+
+    private boolean matchesKeyword(Customer customer, String keyword) {
+        if (!StringUtils.hasText(keyword)) {
+            return true;
+        }
+        String normalized = keyword.trim().toLowerCase();
+        return containsText(customer.getName(), normalized)
+                || containsText(customer.getPhone(), normalized);
+    }
+
+    private boolean containsText(String value, String keyword) {
+        return StringUtils.hasText(value) && value.toLowerCase().contains(keyword);
+    }
+
+    private void saveOperationLog(String module, String action, String detail, Long operatorId) {
+        OperationLog log = new OperationLog();
+        log.setOperatorId(operatorId);
+        log.setModule(module);
+        log.setAction(action);
+        log.setDetail(detail);
+        log.setCreateTime(LocalDateTime.now());
+        operationLogRepository.save(log);
     }
 }

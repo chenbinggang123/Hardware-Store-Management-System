@@ -24,5 +24,6 @@ public class Inventory {
     private Long productId; // 商品ID
     private Integer quantity; // 库存数量
     private String locationId; // 库位ID
+    private Integer warningThreshold; // 预警阈值
     private LocalDateTime lastUpdateTime; // 最后更新时间
 }

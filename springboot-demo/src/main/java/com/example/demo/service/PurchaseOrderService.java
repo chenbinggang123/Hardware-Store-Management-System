@@ -12,5 +12,6 @@ public interface PurchaseOrderService {
     PurchaseOrder updatePurchaseOrder(PurchaseOrder purchaseOrder);
     void deletePurchaseOrder(Long id);
     Optional<PurchaseOrder> getPurchaseOrderById(Long id);
-    List<PurchaseOrder> getAllPurchaseOrders();
+    List<PurchaseOrder> getAllPurchaseOrders(Long supplierId, String status, String dateFrom, String dateTo);
+    PurchaseOrder stockIn(Long id);
 }
