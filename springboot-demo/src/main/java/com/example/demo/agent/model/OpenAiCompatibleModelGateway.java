@@ -62,6 +62,12 @@ public class OpenAiCompatibleModelGateway implements AgentModelGateway {
         body.put("tools", tools.stream().map(this::toToolPayload).toList());
         body.put("tool_choice", "auto");
         body.put("temperature", 0);
+        if (properties.getBaseUrl().contains("api.deepseek.com")) {
+            // DeepSeek defaults to thinking mode, whose multi-step tool calls require
+            // reasoning_content to be replayed. This harness uses the simpler
+            // non-thinking tool-call protocol.
+            body.put("thinking", Map.of("type", "disabled"));
+        }
 
         JsonNode response = restClient.post()
                 .uri("/chat/completions")

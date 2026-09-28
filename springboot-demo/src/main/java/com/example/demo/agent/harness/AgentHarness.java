@@ -78,7 +78,7 @@ public class AgentHarness {
             int firstStep = Math.max(run.getCurrentStep() == null ? 0 : run.getCurrentStep(), 0) + 1;
             for (int step = firstStep; step <= MAX_MODEL_STEPS; step++) {
                 run.setCurrentStep(step);
-                runRepository.save(run);
+                run = runRepository.save(run);
                 AgentModelResponse response = gateway.respond(context, toolRegistry.definitions());
                 if (response == null) {
                     throw new IllegalStateException("模型返回为空");
@@ -87,7 +87,7 @@ public class AgentHarness {
                     run.setStatus(AgentRunStatus.COMPLETED);
                     run.setOutputText(response.getFinalOutput());
                     run.setCompletedAt(LocalDateTime.now());
-                    runRepository.save(run);
+                    run = runRepository.save(run);
                     return new AgentRunResult(run.getId(), run.getStatus(), run.getOutputText());
                 }
                 if (response.getToolCalls() == null || response.getToolCalls().isEmpty()) {
@@ -115,7 +115,7 @@ public class AgentHarness {
                         run.setContextJson(toJson(context.getToolResults()));
                         run.setOutputText("即将执行“" + tool.definition().getDescription()
                                 + "”，请确认。影响预览：" + toJson(approvalPreview));
-                        runRepository.save(run);
+                        run = runRepository.save(run);
                         return new AgentRunResult(run.getId(), run.getStatus(), run.getOutputText(),
                                 pendingAction(run, tool, approvalPreview));
                     }
@@ -140,7 +140,7 @@ public class AgentHarness {
                     ? "操作已成功执行，但生成结果说明失败：" + exception.getMessage()
                     : exception.getMessage());
             run.setCompletedAt(LocalDateTime.now());
-            runRepository.save(run);
+            run = runRepository.save(run);
             return new AgentRunResult(run.getId(), run.getStatus(), run.getOutputText());
         }
     }
@@ -176,7 +176,7 @@ public class AgentHarness {
             run.setCompletedAt(LocalDateTime.now());
             run.setOutputText("用户已取消本次操作");
             clearPending(run);
-            runRepository.save(run);
+            run = runRepository.save(run);
             return new AgentRunResult(run.getId(), run.getStatus(), run.getOutputText());
         }
 
@@ -200,12 +200,12 @@ public class AgentHarness {
             run.setOutputText(toJson(result));
             run.setContextJson(toJson(runContext.getToolResults()));
             clearPending(run);
-            runRepository.save(run);
+            run = runRepository.save(run);
             if (gateway == null) {
                 run.setStatus(AgentRunStatus.COMPLETED);
                 run.setCompletedAt(LocalDateTime.now());
                 run.setOutputText("操作已成功执行。结果：" + toJson(result));
-                runRepository.save(run);
+                run = runRepository.save(run);
                 return new AgentRunResult(run.getId(), run.getStatus(), run.getOutputText());
             }
             return continueRun(run, runContext, gateway, true);
@@ -221,7 +221,7 @@ public class AgentHarness {
                     : exception.getMessage());
             run.setCompletedAt(LocalDateTime.now());
             clearPending(run);
-            runRepository.save(run);
+            run = runRepository.save(run);
             return new AgentRunResult(run.getId(), run.getStatus(), run.getOutputText());
         }
     }
