@@ -36,3 +36,7 @@ powershell -ExecutionPolicy Bypass -File .\run-dev.ps1
 
 - HTTPS 接口根路径：`https://api.hardware1122.xin/api`
 - 微信小程序后台服务器域名：`https://api.hardware1122.xin`
+
+## Agent 方向设计
+
+项目正在规划面向个体经营者的五金店经营 Agent。当前设计阶段的产品、Harness、数据接口和 MVP 开发计划统一维护在 [docs/agent/README.md](docs/agent/README.md)。

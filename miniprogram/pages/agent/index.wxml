@@ -1,0 +1,68 @@
+<view class="agent-screen">
+  <view class="agent-header">
+    <view class="agent-mark">帮</view>
+    <view class="agent-heading">
+      <view class="agent-title">经营助手</view>
+      <view class="agent-subtitle">查库存、开草稿、核对后提交销售单</view>
+    </view>
+    <view class="new-task" bindtap="startNew" wx:if="{{messages.length || run}}">新任务</view>
+  </view>
+
+  <view class="trust-strip">
+    <text>查询自动执行</text><text class="trust-dot">·</text>
+    <text>修改必须确认</text><text class="trust-dot">·</text>
+    <text>正式提交二次确认</text>
+  </view>
+
+  <view class="suggestions" wx:if="{{!messages.length && !run}}">
+    <view class="suggestion-title">可以直接这样说</view>
+    <view class="suggestion" wx:for="{{suggestions}}" wx:key="*this" data-text="{{item}}" bindtap="useSuggestion">{{item}}</view>
+  </view>
+
+  <view class="conversation">
+    <block wx:for="{{messages}}" wx:key="index">
+      <view class="message-row {{item.role}}"><view class="message">{{item.content}}</view></view>
+    </block>
+    <view class="message-row assistant" wx:if="{{sending}}"><view class="message thinking">正在核对业务数据…</view></view>
+  </view>
+
+  <view class="approval-sheet {{run.pendingAction.isHighRisk ? 'high-risk' : ''}}" wx:if="{{run && run.status === 'WAITING_APPROVAL' && run.pendingAction}}">
+    <view class="approval-topline"></view>
+    <view class="approval-head">
+      <view class="approval-heading">
+        <view class="approval-title">{{run.pendingAction.title}}</view>
+        <view class="approval-description">{{run.pendingAction.description}}</view>
+      </view>
+      <view class="risk-badge">{{run.pendingAction.risk === 'R2_WRITE' ? '正式写入' : '草稿操作'}}</view>
+    </view>
+    <view class="customer-line" wx:if="{{run.pendingAction.preview.customerName}}"><text>客户</text><text class="customer-name">{{run.pendingAction.preview.customerName}}</text></view>
+    <view class="amount-grid" wx:if="{{run.pendingAction.preview.totalAmount !== undefined}}">
+      <view class="amount-cell"><text>订单金额</text><text class="amount-value">¥{{run.pendingAction.preview.totalAmount}}</text></view>
+      <view class="amount-cell"><text>已收金额</text><text class="amount-value">¥{{run.pendingAction.preview.receivedAmount || 0}}</text></view>
+      <view class="amount-cell debt"><text>新增欠款</text><text class="amount-value">¥{{run.pendingAction.preview.newDebtAmount || 0}}</text></view>
+      <view class="amount-cell debt"><text>提交后欠款</text><text class="amount-value">¥{{run.pendingAction.preview.debtAfterCommit || 0}}</text></view>
+    </view>
+    <view class="approval-items" wx:if="{{run.pendingAction.preview.items.length}}">
+      <view class="approval-item" wx:for="{{run.pendingAction.preview.items}}" wx:key="productId">
+        <view><view class="item-name">{{item.productName}}</view><view class="item-meta">{{item.quantity}} 件 × ¥{{item.price}} · 库存 {{item.availableQuantity}}</view></view>
+        <view class="item-amount">¥{{item.amount}}</view>
+      </view>
+    </view>
+    <view class="effect-note" wx:if="{{run.pendingAction.preview.effect}}">{{run.pendingAction.preview.effect}}</view>
+    <view class="stock-warning" wx:if="{{run.pendingAction.preview.inventorySufficient === false}}">库存不足，不能继续</view>
+    <view class="approval-actions">
+      <button class="approval-button cancel" bindtap="reject" disabled="{{resolving}}">取消操作</button>
+      <button class="approval-button confirm" bindtap="approve" disabled="{{resolving || run.pendingAction.preview.inventorySufficient === false}}">{{resolving ? '处理中…' : '确认执行'}}</button>
+    </view>
+  </view>
+
+  <view class="result-sheet" wx:if="{{run && run.status !== 'WAITING_APPROVAL' && run.output}}">
+    <view class="result-status">{{run.statusText}}</view><view class="result-copy">{{run.output}}</view>
+  </view>
+
+  <view class="composer-space"></view>
+  <view class="composer">
+    <textarea class="composer-input" value="{{input}}" bindinput="updateInput" auto-height maxlength="500" placeholder="例如：给老王开两把电钻，按以前价格记账" disabled="{{sending || resolving || (run && run.status === 'WAITING_APPROVAL')}}" />
+    <button class="send-button" bindtap="send" disabled="{{!input || sending || resolving || (run && run.status === 'WAITING_APPROVAL')}}">发送</button>
+  </view>
+</view>

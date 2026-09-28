@@ -69,6 +69,58 @@ CREATE TABLE IF NOT EXISTS sales_order (
     UNIQUE KEY uk_sales_order_number (order_number)
 );
 
+CREATE TABLE IF NOT EXISTS sales_order_draft (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    customer_id BIGINT NOT NULL,
+    operator_id BIGINT NOT NULL,
+    total_amount DECIMAL(10, 2) DEFAULT 0.00,
+    received_amount DECIMAL(10, 2) DEFAULT 0.00,
+    debt_amount DECIMAL(10, 2) DEFAULT 0.00,
+    status VARCHAR(32) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    committed_order_id BIGINT,
+    commit_idempotency_key VARCHAR(64),
+    version BIGINT NOT NULL DEFAULT 0,
+    create_time DATETIME NOT NULL,
+    update_time DATETIME NOT NULL,
+    items_json LONGTEXT,
+    UNIQUE KEY uk_sales_draft_commit_key (commit_idempotency_key),
+    KEY idx_sales_draft_operator_status (operator_id, status)
+);
+
+CREATE TABLE IF NOT EXISTS agent_run (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    operator_id BIGINT NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    current_step INT NOT NULL DEFAULT 0,
+    input_text LONGTEXT,
+    output_text LONGTEXT,
+    context_json LONGTEXT,
+    pending_tool_call_id VARCHAR(100),
+    pending_tool_name VARCHAR(64),
+    pending_arguments_json LONGTEXT,
+    pending_preview_json LONGTEXT,
+    error_code VARCHAR(100),
+    started_at DATETIME NOT NULL,
+    completed_at DATETIME,
+    expires_at DATETIME NOT NULL,
+    version BIGINT NOT NULL DEFAULT 0,
+    KEY idx_agent_run_operator_status (operator_id, status)
+);
+
+CREATE TABLE IF NOT EXISTS agent_tool_call (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    run_id BIGINT NOT NULL,
+    tool_call_id VARCHAR(100),
+    tool_name VARCHAR(64) NOT NULL,
+    arguments_json LONGTEXT,
+    result_json LONGTEXT,
+    status VARCHAR(32) NOT NULL,
+    duration_ms BIGINT NOT NULL DEFAULT 0,
+    create_time DATETIME NOT NULL,
+    KEY idx_agent_tool_call_run_id (run_id)
+);
+
 CREATE TABLE IF NOT EXISTS inventory (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     product_id BIGINT NOT NULL,

@@ -1,4 +1,5 @@
 const seedState = require('./mock-data')
+const cloudConfig = require('../config/cloud')
 
 const BASE_URL = 'https://api.hardware1122.xin/api'
 const REQUEST_TIMEOUT = 8000
@@ -67,6 +68,9 @@ function shouldFallback(error) {
 }
 
 function request(path, options = {}) {
+  if (cloudConfig.envId && cloudConfig.serviceName && wx.cloud && wx.cloud.callContainer) {
+    return cloudRequest(path, options)
+  }
   return new Promise((resolve, reject) => {
     const method = (options.method || 'GET').toUpperCase()
     const query = method === 'GET'
@@ -122,13 +126,54 @@ function request(path, options = {}) {
   })
 }
 
+function cloudRequest(path, options = {}) {
+  const method = (options.method || 'GET').toUpperCase()
+  const session = getAuthSession()
+  const header = {
+    'content-type': 'application/json',
+    'X-WX-SERVICE': cloudConfig.serviceName,
+    ...(options.header || {})
+  }
+  if (session && session.token) header.Authorization = `Bearer ${session.token}`
+  return wx.cloud.callContainer({
+    config: { env: cloudConfig.envId },
+    path: `${cloudConfig.apiPrefix}${path}`,
+    method,
+    data: options.data || options.query || {},
+    header
+  }).then((response) => {
+    const payload = response.data
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      if (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'success')) {
+        return payload.success ? payload.data : Promise.reject(payload)
+      }
+      return payload
+    }
+    if (response.statusCode === 401 && path !== '/auth/login') {
+      clearAuthSession()
+      redirectToLogin()
+    }
+    return Promise.reject(payload || { message: '云托管请求失败', statusCode: response.statusCode })
+  })
+}
+
 function withFallback(executor, fallbackResolver) {
   return executor().catch((error) => {
+    if (cloudConfig.envId && cloudConfig.serviceName) {
+      return Promise.reject(error)
+    }
     if (!shouldFallback(error)) {
       return Promise.reject(error)
     }
     return Promise.resolve(typeof fallbackResolver === 'function' ? fallbackResolver() : fallbackResolver)
   })
+}
+
+function agentRequest(path, options = {}) {
+  if (!cloudConfig.envId || !cloudConfig.serviceName || !wx.cloud || !wx.cloud.callContainer) {
+    return Promise.reject({ message: '经营助手尚未配置云托管环境' })
+  }
+  return cloudRequest(path, options)
 }
 
 function nextId(list) {
@@ -423,6 +468,15 @@ module.exports = {
   },
   getStoredSession() {
     return getAuthSession()
+  },
+  sendAgentMessage(content) {
+    return agentRequest('/agent/messages', { method: 'POST', data: { content } })
+  },
+  getAgentRun(runId) {
+    return agentRequest(`/agent/runs/${runId}`)
+  },
+  resolveAgentApproval(runId, approved) {
+    return agentRequest(`/agent/runs/${runId}/approval`, { method: 'POST', data: { approved } })
   },
   getProducts(params = {}) {
     return withFallback(() => request('/products', { data: params }), () => filterProducts(params))

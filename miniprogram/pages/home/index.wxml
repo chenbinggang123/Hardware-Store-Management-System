@@ -4,6 +4,9 @@
     <view class="hero-eyebrow">HARDWARE STORE OS</view>
     <view class="hero-title">早上好，{{currentUser.name || '老板'}}</view>
     <view class="hero-subtitle">{{currentUser.role || '管理员'}} · 今天先处理哪一块业务？</view>
+    <view class="top-actions">
+      <view class="btn home-agent-btn" bindtap="openModule" data-path="/pages/agent/index">和经营助手说一句</view>
+    </view>
   </view>
 
   <!-- Quick Stats -->

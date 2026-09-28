@@ -12,6 +12,8 @@ import org.springframework.web.servlet.HandlerInterceptor;
 @Component
 public class AuthInterceptor implements HandlerInterceptor {
 
+    public static final String AUTH_SESSION_ATTRIBUTE = AuthInterceptor.class.getName() + ".session";
+
     private final AuthServiceImpl authService;
 
     public AuthInterceptor(AuthServiceImpl authService) {
@@ -20,7 +22,7 @@ public class AuthInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
-        authService.requireSession(resolveToken(request));
+        request.setAttribute(AUTH_SESSION_ATTRIBUTE, authService.requireSession(resolveToken(request)));
         return true;
     }
 

@@ -1,1 +1,6 @@
 /* Home page overrides — most styles live in app.wxss */
+.home-agent-btn {
+  background: #FFF8EF;
+  color: #5A2B0B;
+  box-shadow: none;
+}

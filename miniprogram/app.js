@@ -1,7 +1,11 @@
 const AUTH_STORAGE_KEY = 'auth_session'
+const cloudConfig = require('./config/cloud')
 
 App({
   onLaunch() {
+    if (cloudConfig.envId && wx.cloud) {
+      wx.cloud.init({ env: cloudConfig.envId, traceUser: true })
+    }
     this.restoreSession()
   },
 
