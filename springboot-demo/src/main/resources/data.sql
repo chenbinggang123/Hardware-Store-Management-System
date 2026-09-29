@@ -143,13 +143,7 @@ INSERT INTO app_user (id, username, password, name, phone, role, status, create_
     (1, 'admin', '$2a$10$fhDff3zZkxQG6Zy3bgNv/.gbZ5WiznJQzagd8qCeLQWwOXGMVBDHO', '系统管理员', '13600000000', 'ADMIN', 1, '2026-03-27 08:30:00'),
     (2, 'clerk01', '$2a$10$fhDff3zZkxQG6Zy3bgNv/.gbZ5WiznJQzagd8qCeLQWwOXGMVBDHO', '营业员小张', '13600000001', 'CLERK', 1, '2026-03-27 08:40:00')
 ON DUPLICATE KEY UPDATE
-    username = VALUES(username),
-    password = VALUES(password),
-    name = VALUES(name),
-    phone = VALUES(phone),
-    role = VALUES(role),
-    status = VALUES(status),
-    create_time = VALUES(create_time);
+    id = VALUES(id);
 
 INSERT INTO inventory_log (
     id, product_id, product_name, change_type, quantity, before_quantity, after_quantity, operator_id, related_order_id, remark, create_time
