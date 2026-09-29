@@ -1,8 +1,6 @@
 const seedState = require('./mock-data')
 const cloudConfig = require('../config/cloud')
 
-const BASE_URL = 'https://api.hardware1122.xin/api'
-const REQUEST_TIMEOUT = 8000
 const AUTH_STORAGE_KEY = 'auth_session'
 const state = clone(seedState)
 
@@ -14,13 +12,6 @@ function nowString() {
   const now = new Date()
   const pad = (value) => `${value}`.padStart(2, '0')
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
-}
-
-function buildUrl(path, query) {
-  const pairs = Object.keys(query || {})
-    .filter((key) => query[key] !== undefined && query[key] !== null && query[key] !== '')
-    .map((key) => `${encodeURIComponent(key)}=${encodeURIComponent(query[key])}`)
-  return `${BASE_URL}${path}${pairs.length ? `?${pairs.join('&')}` : ''}`
 }
 
 function getAuthSession() {
@@ -68,62 +59,10 @@ function shouldFallback(error) {
 }
 
 function request(path, options = {}) {
-  if (cloudConfig.envId && cloudConfig.serviceName && wx.cloud && wx.cloud.callContainer) {
-    return cloudRequest(path, options)
+  if (!cloudConfig.envId || !cloudConfig.serviceName || !wx.cloud || !wx.cloud.callContainer) {
+    return Promise.reject({ message: 'CloudBase 云托管环境尚未配置' })
   }
-  return new Promise((resolve, reject) => {
-    const method = (options.method || 'GET').toUpperCase()
-    const query = method === 'GET'
-      ? { ...(options.query || {}), ...(options.data || {}) }
-      : (options.query || {})
-    const session = getAuthSession()
-    const header = {
-      'content-type': 'application/json',
-      ...(options.header || {})
-    }
-    if (session && session.token) {
-      header.Authorization = `Bearer ${session.token}`
-    }
-    wx.request({
-      url: buildUrl(path, query),
-      method,
-      timeout: options.timeout || REQUEST_TIMEOUT,
-      data: method === 'GET' ? undefined : (options.data || {}),
-      header,
-      success(res) {
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          const payload = res.data
-          if (payload && typeof payload === 'object'
-            && Object.prototype.hasOwnProperty.call(payload, 'success')
-            && Object.prototype.hasOwnProperty.call(payload, 'data')) {
-            if (payload.success) {
-              resolve(payload.data)
-              return
-            }
-            reject(payload)
-            return
-          }
-          resolve(payload)
-          return
-        }
-        if (res.statusCode === 401 && path !== '/auth/login') {
-          clearAuthSession()
-          redirectToLogin()
-        }
-        if (res.data && typeof res.data === 'object') {
-          reject({
-            ...res.data,
-            statusCode: res.statusCode
-          })
-          return
-        }
-        reject(res)
-      },
-      fail(error) {
-        reject(error)
-      }
-    })
-  })
+  return cloudRequest(path, options)
 }
 
 function cloudRequest(path, options = {}) {
@@ -174,6 +113,64 @@ function agentRequest(path, options = {}) {
     return Promise.reject({ message: '经营助手尚未配置云托管环境' })
   }
   return cloudRequest(path, options)
+}
+
+function localFileName(file) {
+  if (file && file.name) return file.name
+  const path = file && (file.path || file.tempFilePath) ? (file.path || file.tempFilePath) : file
+  return String(path || 'attachment').replace(/\\/g, '/').split('/').pop()
+}
+
+function localFilePath(file) {
+  return file && (file.path || file.tempFilePath) ? (file.path || file.tempFilePath) : file
+}
+
+function localFileSize(file, filePath) {
+  if (file && Number(file.size) > 0) return Promise.resolve(Number(file.size))
+  return new Promise((resolve, reject) => {
+    wx.getFileInfo({ filePath, success: (result) => resolve(result.size), fail: reject })
+  })
+}
+
+function cloudPathFor(fileName) {
+  const session = getAuthSession()
+  const operatorId = session && session.user && session.user.id ? session.user.id : 'unknown'
+  const now = new Date()
+  const extension = fileName.includes('.') ? `.${fileName.split('.').pop().toLowerCase()}` : ''
+  const datePath = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('/')
+  return `agent/${operatorId}/${datePath}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}${extension}`
+}
+
+function removeCloudFile(fileID) {
+  if (!fileID || !wx.cloud || !wx.cloud.deleteFile) return Promise.resolve()
+  return wx.cloud.deleteFile({ fileList: [fileID] }).catch(() => null)
+}
+
+function uploadAgentFile(file, conversationId) {
+  if (!wx.cloud || !wx.cloud.uploadFile || !wx.cloud.getTempFileURL) {
+    return Promise.reject({ message: '当前微信基础库不支持 CloudBase 文件上传' })
+  }
+  const filePath = localFilePath(file)
+  const originalName = localFileName(file)
+  let uploadedFileID = ''
+  return localFileSize(file, filePath)
+    .then((fileSize) => wx.cloud.uploadFile({ cloudPath: cloudPathFor(originalName), filePath })
+      .then((uploadResult) => {
+        uploadedFileID = uploadResult.fileID
+        return wx.cloud.getTempFileURL({ fileList: [uploadedFileID] })
+      })
+      .then((urlResult) => {
+        const item = urlResult.fileList && urlResult.fileList[0]
+        if (!item || !item.tempFileURL || (item.status && item.status !== 0)) {
+          return Promise.reject({ message: (item && item.errMsg) || '无法获取附件临时读取地址' })
+        }
+        return agentRequest('/agent/attachments/cloud', {
+          method: 'POST',
+          data: { cloudFileId: uploadedFileID, downloadUrl: item.tempFileURL, originalName, fileSize, conversationId }
+        })
+      })
+      .then((attachment) => ({ ...attachment, cloudFileId: uploadedFileID })))
+    .catch((error) => removeCloudFile(uploadedFileID).then(() => Promise.reject(error)))
 }
 
 function nextId(list) {
@@ -469,8 +466,23 @@ module.exports = {
   getStoredSession() {
     return getAuthSession()
   },
-  sendAgentMessage(content) {
-    return agentRequest('/agent/messages', { method: 'POST', data: { content } })
+  sendAgentMessage(content, conversationId, attachmentIds) {
+    return agentRequest('/agent/messages', { method: 'POST', data: { content, conversationId, attachmentIds: attachmentIds || [] } })
+  },
+  uploadAgentAttachment(filePath, conversationId) {
+    return uploadAgentFile(filePath, conversationId)
+  },
+  deleteAgentAttachment(attachment) {
+    const attachmentId = typeof attachment === 'object' ? attachment.id : attachment
+    const cloudFileId = typeof attachment === 'object' ? attachment.cloudFileId : ''
+    return agentRequest(`/agent/attachments/${attachmentId}`, { method: 'DELETE' })
+      .then((result) => removeCloudFile(cloudFileId).then(() => result))
+  },
+  getAgentConversations() {
+    return agentRequest('/agent/conversations')
+  },
+  getAgentConversation(conversationId) {
+    return agentRequest(`/agent/conversations/${conversationId}`)
   },
   getAgentRun(runId) {
     return agentRequest(`/agent/runs/${runId}`)

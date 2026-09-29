@@ -77,4 +77,4 @@ module.exports = {
 
 ## 7. 域名策略
 
-开发和内测优先使用云托管调用能力，不依赖自有域名。准备公开发布时再检查 `hardware1122.xin` 的 ICP 备案状态，并将 `api.hardware1122.xin` 绑定到 CloudBase HTTP 访问服务。域名注册状态正常不代表已经完成备案。
+小程序统一使用 CloudBase：业务接口通过 `wx.cloud.callContainer` 调用云托管，附件通过 `wx.cloud.uploadFile` 写入云存储，不依赖自定义域名。若未来增加浏览器或第三方系统访问，再单独评估是否开启公网入口。

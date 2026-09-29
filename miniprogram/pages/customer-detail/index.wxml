@@ -10,7 +10,7 @@
 
   <view class="stats-strip">
     <view class="stat-item">
-      <view class="stat-value" style="color: {{customer.debt > 0 ? '#BF4F1C' : '#29714C'}};">¥{{customer.debt || 0}}</view>
+      <view class="stat-value" style="color: {{customer.debt > 0 ? '#B95034' : '#247A55'}};">¥{{customer.debt || 0}}</view>
       <view class="stat-label">当前欠款</view>
     </view>
     <view class="stat-item">

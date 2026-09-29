@@ -1,28 +1,46 @@
 const { openPage } = require('../../utils/router')
 const api = require('../../utils/api')
 
-const modules = [
-  { title: '商品管理', icon: '📦', iconClass: 'product', desc: '商品、价格、上下架、图片管理', path: '/pages/products/index' },
-  { title: '供应商管理', icon: '🏭', iconClass: 'supplier', desc: '供应商资料、采购历史、价格趋势', path: '/pages/suppliers/index' },
-  { title: '客户管理', icon: '👤', iconClass: 'customer', desc: '客户资料、订单、欠款记录', path: '/pages/customers/index' },
-  { title: '进货管理', icon: '📥', iconClass: 'purchase', desc: '采购单、入库、库位分配', path: '/pages/purchase-orders/index' },
-  { title: '销售管理', icon: '📤', iconClass: 'sales', desc: '销售单、出库、收款登记', path: '/pages/sales-orders/index' },
-  { title: '库存管理', icon: '📋', iconClass: 'stock', desc: '实时库存、盘点、预警', path: '/pages/inventories/index' }
+const directActions = [
+  { title: '开销售单', mark: '单', tone: 'sales', desc: '选客户和商品', path: '/pages/sales-form/index' },
+  { title: '查商品', mark: '查', tone: 'search', desc: '看价格和库存', path: '/pages/products/index' },
+  { title: '采购入库', mark: '入', tone: 'stock-in', desc: '到货后登记', path: '/pages/purchase-orders/index' },
+  { title: '库存盘点', mark: '盘', tone: 'count', desc: '核对实际数量', path: '/pages/inventories/index' }
 ]
+
+const moreFunctions = [
+  { title: '采购', mark: '采', path: '/pages/purchase-orders/index' },
+  { title: '客户', mark: '客', path: '/pages/customers/index' },
+  { title: '供应商', mark: '供', path: '/pages/suppliers/index' },
+  { title: '报表', mark: '表', path: '/pages/report-center/index' },
+  { title: '导出', mark: '出', path: '/pages/report-export/index' },
+  { title: '设置', mark: '设', path: '/pages/settings/index' }
+]
+
+function getTimeLabel() {
+  const now = new Date()
+  const pad = (value) => value < 10 ? `0${value}` : String(value)
+  return `${pad(now.getHours())}:${pad(now.getMinutes())}`
+}
 
 Page({
   data: {
-    modules,
+    directActions,
+    moreFunctions,
     currentUser: {},
+    userInitial: '管',
     stats: { productCount: 0, purchaseCount: 0, salesCount: 0, warningCount: 0 },
     report: { sales: 0, purchase: 0 },
-    recentLogs: []
+    recentLogs: [],
+    dashboardMeta: { status: '正在同步数据', updatedAt: '--:--' }
   },
 
   onShow() {
     const app = getApp()
+    const currentUser = app.globalData.currentUser || { name: '老板', role: '管理员' }
     this.setData({
-      currentUser: app.globalData.currentUser || { name: '老板', role: '管理员' }
+      currentUser,
+      userInitial: currentUser.name ? String(currentUser.name).slice(0, 1) : '管'
     })
     this.loadDashboard()
   },
@@ -48,9 +66,12 @@ Page({
           warningCount: warnings
         },
         report: report || { sales: 0, purchase: 0 },
-        recentLogs: (logs || []).slice(0, 5)
+        recentLogs: (logs || []).slice(0, 5),
+        dashboardMeta: { status: '数据已更新', updatedAt: getTimeLabel() }
       })
-    }).catch(() => {}).finally(() => {
+    }).catch(() => {
+      this.setData({ dashboardMeta: { status: '暂时无法更新', updatedAt: getTimeLabel() } })
+    }).finally(() => {
       if (stopPullDownRefresh) wx.stopPullDownRefresh()
     })
   },

@@ -39,7 +39,7 @@
 - 小程序优先用于开发联调和页面验收
 - 小程序在后端不可用时，允许回退到内置模拟数据
 - 后端默认接口根路径：`http://localhost:8084/api`
-- 公网接口根路径：`https://api.hardware1122.xin/api`
+- 小程序接口：通过 `wx.cloud.callContainer` 调用 CloudBase 云托管服务 `hardware-store-api`，不依赖自定义域名。
 
 ### 2.4 当前工作重点
 

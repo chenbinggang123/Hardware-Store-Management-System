@@ -29,30 +29,47 @@
     "pages/system-logs/index"
   ],
   "window": {
-    "navigationBarTitleText": "五金店管理系统",
-    "navigationBarBackgroundColor": "#FFF9F2",
+    "navigationBarTitleText": "恒丰五金",
+    "navigationBarBackgroundColor": "#F5F7F6",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#F5EFE6",
+    "backgroundColor": "#F5F7F6",
     "backgroundTextStyle": "dark"
   },
   "tabBar": {
-    "position": "top",
-    "color": "#A89880",
-    "selectedColor": "#B75A1A",
-    "backgroundColor": "#FFFCF7",
-    "borderStyle": "white",
+    "color": "#66716D",
+    "selectedColor": "#2865D7",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "black",
     "list": [
       {
         "pagePath": "pages/home/index",
-        "text": "首页"
+        "text": "首页",
+        "iconPath": "assets/tabbar/home.png",
+        "selectedIconPath": "assets/tabbar/home-active.png"
       },
       {
-        "pagePath": "pages/analysis/index",
-        "text": "分析"
+        "pagePath": "pages/products/index",
+        "text": "商品",
+        "iconPath": "assets/tabbar/products.png",
+        "selectedIconPath": "assets/tabbar/products-active.png"
       },
       {
-        "pagePath": "pages/settings/index",
-        "text": "设置"
+        "pagePath": "pages/sales-orders/index",
+        "text": "单据",
+        "iconPath": "assets/tabbar/orders.png",
+        "selectedIconPath": "assets/tabbar/orders-active.png"
+      },
+      {
+        "pagePath": "pages/inventories/index",
+        "text": "库存",
+        "iconPath": "assets/tabbar/inventory.png",
+        "selectedIconPath": "assets/tabbar/inventory-active.png"
+      },
+      {
+        "pagePath": "pages/agent/index",
+        "text": "小五",
+        "iconPath": "assets/tabbar/agent.png",
+        "selectedIconPath": "assets/tabbar/agent-active.png"
       }
     ]
   },

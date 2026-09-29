@@ -1,5 +1,7 @@
 package com.example.demo.agent.harness;
 
+import com.example.demo.agent.model.AgentChatMessage;
+
 import lombok.Getter;
 
 import java.util.ArrayList;
@@ -12,12 +14,22 @@ public class AgentRunContext {
     private final Long runId;
     private final Long operatorId;
     private final String userInput;
+    private final List<AgentChatMessage> conversationHistory;
     private final List<Map<String, Object>> toolResults = new ArrayList<>();
 
     public AgentRunContext(Long runId, Long operatorId, String userInput) {
+        this(runId, operatorId, userInput, List.of());
+    }
+
+    public AgentRunContext(
+            Long runId,
+            Long operatorId,
+            String userInput,
+            List<AgentChatMessage> conversationHistory) {
         this.runId = runId;
         this.operatorId = operatorId;
         this.userInput = userInput;
+        this.conversationHistory = conversationHistory == null ? List.of() : List.copyOf(conversationHistory);
     }
 
     public void addToolResult(String toolCallId, String toolName, Map<String, Object> arguments, Object result) {

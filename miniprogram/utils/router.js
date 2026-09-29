@@ -1,7 +1,9 @@
 const TAB_PAGES = new Set([
   '/pages/home/index',
-  '/pages/analysis/index',
-  '/pages/settings/index'
+  '/pages/products/index',
+  '/pages/sales-orders/index',
+  '/pages/inventories/index',
+  '/pages/agent/index'
 ])
 
 function buildQuery(params) {

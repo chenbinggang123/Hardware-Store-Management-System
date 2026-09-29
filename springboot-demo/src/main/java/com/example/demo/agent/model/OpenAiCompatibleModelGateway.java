@@ -62,6 +62,12 @@ public class OpenAiCompatibleModelGateway implements AgentModelGateway {
         body.put("tools", tools.stream().map(this::toToolPayload).toList());
         body.put("tool_choice", "auto");
         body.put("temperature", 0);
+        if (properties.getBaseUrl().contains("api.deepseek.com")) {
+            // DeepSeek defaults to thinking mode, whose multi-step tool calls require
+            // reasoning_content to be replayed. This harness uses the simpler
+            // non-thinking tool-call protocol.
+            body.put("thinking", Map.of("type", "disabled"));
+        }
 
         JsonNode response = restClient.post()
                 .uri("/chat/completions")
@@ -76,6 +82,12 @@ public class OpenAiCompatibleModelGateway implements AgentModelGateway {
     private List<Map<String, Object>> buildMessages(AgentRunContext context) {
         List<Map<String, Object>> messages = new ArrayList<>();
         messages.add(Map.of("role", "system", "content", SYSTEM_PROMPT));
+        for (AgentChatMessage historyMessage : context.getConversationHistory()) {
+            if (StringUtils.hasText(historyMessage.content())
+                    && ("user".equals(historyMessage.role()) || "assistant".equals(historyMessage.role()))) {
+                messages.add(Map.of("role", historyMessage.role(), "content", historyMessage.content()));
+            }
+        }
         messages.add(Map.of("role", "user", "content", context.getUserInput()));
         for (Map<String, Object> entry : context.getToolResults()) {
             String callId = String.valueOf(entry.get("toolCallId"));

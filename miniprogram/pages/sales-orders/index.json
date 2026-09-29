@@ -1,3 +1,4 @@
 {
-  "navigationBarTitleText": "销售管理"
+  "navigationBarTitleText": "销售单据",
+  "enablePullDownRefresh": true
 }

@@ -5,6 +5,7 @@ import lombok.Data;
 @Data
 public class AgentRunResult {
     private Long runId;
+    private Long conversationId;
     private AgentRunStatus status;
     private String output;
     private AgentPendingAction pendingAction;

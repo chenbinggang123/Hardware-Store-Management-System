@@ -14,7 +14,7 @@ App({
   },
 
   globalData: {
-    brandName: '五金店管理系统',
+    brandName: '恒丰五金',
     currentUser: null,
     currentOperatorId: null,
     authToken: ''

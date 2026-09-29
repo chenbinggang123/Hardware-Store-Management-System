@@ -2,14 +2,14 @@
 
 ## 目录
 - 小程序项目目录：`miniprogram`
-- 默认生产后端地址：`https://api.hardware1122.xin/api`
+- 默认后端：CloudBase 环境 `cloud1-d0gvllpf639d10665` 中的云托管服务 `hardware-store-api`
 
 ## 打开方式
 1. 打开微信开发者工具。
 2. 选择导入项目。
 3. 项目目录指向当前仓库下的 `miniprogram`。
 4. 开发调试阶段可以勾选“不校验合法域名、web-view（业务域名）、TLS 版本以及 HTTPS 证书”。
-5. 真机预览和发布前，需要在微信公众平台配置服务器域名：`https://api.hardware1122.xin`。
+5. 真机预览和发布前，确认小程序已关联该 CloudBase 环境；普通接口使用 `wx.cloud.callContainer`，附件使用 `wx.cloud.uploadFile`，无需配置旧的自定义域名。
 
 ## 当前页面结构
 - 登录页

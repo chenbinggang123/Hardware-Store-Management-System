@@ -1,0 +1,7 @@
+springboot-demo/scripts/rds/rds.config.json
+.claude/settings.local.json
+springboot-demo/target/
+springboot-demo/.m2repo/
+springboot-demo/data/
+**/__pycache__/
+*.pyc

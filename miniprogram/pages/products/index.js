@@ -107,6 +107,10 @@ Page({
     openPage('/pages/product-form/index')
   },
 
+  openAgent() {
+    openPage('/pages/agent/index')
+  },
+
   openEdit(event) {
     openPage('/pages/product-form/index', { id: event.currentTarget.dataset.id, mode: 'edit' })
   },

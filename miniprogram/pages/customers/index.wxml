@@ -29,7 +29,7 @@
           </view>
           <view class="tag {{item.type === '老客户' ? 'tag-warning' : item.type === 'B' ? 'tag-info' : 'tag-neutral'}}">{{item.type}}</view>
         </view>
-        <view class="list-meta" style="color: {{item.debt > 0 ? '#BF4F1C' : '#29714C'}}; font-weight: 600;">欠款 ¥{{item.debt || 0}}</view>
+        <view class="list-meta" style="color: {{item.debt > 0 ? '#B95034' : '#247A55'}}; font-weight: 600;">欠款 ¥{{item.debt || 0}}</view>
         <view class="list-meta" wx:if="{{item.remark}}">{{item.remark}}</view>
         <view class="action-row">
           <view class="btn btn-outline btn-sm" bindtap="openDetail" data-id="{{item.id}}">详情</view>

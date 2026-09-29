@@ -1,6 +1,25 @@
 <view class="screen">
-  <view class="section-head">
-    <view class="section-title">库存管理</view>
+  <view class="page-heading">
+    <view class="page-heading-copy">
+      <view class="page-kicker">实时库存</view>
+      <view class="section-title">看数量、查缺货</view>
+      <view class="page-description">需要盘点时，直接进入对应商品调整</view>
+    </view>
+    <view class="page-heading-badge"><view class="badge-dot"></view>库存同步</view>
+  </view>
+
+  <view class="stats-strip">
+    <view class="stat-item"><view class="stat-value">{{metrics.total}}</view><view class="stat-label">当前商品</view></view>
+    <view class="stat-item"><view class="stat-value">{{metrics.quantity}}</view><view class="stat-label">库存总数</view></view>
+    <view class="stat-item {{metrics.warning ? 'stat-attention' : ''}}"><view class="stat-value">{{metrics.warning}}</view><view class="stat-label">库存预警</view></view>
+  </view>
+
+  <view class="page-widget-row">
+    <view class="page-widget-alert {{metrics.warning ? 'is-warning' : ''}}">
+      <view class="page-widget-mark">货</view>
+      <view><view class="page-widget-title">{{metrics.warning ? metrics.warning + ' 件建议补货' : '目前没有缺货提醒'}}</view><view class="page-widget-desc">预警数量会标红显示</view></view>
+    </view>
+    <view class="agent-assist" bindtap="openAgent"><text>帮我分析</text><text class="agent-assist-arrow">›</text></view>
   </view>
 
   <view class="toolbar">
@@ -18,7 +37,7 @@
 
   <view class="list" wx:if="{{!loading && inventories.length}}">
     <block wx:for="{{inventories}}" wx:key="id">
-      <view class="list-card">
+      <view class="list-card {{item.quantity <= item.warningThreshold ? 'inventory-warning-card' : ''}}">
         <view class="list-head">
           <view style="flex:1; min-width:0;">
             <view class="list-title">商品 ID {{item.productId}}</view>
@@ -27,8 +46,8 @@
           <view class="tag {{item.quantity <= item.warningThreshold ? 'tag-danger' : 'tag-success'}}">{{item.quantity <= item.warningThreshold ? '库存预警' : '库存正常'}}</view>
         </view>
         <view class="list-meta" style="font-weight: 600;">库存 {{item.quantity}} · 预警阈值 {{item.warningThreshold}}</view>
-        <view class="action-row">
-          <view class="btn btn-outline btn-sm" bindtap="openDetail" data-id="{{item.id}}">详情</view>
+        <view class="action-row card-actions">
+          <view class="btn btn-primary btn-sm" bindtap="openDetail" data-id="{{item.id}}">查看详情</view>
           <view class="btn btn-outline btn-sm" bindtap="openAdjust" data-id="{{item.id}}">盘点调整</view>
           <view class="btn btn-ghost btn-sm" bindtap="openDetail" data-id="{{item.id}}">库存日志</view>
         </view>
@@ -39,6 +58,6 @@
   <view class="empty-state" wx:if="{{!loading && !inventories.length}}">
     <text class="empty-icon">📋</text>
     <view class="empty-title">暂无库存数据</view>
-    <view class="empty-desc">添加商品后会自动生成库存记录</view>
+    <view class="empty-desc">添加商品后，这里会自动生成库存记录</view>
   </view>
 </view>

@@ -1,29 +1,82 @@
 <view class="agent-screen">
   <view class="agent-header">
-    <view class="agent-mark">帮</view>
+    <view class="agent-mark">小</view>
     <view class="agent-heading">
-      <view class="agent-title">经营助手</view>
-      <view class="agent-subtitle">查库存、开草稿、核对后提交销售单</view>
+      <view class="agent-title">小五</view>
+      <view class="agent-subtitle"><text>复杂开单、模糊查找和经营分析</text><text class="agent-live"><text class="agent-live-dot"></text>可用</text></view>
     </view>
-    <view class="new-task" bindtap="startNew" wx:if="{{messages.length || run}}">新任务</view>
+    <view class="header-actions">
+      <view class="history-button" bindtap="openHistory">历史</view>
+      <view class="new-task" bindtap="startNew" wx:if="{{messages.length || run}}">新对话</view>
+    </view>
   </view>
 
   <view class="trust-strip">
-    <text>查询自动执行</text><text class="trust-dot">·</text>
-    <text>修改必须确认</text><text class="trust-dot">·</text>
-    <text>正式提交二次确认</text>
+    <text>查数据直接完成</text><text class="trust-dot">·</text>
+    <text>正式操作由你确认</text>
+  </view>
+
+  <view class="history-backdrop" wx:if="{{historyOpen}}" bindtap="closeHistory"></view>
+  <view class="history-drawer {{historyOpen ? 'open' : ''}}">
+    <view class="history-handle"></view>
+    <view class="history-head">
+      <view><view class="history-title">历史会话</view><view class="history-subtitle">继续之前的查询和开单</view></view>
+      <view class="history-close" bindtap="closeHistory">关闭</view>
+    </view>
+    <scroll-view class="history-list" scroll-y>
+      <view class="history-loading" wx:if="{{loadingHistory}}">正在读取历史…</view>
+      <view class="history-empty" wx:elif="{{!conversations.length}}">还没有历史会话<br/><text>发送第一条消息后会自动保存在这里</text></view>
+      <view class="history-entry {{item.id === conversationId ? 'active' : ''}}" wx:for="{{conversations}}" wx:key="id" data-id="{{item.id}}" bindtap="chooseConversation">
+        <view class="history-entry-top"><text class="history-entry-title">{{item.title}}</text><text class="history-entry-time">{{item.timeText}}</text></view>
+        <view class="history-entry-preview">{{item.preview}}</view>
+      </view>
+    </scroll-view>
+    <view class="history-new" bindtap="startNew">＋ 开始新对话</view>
   </view>
 
   <view class="suggestions" wx:if="{{!messages.length && !run}}">
-    <view class="suggestion-title">可以直接这样说</view>
-    <view class="suggestion" wx:for="{{suggestions}}" wx:key="*this" data-text="{{item}}" bindtap="useSuggestion">{{item}}</view>
+    <view class="suggestion-title">可以这样跟小五说</view>
+    <view class="suggestion" wx:for="{{suggestions}}" wx:key="*this" data-text="{{item}}" bindtap="useSuggestion"><view class="suggestion-mark">{{index + 1}}</view><view class="suggestion-copy">{{item}}</view><view class="suggestion-arrow">›</view></view>
   </view>
 
   <view class="conversation">
     <block wx:for="{{messages}}" wx:key="index">
-      <view class="message-row {{item.role}}"><view class="message">{{item.content}}</view></view>
+      <view class="message-row {{item.role}}">
+        <view class="message-stack" wx:if="{{item.role === 'assistant'}}">
+          <view class="assistant-author">小五</view>
+          <view class="message assistant-content">
+            <block wx:if="{{item.blocks && item.blocks.length}}">
+              <block wx:for="{{item.blocks}}" wx:for-item="block" wx:key="*this">
+                <view class="answer-paragraph" wx:if="{{block.type === 'text'}}">{{block.text}}</view>
+                <view class="answer-field" wx:elif="{{block.type === 'field'}}">
+                  <text class="answer-field-label">{{block.label}}</text>
+                  <text class="answer-field-value">{{block.value}}</text>
+                </view>
+                <view class="product-result" wx:elif="{{block.type === 'product'}}">
+                  <view class="product-result-head">
+                    <text class="product-result-name">{{block.name}}</text>
+                    <text class="product-result-price">¥{{block.price}}</text>
+                  </view>
+                  <view class="product-result-meta">{{block.spec}} · {{block.unit}}</view>
+                  <view class="product-result-id">商品 ID {{block.id}}</view>
+                </view>
+              </block>
+            </block>
+            <view class="answer-paragraph" wx:else>{{item.content}}</view>
+          </view>
+        </view>
+        <view class="message" wx:else>
+          <view class="message-attachments" wx:if="{{item.attachments && item.attachments.length}}">
+            <view class="attachment-card sent" wx:for="{{item.attachments}}" wx:for-item="file" wx:key="id">
+              <view class="attachment-icon">{{file.typeText === '图片' ? '图' : '表'}}</view>
+              <view class="attachment-copy"><view class="attachment-name">{{file.originalName}}</view><view class="attachment-meta">{{file.typeText}} · {{file.sizeText}}</view></view>
+            </view>
+          </view>
+          <view>{{item.content}}</view>
+        </view>
+      </view>
     </block>
-    <view class="message-row assistant" wx:if="{{sending}}"><view class="message thinking">正在核对业务数据…</view></view>
+    <view class="message-row assistant" wx:if="{{sending}}"><view class="message-stack"><view class="assistant-author">小五</view><view class="message thinking">正在核对业务数据…</view></view></view>
   </view>
 
   <view class="approval-sheet {{run.pendingAction.isHighRisk ? 'high-risk' : ''}}" wx:if="{{run && run.status === 'WAITING_APPROVAL' && run.pendingAction}}">
@@ -56,13 +109,24 @@
     </view>
   </view>
 
-  <view class="result-sheet" wx:if="{{run && run.status !== 'WAITING_APPROVAL' && run.output}}">
+  <view class="result-sheet" wx:if="{{run && run.status !== 'WAITING_APPROVAL' && run.output && !messages.length}}">
     <view class="result-status">{{run.statusText}}</view><view class="result-copy">{{run.output}}</view>
   </view>
 
   <view class="composer-space"></view>
   <view class="composer">
-    <textarea class="composer-input" value="{{input}}" bindinput="updateInput" auto-height maxlength="500" placeholder="例如：给老王开两把电钻，按以前价格记账" disabled="{{sending || resolving || (run && run.status === 'WAITING_APPROVAL')}}" />
-    <button class="send-button" bindtap="send" disabled="{{!input || sending || resolving || (run && run.status === 'WAITING_APPROVAL')}}">发送</button>
+    <view class="composer-attachments" wx:if="{{pendingAttachments.length || uploading}}">
+      <view class="attachment-card" wx:for="{{pendingAttachments}}" wx:key="id">
+        <view class="attachment-icon">{{item.typeText === '图片' ? '图' : '表'}}</view>
+        <view class="attachment-copy"><view class="attachment-name">{{item.originalName}}</view><view class="attachment-meta {{item.ready ? '' : 'waiting'}}">{{item.ready ? item.sizeText + ' · 已解析' : item.errorMessage}}</view></view>
+        <view class="attachment-remove" data-id="{{item.id}}" bindtap="removeAttachment">×</view>
+      </view>
+      <view class="uploading-line" wx:if="{{uploading}}">正在上传并解析附件…</view>
+    </view>
+    <view class="composer-row">
+      <view class="attach-button" bindtap="chooseAttachment">＋</view>
+      <textarea class="composer-input" value="{{input}}" bindinput="updateInput" auto-height maxlength="500" placeholder="输入问题，或上传订单图片 / Excel" disabled="{{sending || resolving || uploading || (run && run.status === 'WAITING_APPROVAL')}}" />
+      <button class="send-button" bindtap="send" disabled="{{(!input && !pendingAttachments.length) || sending || resolving || uploading || (run && run.status === 'WAITING_APPROVAL')}}">发送</button>
+    </view>
   </view>
 </view>

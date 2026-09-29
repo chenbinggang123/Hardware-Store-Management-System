@@ -1,9 +1,9 @@
 <view class="screen">
   <!-- User Profile -->
   <view class="hero-card">
-    <view class="hero-eyebrow">SYSTEM</view>
+    <view class="hero-eyebrow">设置</view>
     <view style="display:flex; align-items:center; gap:20rpx; margin-top: 16rpx;">
-      <view class="avatar avatar-lg">{{currentUser.name ? currentUser.name.charAt(0) : '管'}}</view>
+      <view class="avatar avatar-lg">{{userInitial}}</view>
       <view>
         <view class="hero-title" style="font-size: 32rpx; margin-top: 0;">{{currentUser.name || '管理员'}}</view>
         <view class="hero-subtitle" style="margin-top: 4rpx;">{{currentUser.role || '管理员'}} · {{currentUser.username || 'admin'}}</view>
@@ -15,7 +15,7 @@
   <view class="form-card">
     <view class="setting-row" bindtap="openUsers">
       <view class="setting-left">
-        <view class="setting-icon users">👥</view>
+        <view class="setting-icon users">人</view>
         <view>
           <view class="setting-label">用户管理</view>
           <view class="setting-desc">管理系统账号和角色权限</view>
@@ -25,7 +25,7 @@
     </view>
     <view class="setting-row" bindtap="openLogs">
       <view class="setting-left">
-        <view class="setting-icon logs">📝</view>
+        <view class="setting-icon logs">记</view>
         <view>
           <view class="setting-label">操作日志</view>
           <view class="setting-desc">查看关键操作记录</view>
@@ -35,7 +35,7 @@
     </view>
     <view class="setting-row" bindtap="backupNow">
       <view class="setting-left">
-        <view class="setting-icon backup">💾</view>
+        <view class="setting-icon backup">存</view>
         <view>
           <view class="setting-label">立即备份</view>
           <view class="setting-desc">备份当前系统数据</view>
@@ -45,7 +45,7 @@
     </view>
     <view class="setting-row" bindtap="restoreLast">
       <view class="setting-left">
-        <view class="setting-icon backup">🔄</view>
+        <view class="setting-icon backup">复</view>
         <view>
           <view class="setting-label">恢复备份</view>
           <view class="setting-desc">恢复最近一次备份</view>
@@ -55,9 +55,9 @@
     </view>
     <view class="setting-row" bindtap="logout">
       <view class="setting-left">
-        <view class="setting-icon logout">🚪</view>
+        <view class="setting-icon logout">退</view>
         <view>
-          <view class="setting-label" style="color: #BF4F1C;">退出登录</view>
+          <view class="setting-label" style="color: #B95034;">退出登录</view>
           <view class="setting-desc">返回登录界面</view>
         </view>
       </view>

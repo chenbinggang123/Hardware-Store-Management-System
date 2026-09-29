@@ -20,7 +20,7 @@
     </view>
     <view class="data-card" style="border: 2rpx solid rgba(196, 86, 42, 0.2);">
       <view class="metric-label">库存预警</view>
-      <view class="metric-value" style="color: {{inventoryReport.warningCount > 0 ? '#BF4F1C' : '#1A1410'}};">{{inventoryReport.warningCount}}</view>
+      <view class="metric-value" style="color: {{inventoryReport.warningCount > 0 ? '#B95034' : '#182126'}};">{{inventoryReport.warningCount}}</view>
     </view>
   </view>
 
@@ -36,7 +36,7 @@
     <view class="form-section-title">销售统计</view>
     <view class="detail-grid">
       <view class="detail-item"><view class="detail-label">销售单数量</view><view class="detail-value">{{salesReport.count}}</view></view>
-      <view class="detail-item"><view class="detail-label">已收金额</view><view class="detail-value" style="color: #29714C;">¥{{salesReport.receivedAmount}}</view></view>
+      <view class="detail-item"><view class="detail-label">已收金额</view><view class="detail-value" style="color: #247A55;">¥{{salesReport.receivedAmount}}</view></view>
     </view>
   </view>
 
@@ -44,7 +44,7 @@
     <view class="form-section-title">库存统计</view>
     <view class="detail-grid">
       <view class="detail-item"><view class="detail-label">库存记录数</view><view class="detail-value">{{inventoryReport.totalInventoryRecords}}</view></view>
-      <view class="detail-item"><view class="detail-label">预警数量</view><view class="detail-value" style="color: {{inventoryReport.warningCount > 0 ? '#BF4F1C' : '#1A1410'}};">{{inventoryReport.warningCount}}</view></view>
+      <view class="detail-item"><view class="detail-label">预警数量</view><view class="detail-value" style="color: {{inventoryReport.warningCount > 0 ? '#B95034' : '#182126'}};">{{inventoryReport.warningCount}}</view></view>
     </view>
   </view>
 </view>

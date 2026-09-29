@@ -19,6 +19,12 @@ Agent 的产品目标不是模拟用户点击小程序，而是让个体经营�
 
 ## 3. 文档地图
 
+### 技术架构总览
+
+[![五金门店智能 Agent 技术架构](./technical-architecture.png)](./technical-architecture.png)
+
+该图集中展示微信小程序、CloudBase 云托管、Spring Boot、Agent Harness、业务工具、大模型服务与 MySQL 之间的关系，以及一次 Agent 任务的执行与人工确认流程。
+
 | 文档 | 内容 | 状态 |
 | --- | --- | --- |
 | [01-产品设计.md](./01-产品设计.md) | 用户、场景、价值、MVP 和产品指标 | 初稿 |
@@ -45,12 +51,13 @@ Agent 的产品目标不是模拟用户点击小程序，而是让个体经营�
 - 销售单草稿生成和修改。
 - 人工确认后创建正式销售单。
 - Agent 会话、运行、工具调用和审批日志。
+- JPG/PNG/WEBP 订单图片与 XLS/XLSX/CSV 订单附件识别。
 - 失败时回退到传统页面。
 
 ### 4.2 后续范围
 
 - 语音开单。
-- 图片和票据识别。
+- PDF、Word 和复杂版式票据识别。
 - 用户商品别名与经营习惯记忆。
 - 采购建议和采购草稿。
 - 主动经营提醒。
@@ -72,3 +79,27 @@ Agent 的产品目标不是模拟用户点击小程序，而是让个体经营�
 - 文档中的“计划”“建议”和“已实现”必须明确区分。
 - 新工具必须同时补充风险等级、权限、幂等、确认和评测用例。
 - 正式开发前，MVP 文档中的待确认事项必须完成评审。
+
+## 6. 附件识别部署
+
+小程序生产环境使用 CloudBase 云存储直传：`wx.cloud.uploadFile` 返回 `fileID`，再通过 `wx.cloud.callContainer` 通知后端读取和解析。无需配置旧的 `uploadFile` 公网合法域名。
+
+附件默认保存到 `./data/agent-attachments` 的方式仅用于本地接口测试；如果其他客户端仍通过后端 multipart 上传，可切换为私有 COS：
+
+```text
+AGENT_ATTACHMENT_STORAGE=cos
+COS_SECRET_ID=...
+COS_SECRET_KEY=...
+COS_REGION=ap-shanghai
+COS_BUCKET=your-private-bucket-1250000000
+```
+
+Excel 和 CSV 由 Spring Boot 直接解析。图片需要先部署 [`tools/paddleocr-service`](../../tools/paddleocr-service/README.md)，然后设置：
+
+```text
+AGENT_ATTACHMENT_OCR_URL=http://paddleocr-service:8090/ocr
+```
+
+单个文件默认不超过 10MB，每条消息最多 3 个附件。附件内容会作为不可信业务数据交给模型，识别结果只能生成待确认草稿，不能绕过已有审批流程直接创建正式订单。
+
+生产环境需确认 `CLOUDBASE_ENV_ID` 与小程序的 CloudBase 环境一致，并把云存储安全规则限制为当前小程序用户可写。后端只接受当前环境的 `cloud://` fileID，并只从 CloudBase/COS 官方域名读取短期下载地址。

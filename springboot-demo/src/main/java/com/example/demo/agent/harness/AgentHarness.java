@@ -1,5 +1,6 @@
 package com.example.demo.agent.harness;
 
+import com.example.demo.agent.entity.AgentConversation;
 import com.example.demo.agent.entity.AgentRun;
 import com.example.demo.agent.model.AgentModelGateway;
 import com.example.demo.agent.model.AgentModelResponse;
@@ -7,12 +8,14 @@ import com.example.demo.agent.model.AgentToolCall;
 import com.example.demo.agent.policy.AgentPolicyDecision;
 import com.example.demo.agent.policy.AgentPolicyEngine;
 import com.example.demo.agent.repository.AgentRunRepository;
+import com.example.demo.agent.service.AgentConversationService;
 import com.example.demo.agent.tool.AgentTool;
 import com.example.demo.agent.tool.AgentToolContext;
 import com.example.demo.agent.tool.AgentToolRegistry;
 import com.example.demo.agent.trace.AgentTraceRecorder;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -32,6 +35,23 @@ public class AgentHarness {
     private final AgentPolicyEngine policyEngine;
     private final AgentTraceRecorder traceRecorder;
     private final ObjectMapper objectMapper;
+    private final AgentConversationService conversationService;
+
+    @Autowired
+    public AgentHarness(
+            AgentRunRepository runRepository,
+            AgentToolRegistry toolRegistry,
+            AgentPolicyEngine policyEngine,
+            AgentTraceRecorder traceRecorder,
+            ObjectMapper objectMapper,
+            AgentConversationService conversationService) {
+        this.runRepository = runRepository;
+        this.toolRegistry = toolRegistry;
+        this.policyEngine = policyEngine;
+        this.traceRecorder = traceRecorder;
+        this.objectMapper = objectMapper;
+        this.conversationService = conversationService;
+    }
 
     public AgentHarness(
             AgentRunRepository runRepository,
@@ -39,20 +59,41 @@ public class AgentHarness {
             AgentPolicyEngine policyEngine,
             AgentTraceRecorder traceRecorder,
             ObjectMapper objectMapper) {
-        this.runRepository = runRepository;
-        this.toolRegistry = toolRegistry;
-        this.policyEngine = policyEngine;
-        this.traceRecorder = traceRecorder;
-        this.objectMapper = objectMapper;
+        this(runRepository, toolRegistry, policyEngine, traceRecorder, objectMapper, null);
     }
 
     public AgentRunResult run(String userInput, Long operatorId, AgentModelGateway gateway) {
+        return run(userInput, operatorId, gateway, null);
+    }
+
+    public AgentRunResult run(
+            String userInput,
+            Long operatorId,
+            AgentModelGateway gateway,
+            Long conversationId) {
+        return run(userInput, userInput, operatorId, gateway, conversationId);
+    }
+
+    public AgentRunResult run(
+            String userInput,
+            String modelInput,
+            Long operatorId,
+            AgentModelGateway gateway,
+            Long conversationId) {
         if (!StringUtils.hasText(userInput)) {
             throw new IllegalArgumentException("Agent 输入不能为空");
+        }
+        if (!StringUtils.hasText(modelInput)) {
+            throw new IllegalArgumentException("Agent 模型输入不能为空");
         }
         if (gateway == null) {
             throw new IllegalArgumentException("Agent 模型网关不能为空");
         }
+
+        AgentConversation conversation = conversationService == null ? null
+                : conversationService.resolve(conversationId, operatorId, userInput);
+        var conversationHistory = conversation == null ? List.<com.example.demo.agent.model.AgentChatMessage>of()
+                : conversationService.context(conversation.getId());
 
         AgentRun run = new AgentRun();
         run.setOperatorId(operatorId);
@@ -62,8 +103,12 @@ public class AgentHarness {
         run.setStartedAt(LocalDateTime.now());
         run.setExpiresAt(LocalDateTime.now().plusMinutes(30));
         run = runRepository.save(run);
+        if (conversation != null) {
+            conversationService.attachRun(conversation, run.getId());
+        }
 
-        AgentRunContext context = new AgentRunContext(run.getId(), operatorId, userInput.trim());
+        AgentRunContext context = new AgentRunContext(
+                run.getId(), operatorId, modelInput.trim(), conversationHistory);
         return continueRun(run, context, gateway, false);
     }
 
@@ -78,7 +123,7 @@ public class AgentHarness {
             int firstStep = Math.max(run.getCurrentStep() == null ? 0 : run.getCurrentStep(), 0) + 1;
             for (int step = firstStep; step <= MAX_MODEL_STEPS; step++) {
                 run.setCurrentStep(step);
-                runRepository.save(run);
+                run = runRepository.save(run);
                 AgentModelResponse response = gateway.respond(context, toolRegistry.definitions());
                 if (response == null) {
                     throw new IllegalStateException("模型返回为空");
@@ -87,8 +132,8 @@ public class AgentHarness {
                     run.setStatus(AgentRunStatus.COMPLETED);
                     run.setOutputText(response.getFinalOutput());
                     run.setCompletedAt(LocalDateTime.now());
-                    runRepository.save(run);
-                    return new AgentRunResult(run.getId(), run.getStatus(), run.getOutputText());
+                    run = runRepository.save(run);
+                    return result(run, null);
                 }
                 if (response.getToolCalls() == null || response.getToolCalls().isEmpty()) {
                     throw new IllegalStateException("模型既未返回结果，也未请求工具");
@@ -115,9 +160,8 @@ public class AgentHarness {
                         run.setContextJson(toJson(context.getToolResults()));
                         run.setOutputText("即将执行“" + tool.definition().getDescription()
                                 + "”，请确认。影响预览：" + toJson(approvalPreview));
-                        runRepository.save(run);
-                        return new AgentRunResult(run.getId(), run.getStatus(), run.getOutputText(),
-                                pendingAction(run, tool, approvalPreview));
+                        run = runRepository.save(run);
+                        return result(run, pendingAction(run, tool, approvalPreview));
                     }
                     long started = System.currentTimeMillis();
                     try {
@@ -140,8 +184,8 @@ public class AgentHarness {
                     ? "操作已成功执行，但生成结果说明失败：" + exception.getMessage()
                     : exception.getMessage());
             run.setCompletedAt(LocalDateTime.now());
-            runRepository.save(run);
-            return new AgentRunResult(run.getId(), run.getStatus(), run.getOutputText());
+            run = runRepository.save(run);
+            return result(run, null);
         }
     }
 
@@ -165,7 +209,7 @@ public class AgentHarness {
                 existing.setCompletedAt(now);
                 existing.setOutputText("确认已超时，请重新发起任务");
                 runRepository.save(existing);
-                return new AgentRunResult(existing.getId(), existing.getStatus(), existing.getOutputText());
+                return result(existing, null);
             }
             throw new IllegalArgumentException("Agent 任务已被处理或当前不等待确认");
         }
@@ -176,8 +220,8 @@ public class AgentHarness {
             run.setCompletedAt(LocalDateTime.now());
             run.setOutputText("用户已取消本次操作");
             clearPending(run);
-            runRepository.save(run);
-            return new AgentRunResult(run.getId(), run.getStatus(), run.getOutputText());
+            run = runRepository.save(run);
+            return result(run, null);
         }
 
         AgentTool tool = toolRegistry.require(run.getPendingToolName());
@@ -200,13 +244,13 @@ public class AgentHarness {
             run.setOutputText(toJson(result));
             run.setContextJson(toJson(runContext.getToolResults()));
             clearPending(run);
-            runRepository.save(run);
+            run = runRepository.save(run);
             if (gateway == null) {
                 run.setStatus(AgentRunStatus.COMPLETED);
                 run.setCompletedAt(LocalDateTime.now());
                 run.setOutputText("操作已成功执行。结果：" + toJson(result));
-                runRepository.save(run);
-                return new AgentRunResult(run.getId(), run.getStatus(), run.getOutputText());
+                run = runRepository.save(run);
+                return result(run, null);
             }
             return continueRun(run, runContext, gateway, true);
         } catch (RuntimeException exception) {
@@ -221,8 +265,8 @@ public class AgentHarness {
                     : exception.getMessage());
             run.setCompletedAt(LocalDateTime.now());
             clearPending(run);
-            runRepository.save(run);
-            return new AgentRunResult(run.getId(), run.getStatus(), run.getOutputText());
+            run = runRepository.save(run);
+            return result(run, null);
         }
     }
 
@@ -233,15 +277,17 @@ public class AgentHarness {
             throw new IllegalArgumentException("无权查看其他操作人的 Agent 任务");
         }
         if (run.getStatus() != AgentRunStatus.WAITING_APPROVAL) {
-            return new AgentRunResult(run.getId(), run.getStatus(), run.getOutputText());
+            return result(run, null);
         }
         AgentTool tool = toolRegistry.require(run.getPendingToolName());
-        return new AgentRunResult(run.getId(), run.getStatus(), run.getOutputText(),
-                pendingAction(run, tool, readJsonValue(run.getPendingPreviewJson())));
+        return result(run, pendingAction(run, tool, readJsonValue(run.getPendingPreviewJson())));
     }
 
     private AgentRunContext restoreContext(AgentRun run) {
-        AgentRunContext context = new AgentRunContext(run.getId(), run.getOperatorId(), run.getInputText());
+        var history = conversationService == null ? List.<com.example.demo.agent.model.AgentChatMessage>of()
+                : conversationService.contextBeforeRun(run.getId());
+        AgentRunContext context = new AgentRunContext(
+                run.getId(), run.getOperatorId(), run.getInputText(), history);
         if (!StringUtils.hasText(run.getContextJson())) {
             return context;
         }
@@ -286,6 +332,16 @@ public class AgentHarness {
         run.setPendingToolName(null);
         run.setPendingArgumentsJson(null);
         run.setPendingPreviewJson(null);
+    }
+
+    private AgentRunResult result(AgentRun run, AgentPendingAction pendingAction) {
+        AgentRunResult result = new AgentRunResult(
+                run.getId(), run.getStatus(), run.getOutputText(), pendingAction);
+        if (conversationService != null) {
+            result.setConversationId(conversationService.conversationIdForRun(run.getId()));
+            conversationService.touchByRunId(run.getId());
+        }
+        return result;
     }
 
     private AgentPendingAction pendingAction(AgentRun run, AgentTool tool, Object preview) {

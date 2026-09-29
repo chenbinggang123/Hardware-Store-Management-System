@@ -1,7 +1,25 @@
 <view class="screen">
-  <view class="section-head">
-    <view class="section-title">销售管理</view>
-    <view class="btn btn-primary btn-sm" bindtap="openCreate">＋ 新建销售单</view>
+  <view class="page-heading">
+    <view class="page-heading-copy">
+      <view class="page-kicker">销售单据</view>
+      <view class="section-title">开单、收款、出库</view>
+      <view class="page-description">普通开单直接操作，复杂订单交给小五</view>
+    </view>
+    <view class="btn btn-primary btn-sm" bindtap="openCreate">＋ 新建</view>
+  </view>
+
+  <view class="stats-strip">
+    <view class="stat-item"><view class="stat-value">{{metrics.total}}</view><view class="stat-label">销售单</view></view>
+    <view class="stat-item"><view class="stat-value stat-currency">¥{{metrics.totalAmount}}</view><view class="stat-label">单据金额</view></view>
+    <view class="stat-item {{metrics.unpaidCount ? 'stat-attention' : ''}}"><view class="stat-value">{{metrics.unpaidCount}}</view><view class="stat-label">待收款</view></view>
+  </view>
+
+  <view class="page-widget-row">
+    <view class="page-widget-alert {{metrics.unpaidCount ? 'is-warning' : ''}}">
+      <view class="page-widget-mark">款</view>
+      <view><view class="page-widget-title">待收 ¥{{metrics.debtAmount}}</view><view class="page-widget-desc">点进单据登记收款</view></view>
+    </view>
+    <view class="agent-assist" bindtap="openAgent"><text>复杂开单</text><text class="agent-assist-arrow">›</text></view>
   </view>
 
   <view class="loading-state" wx:if="{{loading}}">销售数据加载中...</view>
@@ -18,8 +36,8 @@
         </view>
         <view class="list-meta">总金额 ¥{{item.totalAmount}} · 已收 ¥{{item.receivedAmount}} · 欠款 ¥{{item.debtAmount}}</view>
         <view class="list-meta">出库 {{item.status}} · {{item.orderTime}}</view>
-        <view class="action-row">
-          <view class="btn btn-outline btn-sm" bindtap="openDetail" data-id="{{item.id}}">详情</view>
+        <view class="action-row card-actions">
+          <view class="btn btn-primary btn-sm" bindtap="openDetail" data-id="{{item.id}}">查看详情</view>
           <view class="btn btn-outline btn-sm" bindtap="openEdit" data-id="{{item.id}}">编辑</view>
           <view class="btn btn-ghost btn-sm" bindtap="openDetail" data-id="{{item.id}}">确认出库</view>
           <view class="btn btn-ghost btn-sm" bindtap="openDetail" data-id="{{item.id}}">收款登记</view>
@@ -31,6 +49,6 @@
   <view class="empty-state" wx:if="{{!loading && !salesOrders.length}}">
     <text class="empty-icon">📤</text>
     <view class="empty-title">暂无销售单</view>
-    <view class="empty-desc">点击右上角新建第一张销售单</view>
+    <view class="empty-desc">点击右上角“新建”，开第一张销售单</view>
   </view>
 </view>

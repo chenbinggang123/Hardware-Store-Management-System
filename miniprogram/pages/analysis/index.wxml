@@ -1,8 +1,8 @@
 <view class="screen">
   <view class="hero-card">
     <view class="hero-eyebrow">INSIGHT</view>
-    <view class="hero-title">经营数据看板</view>
-    <view class="hero-subtitle">聚合核心指标和趋势视图，帮助快速判断该补货、该催款还是该压采购。</view>
+    <view class="hero-title">经营分析</view>
+    <view class="hero-subtitle">直接看采购、销售和库存情况，需要深入判断时再交给小五分析。</view>
     <view class="top-actions">
       <view class="btn btn-primary btn-sm" bindtap="openReportCenter">报表中心</view>
       <view class="btn btn-outline btn-sm" bindtap="openExport">数据导出</view>
@@ -11,19 +11,19 @@
 
   <view class="grid-2" style="margin-top: 20rpx;">
     <view class="data-card">
-      <view class="metric-label">📥 采购总额</view>
+      <view class="metric-label">采购总额</view>
       <view class="metric-value">¥{{report.purchase || 0}}</view>
     </view>
     <view class="data-card">
-      <view class="metric-label">📤 销售总额</view>
+      <view class="metric-label">销售总额</view>
       <view class="metric-value">¥{{report.sales || 0}}</view>
     </view>
     <view class="data-card">
-      <view class="metric-label">⚠️ 库存预警</view>
-      <view class="metric-value" style="color: {{report.inventoryWarnings > 0 ? '#BF4F1C' : '#1A1410'}};">{{report.inventoryWarnings || 0}}</view>
+      <view class="metric-label">库存预警</view>
+      <view class="metric-value" style="color: {{report.inventoryWarnings > 0 ? '#B95034' : '#182126'}};">{{report.inventoryWarnings || 0}}</view>
     </view>
     <view class="data-card">
-      <view class="metric-label">📊 报表类型</view>
+      <view class="metric-label">当前报表</view>
       <view class="metric-value" style="font-size: 28rpx;">{{report.label || '日报'}}</view>
     </view>
   </view>

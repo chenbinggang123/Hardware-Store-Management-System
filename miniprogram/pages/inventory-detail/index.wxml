@@ -13,7 +13,7 @@
     <view class="detail-grid">
       <view class="detail-item"><view class="detail-label">商品条码</view><view class="detail-value">{{product ? product.barcode : '--'}}</view></view>
       <view class="detail-item"><view class="detail-label">库位</view><view class="detail-value">{{inventory.locationId}}</view></view>
-      <view class="detail-item"><view class="detail-label">当前库存</view><view class="detail-value" style="color: {{inventory.quantity <= inventory.warningThreshold ? '#BF4F1C' : '#1A1410'}}; font-size: 32rpx; font-weight: 800;">{{inventory.quantity}}</view></view>
+      <view class="detail-item"><view class="detail-label">当前库存</view><view class="detail-value" style="color: {{inventory.quantity <= inventory.warningThreshold ? '#B95034' : '#182126'}}; font-size: 32rpx; font-weight: 800;">{{inventory.quantity}}</view></view>
       <view class="detail-item"><view class="detail-label">最后更新</view><view class="detail-value">{{inventory.lastUpdateTime}}</view></view>
     </view>
   </view>

@@ -31,7 +31,7 @@
       <view class="stat-label">当前库存</view>
     </view>
     <view class="stat-item">
-      <view class="stat-value" style="font-size: 24rpx; color: {{product.status === 1 ? '#29714C' : '#A89880'}};">{{product.statusText}}</view>
+      <view class="stat-value" style="font-size: 24rpx; color: {{product.status === 1 ? '#247A55' : '#74807B'}};">{{product.statusText}}</view>
       <view class="stat-label">状态</view>
     </view>
   </view>
@@ -65,7 +65,7 @@
       <view class="detail-item"><view class="detail-label">库位</view><view class="detail-value">{{product.locationText}}</view></view>
     </view>
     <view class="banner banner-warning" wx:if="{{product.lowStock}}" style="margin-top: 16rpx;">
-      <text class="banner-icon">⚠️</text>
+      <text class="banner-icon">!</text>
       <view><view class="banner-title">库存预警</view><view class="banner-desc">当前库存已进入低库存区间，建议尽快补货。</view></view>
     </view>
   </view>

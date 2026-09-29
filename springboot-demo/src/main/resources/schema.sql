@@ -88,6 +88,15 @@ CREATE TABLE IF NOT EXISTS sales_order_draft (
     KEY idx_sales_draft_operator_status (operator_id, status)
 );
 
+CREATE TABLE IF NOT EXISTS agent_conversation (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    operator_id BIGINT NOT NULL,
+    title VARCHAR(120) NOT NULL,
+    create_time DATETIME NOT NULL,
+    update_time DATETIME NOT NULL,
+    KEY idx_agent_conversation_operator_update (operator_id, update_time)
+);
+
 CREATE TABLE IF NOT EXISTS agent_run (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     operator_id BIGINT NOT NULL,
@@ -106,6 +115,35 @@ CREATE TABLE IF NOT EXISTS agent_run (
     expires_at DATETIME NOT NULL,
     version BIGINT NOT NULL DEFAULT 0,
     KEY idx_agent_run_operator_status (operator_id, status)
+);
+
+CREATE TABLE IF NOT EXISTS agent_conversation_run (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    conversation_id BIGINT NOT NULL,
+    run_id BIGINT NOT NULL,
+    create_time DATETIME NOT NULL,
+    UNIQUE KEY uk_agent_conversation_run (run_id),
+    KEY idx_agent_conversation_run_order (conversation_id, create_time)
+);
+
+CREATE TABLE IF NOT EXISTS agent_attachment (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    conversation_id BIGINT NOT NULL,
+    run_id BIGINT,
+    operator_id BIGINT NOT NULL,
+    object_key VARCHAR(500) NOT NULL,
+    original_name VARCHAR(255) NOT NULL,
+    mime_type VARCHAR(100) NOT NULL,
+    file_size BIGINT NOT NULL,
+    sha256 VARCHAR(64) NOT NULL,
+    parse_status VARCHAR(32) NOT NULL,
+    extracted_text LONGTEXT,
+    error_message VARCHAR(1000),
+    create_time DATETIME NOT NULL,
+    update_time DATETIME NOT NULL,
+    KEY idx_agent_attachment_conversation (conversation_id, create_time),
+    KEY idx_agent_attachment_run (run_id),
+    KEY idx_agent_attachment_operator (operator_id)
 );
 
 CREATE TABLE IF NOT EXISTS agent_tool_call (

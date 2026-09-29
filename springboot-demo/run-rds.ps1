@@ -1,5 +1,5 @@
 param(
-    [string]$ConfigPath = "scripts/rds/rds.config.example.json",
+    [string]$ConfigPath = "scripts/rds/rds.config.json",
     [string]$DbHost,
     [Nullable[int]]$DbPort,
     [string]$DbName,
@@ -12,21 +12,23 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-. (Join-Path $PSScriptRoot "scripts\backup\common.ps1")
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$configResolved = $ConfigPath
 
-$config = Read-BackupConfig -ConfigPath $ConfigPath
-$dbHostValue = Select-SettingValue -ExplicitValue $DbHost -ConfigValue (Get-ConfigValue $config "connection.host")
-$dbPortValue = [int](Select-SettingValue -ExplicitValue $DbPort -ConfigValue (Get-ConfigValue $config "connection.port") -DefaultValue 3306)
-$dbNameValue = Select-SettingValue -ExplicitValue $DbName -ConfigValue (Get-ConfigValue $config "connection.database") -DefaultValue "hardware_store"
-$dbUsernameValue = Select-SettingValue -ExplicitValue $DbUsername -ConfigValue (Get-ConfigValue $config "connection.username")
-$dbPasswordValue = Select-SettingValue -ExplicitValue $DbPassword -ConfigValue (Get-ConfigValue $config "connection.password") -DefaultValue ""
-$serverPortValue = [int](Select-SettingValue -ExplicitValue $ServerPort -ConfigValue (Get-ConfigValue $config "application.serverPort") -DefaultValue 8084)
-
-if (-not (Test-TextValue $dbHostValue)) {
-    throw "DbHost is required."
+if (-not [System.IO.Path]::IsPathRooted($ConfigPath)) {
+    $configResolved = Join-Path $scriptDir $ConfigPath
+    $configResolved = (Resolve-Path $configResolved).Path
 }
-if (-not (Test-TextValue $dbUsernameValue)) {
-    throw "DbUsername is required."
+
+$config = Get-Content -Raw $configResolved | ConvertFrom-Json
+
+$dbHostValue = if ($DbHost) { $DbHost } else { $config.connection.host }
+$dbPortValue = if ($DbPort) { $DbPort } else { $config.connection.port }
+$dbNameValue = if ($DbName) { $DbName } else { $config.connection.database }
+$dbUsernameValue = if ($DbUsername) { $DbUsername } else { $config.connection.username }
+$dbPasswordValue = if ($DbPassword) { $DbPassword } else { $config.connection.password }
+$serverPortValue = if ($ServerPort) { $ServerPort } else {
+    if ($config.application.serverPort) { $config.application.serverPort } else { 8084 }
 }
 
 $env:APP_PROFILE = "mysql"
@@ -36,9 +38,12 @@ $env:DB_NAME = $dbNameValue
 $env:DB_USERNAME = $dbUsernameValue
 $env:DB_PASSWORD = $dbPasswordValue
 
-Write-Host ("Running application against RDS: {0}:{1}/{2}" -f $dbHostValue, $dbPortValue, $dbNameValue)
+Write-Host "Running application against RDS: ${dbHostValue}:${dbPortValue}/${dbNameValue}"
+Write-Host "Server port: $serverPortValue"
+Write-Host ""
 
-$runScript = Join-Path $PSScriptRoot "run-dev.ps1"
+$runScript = Join-Path $scriptDir "run-dev.ps1"
+
 if ($CompileOnly) {
     & $runScript -CompileOnly -Port $serverPortValue
 } else {

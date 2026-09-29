@@ -1,1 +1,3 @@
-/* Inventories overrides */
+/* Inventories details */
+.list-card { position: relative; overflow: hidden; }
+.inventory-warning-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 7rpx; background: #B95034; }

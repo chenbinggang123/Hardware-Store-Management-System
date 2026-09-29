@@ -9,7 +9,7 @@
       <view class="list-card">
         <view class="list-head">
           <view style="display:flex; align-items:center; gap: 16rpx;">
-            <view class="avatar" style="width: 64rpx; height: 64rpx; font-size: 24rpx;">{{item.name.charAt(0)}}</view>
+            <view class="avatar" style="width: 64rpx; height: 64rpx; font-size: 24rpx;">{{item.initial}}</view>
             <view style="flex:1; min-width:0;">
               <view class="list-title">{{item.name}}</view>
               <view class="list-meta">{{item.username}} · {{item.phone}}</view>

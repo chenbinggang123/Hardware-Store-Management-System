@@ -1,1 +1,3 @@
 /* Login overrides — most styles live in app.wxss */
+.login-card .search-icon { min-width: 58rpx; margin-right: 14rpx; color: #52605A; font-size: 22rpx; font-weight: 600; }
+.login-card .search-icon::after { display: none; }

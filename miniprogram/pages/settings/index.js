@@ -4,6 +4,7 @@ const { openPage, showToast } = require('../../utils/router')
 Page({
   data: {
     currentUser: {},
+    userInitial: '管',
     users: [],
     logs: [],
     lastBackup: null
@@ -11,15 +12,19 @@ Page({
 
   onLoad() {
     const app = getApp()
+    const currentUser = app.globalData.currentUser || {}
     this.setData({
-      currentUser: app.globalData.currentUser || {}
+      currentUser,
+      userInitial: currentUser.name ? String(currentUser.name).slice(0, 1) : '管'
     })
   },
 
   onShow() {
     const app = getApp()
+    const currentUser = app.globalData.currentUser || {}
     this.setData({
-      currentUser: app.globalData.currentUser || {}
+      currentUser,
+      userInitial: currentUser.name ? String(currentUser.name).slice(0, 1) : '管'
     })
     Promise.all([api.getUsers(), api.getLogs()]).then(([users, logs]) => {
       this.setData({

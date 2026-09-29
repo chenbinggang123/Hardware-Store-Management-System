@@ -15,11 +15,11 @@
       <view class="stat-label">总金额</view>
     </view>
     <view class="stat-item">
-      <view class="stat-value" style="color: #29714C;">¥{{order.receivedAmount}}</view>
+      <view class="stat-value" style="color: #247A55;">¥{{order.receivedAmount}}</view>
       <view class="stat-label">已收</view>
     </view>
     <view class="stat-item">
-      <view class="stat-value" style="color: {{order.debtAmount > 0 ? '#BF4F1C' : '#29714C'}};">¥{{order.debtAmount}}</view>
+      <view class="stat-value" style="color: {{order.debtAmount > 0 ? '#B95034' : '#247A55'}};">¥{{order.debtAmount}}</view>
       <view class="stat-label">欠款</view>
     </view>
   </view>

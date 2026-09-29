@@ -1,10 +1,23 @@
 const api = require('../../utils/api')
 const { openPage } = require('../../utils/router')
 
+function buildMetrics(orders) {
+  const totalAmount = orders.reduce((sum, item) => sum + Number(item.totalAmount || 0), 0)
+  const debtAmount = orders.reduce((sum, item) => sum + Number(item.debtAmount || 0), 0)
+  const unpaidCount = orders.filter((item) => Number(item.debtAmount || 0) > 0).length
+  return {
+    total: orders.length,
+    totalAmount: totalAmount.toFixed(2),
+    debtAmount: debtAmount.toFixed(2),
+    unpaidCount
+  }
+}
+
 Page({
   data: {
     salesOrders: [],
-    loading: true
+    loading: true,
+    metrics: { total: 0, totalAmount: '0.00', debtAmount: '0.00', unpaidCount: 0 }
   },
 
   onLoad() {
@@ -22,14 +35,17 @@ Page({
   loadSalesOrders(stopPullDownRefresh) {
     this.setData({ loading: true })
     api.getSalesOrders().then((salesOrders) => {
+      const orders = salesOrders || []
       this.setData({
-        salesOrders: salesOrders || [],
-        loading: false
+        salesOrders: orders,
+        loading: false,
+        metrics: buildMetrics(orders)
       })
     }).catch(() => {
       this.setData({
         salesOrders: [],
-        loading: false
+        loading: false,
+        metrics: { total: 0, totalAmount: '0.00', debtAmount: '0.00', unpaidCount: 0 }
       })
     }).finally(() => {
       if (stopPullDownRefresh) wx.stopPullDownRefresh()
@@ -42,6 +58,10 @@ Page({
 
   openCreate() {
     openPage('/pages/sales-form/index')
+  },
+
+  openAgent() {
+    openPage('/pages/agent/index')
   },
 
   openEdit(event) {

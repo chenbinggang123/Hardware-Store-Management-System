@@ -34,8 +34,8 @@ powershell -ExecutionPolicy Bypass -File .\run-dev.ps1
 
 公网部署地址：
 
-- HTTPS 接口根路径：`https://api.hardware1122.xin/api`
-- 微信小程序后台服务器域名：`https://api.hardware1122.xin`
+- CloudBase 环境：`cloud1-d0gvllpf639d10665`
+- 云托管服务：`hardware-store-api`（小程序通过 `wx.cloud.callContainer` 调用，不依赖自定义域名）
 
 ## Agent 方向设计
 

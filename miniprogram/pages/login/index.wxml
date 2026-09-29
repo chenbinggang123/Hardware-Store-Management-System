@@ -1,18 +1,18 @@
 <view class="login-screen">
   <view class="login-brand">
-    <view class="login-brand-icon">🔧</view>
-    <view class="login-brand-name">五金店管理系统</view>
-    <view class="login-brand-desc">Hardware Store OS</view>
+    <view class="login-brand-icon">恒</view>
+    <view class="login-brand-name">恒丰五金</view>
+    <view class="login-brand-desc">商品、单据和库存都在这里</view>
   </view>
 
   <view class="login-card">
     <view class="title-md" style="margin-bottom: 4rpx;">账号登录</view>
-    <view class="text-muted">请输入管理员分配的账号密码</view>
+    <view class="text-muted">输入账号和密码即可进入</view>
 
     <view class="login-field">
       <view class="form-label">账号</view>
       <view class="search-box" style="margin-top: 8rpx;">
-        <text class="search-icon">👤</text>
+        <text class="search-icon">账号</text>
         <input class="search-input" placeholder="请输入账号" value="{{username}}" bindinput="onUsernameInput" />
       </view>
     </view>
@@ -20,13 +20,13 @@
     <view class="login-field">
       <view class="form-label">密码</view>
       <view class="search-box" style="margin-top: 8rpx;">
-        <text class="search-icon">🔒</text>
+        <text class="search-icon">密码</text>
         <input class="search-input" password placeholder="请输入密码" value="{{password}}" bindinput="onPasswordInput" />
       </view>
     </view>
 
     <button class="login-btn" loading="{{loading}}" bindtap="handleLogin">
-      {{loading ? '登录中...' : '进入系统'}}
+      {{loading ? '正在登录...' : '进入恒丰五金'}}
     </button>
   </view>
 
