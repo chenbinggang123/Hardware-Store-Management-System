@@ -41,6 +41,7 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     public Customer saveCustomer(Customer customer) {
+        validateCustomer(customer);
         if (customer.getCreateTime() == null) {
             customer.setCreateTime(LocalDateTime.now());
         }
@@ -54,6 +55,7 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     public Customer updateCustomer(Customer customer) {
+        validateCustomer(customer);
         Customer existingCustomer = getCustomerById(customer.getId())
                 .orElseThrow(() -> new IllegalArgumentException("客户不存在，无法更新"));
         existingCustomer.setName(customer.getName());
@@ -61,9 +63,6 @@ public class CustomerServiceImpl implements CustomerService {
         existingCustomer.setPhone(customer.getPhone());
         existingCustomer.setAddress(customer.getAddress());
         existingCustomer.setRemark(customer.getRemark());
-        if (customer.getDebt() != null) {
-            existingCustomer.setDebt(customer.getDebt());
-        }
         Customer saved = customerRepository.save(existingCustomer);
         saveOperationLog("CUSTOMER", "UPDATE", "更新客户：" + saved.getName(), 1L);
         return saved;
@@ -73,6 +72,9 @@ public class CustomerServiceImpl implements CustomerService {
     public void deleteCustomer(Long id) {
         Customer customer = getCustomerById(id)
                 .orElseThrow(() -> new IllegalArgumentException("客户不存在，无法删除"));
+        if (!salesOrderRepository.findByCustomerId(id).isEmpty()) {
+            throw new IllegalArgumentException("客户存在销售订单，不允许删除");
+        }
         customerRepository.deleteById(id);
         saveOperationLog("CUSTOMER", "DELETE", "删除客户：" + customer.getName(), 1L);
     }
@@ -127,6 +129,16 @@ public class CustomerServiceImpl implements CustomerService {
         String normalized = keyword.trim().toLowerCase();
         return containsText(customer.getName(), normalized)
                 || containsText(customer.getPhone(), normalized);
+    }
+
+    private void validateCustomer(Customer customer) {
+        if (customer == null || !StringUtils.hasText(customer.getName())) {
+            throw new IllegalArgumentException("客户名称不能为空");
+        }
+        if (customer.getDebt() != null && customer.getDebt().compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("客户欠款不能小于 0");
+        }
+        customer.setName(customer.getName().trim());
     }
 
     private boolean containsText(String value, String keyword) {

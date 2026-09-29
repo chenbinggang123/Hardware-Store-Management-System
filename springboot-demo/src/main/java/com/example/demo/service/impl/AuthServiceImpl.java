@@ -8,6 +8,7 @@ import com.example.demo.repository.AppUserRepository;
 import com.example.demo.repository.OperationLogRepository;
 import com.example.demo.security.AuthSession;
 import com.example.demo.security.AuthTokenStore;
+import com.example.demo.security.PasswordSupport;
 import com.example.demo.service.AuthService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,11 +48,15 @@ public class AuthServiceImpl implements AuthService {
         }
         AppUser user = appUserRepository.findByUsername(username)
                 .orElseThrow(() -> new ResponseStatusException(UNAUTHORIZED, "账号或密码错误"));
-        if (!password.equals(user.getPassword())) {
+        if (!PasswordSupport.matches(password, user.getPassword())) {
             throw new ResponseStatusException(UNAUTHORIZED, "账号或密码错误");
         }
         if (user.getStatus() != null && user.getStatus() != 1) {
             throw new ResponseStatusException(UNAUTHORIZED, "当前账号已被禁用");
+        }
+        if (!PasswordSupport.isEncoded(user.getPassword())) {
+            user.setPassword(PasswordSupport.encode(password));
+            appUserRepository.save(user);
         }
         AuthSession session = authTokenStore.createSession(user);
         saveOperationLog(user.getId(), "AUTH", "LOGIN", "用户登录：" + user.getUsername());
@@ -72,8 +77,15 @@ public class AuthServiceImpl implements AuthService {
     }
 
     public AuthSession requireSession(String token) {
-        return authTokenStore.getSession(token)
+        AuthSession session = authTokenStore.getSession(token)
                 .orElseThrow(() -> new ResponseStatusException(UNAUTHORIZED, "登录状态已失效，请重新登录"));
+        AppUser currentUser = appUserRepository.findById(session.getUser().getId())
+                .orElseThrow(() -> new ResponseStatusException(UNAUTHORIZED, "登录用户不存在，请重新登录"));
+        if (currentUser.getStatus() == null || currentUser.getStatus() != 1) {
+            authTokenStore.removeSession(token);
+            throw new ResponseStatusException(UNAUTHORIZED, "当前账号已被禁用");
+        }
+        return new AuthSession(token, currentUser, session.getExpiresAt());
     }
 
     private AuthSessionResponse toResponse(AuthSession session) {
@@ -85,6 +97,7 @@ public class AuthServiceImpl implements AuthService {
         response.setName(user.getName());
         response.setRole(user.getRole());
         response.setStatus(user.getStatus());
+        response.setExpiresAt(session.getExpiresAt());
         return response;
     }
 
