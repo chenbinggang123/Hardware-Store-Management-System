@@ -82,6 +82,9 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     public void deletePurchaseOrder(Long id) {
         PurchaseOrder order = getPurchaseOrderById(id)
                 .orElseThrow(() -> new IllegalArgumentException("采购单不存在，无法删除"));
+        if ("已入库".equals(order.getStatus())) {
+            throw new IllegalArgumentException("已入库采购单不允许删除");
+        }
         purchaseOrderRepository.deleteById(id);
         saveOperationLog("PURCHASE", "DELETE", "删除采购单：" + order.getOrderNumber(), order.getOperatorId());
     }
@@ -113,6 +116,12 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             return order;
         }
         for (PurchaseOrderItem item : safePurchaseItems(order.getItems())) {
+            if (item == null || item.getProductId() == null) {
+                throw new IllegalArgumentException("采购商品不能为空");
+            }
+            if (item.getQuantity() == null || item.getQuantity() <= 0) {
+                throw new IllegalArgumentException("采购商品数量必须大于 0");
+            }
             Product product = productRepository.findById(item.getProductId())
                     .orElseThrow(() -> new IllegalArgumentException("商品不存在，无法入库"));
             Inventory inventory = findOrCreateInventory(product.getId(), product.getLocationId(), product.getStock());
@@ -150,6 +159,9 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     }
 
     private void normalizePurchaseOrder(PurchaseOrder purchaseOrder, boolean keepOrderNumber) {
+        if (purchaseOrder == null) {
+            throw new IllegalArgumentException("采购单不能为空");
+        }
         if (!keepOrderNumber || !StringUtils.hasText(purchaseOrder.getOrderNumber())) {
             purchaseOrder.setOrderNumber("PO" + DateTimeFormatter.ofPattern("yyyyMMddHHmmss").format(LocalDateTime.now()));
         }
@@ -161,19 +173,29 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             purchaseOrder.setStatus("待入库");
         }
         List<PurchaseOrderItem> items = copyPurchaseItems(purchaseOrder.getItems());
+        if (items.isEmpty()) {
+            throw new IllegalArgumentException("采购商品不能为空");
+        }
         BigDecimal totalAmount = BigDecimal.ZERO;
         for (PurchaseOrderItem item : items) {
-            Product product = productRepository.findById(item.getProductId()).orElse(null);
-            if (!StringUtils.hasText(item.getProductName()) && product != null) {
+            if (item == null || item.getProductId() == null) {
+                throw new IllegalArgumentException("采购商品不能为空");
+            }
+            if (item.getQuantity() == null || item.getQuantity() <= 0) {
+                throw new IllegalArgumentException("采购商品数量必须大于 0");
+            }
+            Product product = productRepository.findById(item.getProductId())
+                    .orElseThrow(() -> new IllegalArgumentException("商品不存在：" + item.getProductId()));
+            if (!StringUtils.hasText(item.getProductName())) {
                 item.setProductName(product.getName());
             }
             if (item.getPrice() == null) {
-                item.setPrice(product != null && product.getCostPrice() != null ? product.getCostPrice() : BigDecimal.ZERO);
+                item.setPrice(product.getCostPrice() == null ? BigDecimal.ZERO : product.getCostPrice());
             }
-            BigDecimal amount = item.getAmount();
-            if (amount == null) {
-                amount = item.getPrice().multiply(BigDecimal.valueOf(defaultInteger(item.getQuantity())));
+            if (item.getPrice().compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException("采购商品价格不能小于 0");
             }
+            BigDecimal amount = item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
             item.setAmount(amount);
             totalAmount = totalAmount.add(amount);
         }

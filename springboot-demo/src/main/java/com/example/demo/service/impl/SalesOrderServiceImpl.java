@@ -74,6 +74,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         if ("已出库".equals(existingOrder.getStatus())) {
             throw new IllegalArgumentException("已出库销售单不允许修改");
         }
+        Long previousCustomerId = existingOrder.getCustomerId();
         existingOrder.setCustomerId(salesOrder.getCustomerId());
         existingOrder.setOperatorId(salesOrder.getOperatorId());
         existingOrder.setOrderTime(defaultDateTime(salesOrder.getOrderTime()));
@@ -82,6 +83,9 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         normalizeSalesOrder(existingOrder, true);
         SalesOrder saved = salesOrderRepository.save(existingOrder);
         recalculateCustomerDebt(saved.getCustomerId());
+        if (previousCustomerId != null && !previousCustomerId.equals(saved.getCustomerId())) {
+            recalculateCustomerDebt(previousCustomerId);
+        }
         saveOperationLog("SALES", "UPDATE", "更新销售单：" + saved.getOrderNumber(), saved.getOperatorId());
         return saved;
     }
@@ -90,6 +94,9 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     public void deleteSalesOrder(Long id) {
         SalesOrder order = getSalesOrderById(id)
                 .orElseThrow(() -> new IllegalArgumentException("销售单不存在，无法删除"));
+        if ("已出库".equals(order.getStatus())) {
+            throw new IllegalArgumentException("已出库销售单不允许删除");
+        }
         salesOrderRepository.deleteById(id);
         recalculateCustomerDebt(order.getCustomerId());
         saveOperationLog("SALES", "DELETE", "删除销售单：" + order.getOrderNumber(), order.getOperatorId());
@@ -123,6 +130,12 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             return order;
         }
         for (SalesOrderItem item : safeSalesItems(order.getItems())) {
+            if (item == null || item.getProductId() == null) {
+                throw new IllegalArgumentException("销售商品不能为空");
+            }
+            if (item.getQuantity() == null || item.getQuantity() <= 0) {
+                throw new IllegalArgumentException("销售商品数量必须大于 0");
+            }
             Product product = productRepository.findById(item.getProductId())
                     .orElseThrow(() -> new IllegalArgumentException("商品不存在，无法出库"));
             Inventory inventory = findOrCreateInventory(product.getId(), product.getLocationId(), product.getStock());
@@ -162,8 +175,12 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     public SalesOrder registerPayment(Long id, PaymentRequest paymentRequest) {
         SalesOrder order = getSalesOrderById(id)
                 .orElseThrow(() -> new IllegalArgumentException("销售单不存在，无法登记收款"));
+        if (paymentRequest == null || paymentRequest.getReceivedAmount() == null
+                || paymentRequest.getReceivedAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("收款金额必须大于 0");
+        }
         BigDecimal currentReceived = nullSafe(order.getReceivedAmount());
-        BigDecimal income = paymentRequest.getReceivedAmount() == null ? BigDecimal.ZERO : paymentRequest.getReceivedAmount();
+        BigDecimal income = paymentRequest.getReceivedAmount();
         BigDecimal newReceived = currentReceived.add(income);
         if (newReceived.compareTo(order.getTotalAmount()) > 0) {
             newReceived = order.getTotalAmount();
@@ -179,6 +196,12 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     }
 
     private void normalizeSalesOrder(SalesOrder salesOrder, boolean keepOrderNumber) {
+        if (salesOrder == null) {
+            throw new IllegalArgumentException("销售单不能为空");
+        }
+        if (salesOrder.getCustomerId() == null) {
+            throw new IllegalArgumentException("客户不能为空");
+        }
         if (!keepOrderNumber || !StringUtils.hasText(salesOrder.getOrderNumber())) {
             salesOrder.setOrderNumber("SO" + DateTimeFormatter.ofPattern("yyyyMMddHHmmss").format(LocalDateTime.now()));
         }
@@ -190,26 +213,43 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             salesOrder.setStatus("待出库");
         }
         List<SalesOrderItem> items = copySalesItems(salesOrder.getItems());
-        Customer customer = customerRepository.findById(salesOrder.getCustomerId()).orElse(null);
+        if (items.isEmpty()) {
+            throw new IllegalArgumentException("销售商品不能为空");
+        }
+        Customer customer = customerRepository.findById(salesOrder.getCustomerId())
+                .orElseThrow(() -> new IllegalArgumentException("客户不存在"));
         BigDecimal totalAmount = BigDecimal.ZERO;
         for (SalesOrderItem item : items) {
-            Product product = productRepository.findById(item.getProductId()).orElse(null);
-            if (!StringUtils.hasText(item.getProductName()) && product != null) {
+            if (item == null || item.getProductId() == null) {
+                throw new IllegalArgumentException("销售商品不能为空");
+            }
+            if (item.getQuantity() == null || item.getQuantity() <= 0) {
+                throw new IllegalArgumentException("销售商品数量必须大于 0");
+            }
+            Product product = productRepository.findById(item.getProductId())
+                    .orElseThrow(() -> new IllegalArgumentException("商品不存在：" + item.getProductId()));
+            if (product.getStatus() != null && product.getStatus() != 1) {
+                throw new IllegalArgumentException("商品已下架：" + product.getName());
+            }
+            if (!StringUtils.hasText(item.getProductName())) {
                 item.setProductName(product.getName());
             }
             if (item.getPrice() == null) {
                 item.setPrice(resolveSalesPrice(product, customer));
             }
-            BigDecimal amount = item.getAmount();
-            if (amount == null) {
-                amount = item.getPrice().multiply(BigDecimal.valueOf(defaultInteger(item.getQuantity())));
+            if (item.getPrice().compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException("销售商品价格不能小于 0");
             }
+            BigDecimal amount = item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
             item.setAmount(amount);
             totalAmount = totalAmount.add(amount);
         }
         salesOrder.setItems(items);
         salesOrder.setTotalAmount(totalAmount);
         salesOrder.setReceivedAmount(nullSafe(salesOrder.getReceivedAmount()));
+        if (salesOrder.getReceivedAmount().compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("已收金额不能小于 0");
+        }
         if (salesOrder.getReceivedAmount().compareTo(totalAmount) > 0) {
             salesOrder.setReceivedAmount(totalAmount);
         }

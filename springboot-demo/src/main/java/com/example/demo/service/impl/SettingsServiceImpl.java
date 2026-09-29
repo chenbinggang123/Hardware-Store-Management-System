@@ -4,6 +4,7 @@ import com.example.demo.entity.AppUser;
 import com.example.demo.entity.OperationLog;
 import com.example.demo.repository.AppUserRepository;
 import com.example.demo.repository.OperationLogRepository;
+import com.example.demo.security.PasswordSupport;
 import com.example.demo.service.SettingsService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,11 +46,12 @@ public class SettingsServiceImpl implements SettingsService {
 
     @Override
     public AppUser saveUser(AppUser user) {
+        fillUserDefaults(user);
+        validateUser(user);
+        ensureUsernameAvailable(user.getUsername(), null);
+        user.setPassword(PasswordSupport.encode(user.getPassword()));
         if (user.getCreateTime() == null) {
             user.setCreateTime(LocalDateTime.now());
-        }
-        if (user.getStatus() == null) {
-            user.setStatus(1);
         }
         AppUser saved = appUserRepository.save(user);
         saveOperationLog(saved.getId(), "SETTINGS", "CREATE_USER", "新增用户：" + saved.getUsername());
@@ -58,10 +60,22 @@ public class SettingsServiceImpl implements SettingsService {
 
     @Override
     public AppUser updateUser(Long id, AppUser user) {
+        if (user == null) {
+            throw new IllegalArgumentException("用户不能为空");
+        }
         AppUser existingUser = getUserById(id)
                 .orElseThrow(() -> new IllegalArgumentException("用户不存在，无法更新"));
+        String password = StringUtils.hasText(user.getPassword())
+                ? PasswordSupport.encode(user.getPassword())
+                : existingUser.getPassword();
+        user.setPassword(password);
+        if (user.getStatus() == null) {
+            user.setStatus(existingUser.getStatus());
+        }
+        validateUser(user);
+        ensureUsernameAvailable(user.getUsername(), id);
         existingUser.setUsername(user.getUsername());
-        existingUser.setPassword(user.getPassword());
+        existingUser.setPassword(password);
         existingUser.setName(user.getName());
         existingUser.setPhone(user.getPhone());
         existingUser.setRole(user.getRole());
@@ -75,6 +89,7 @@ public class SettingsServiceImpl implements SettingsService {
 
     @Override
     public AppUser updateUserRole(Long id, String role) {
+        validateRole(role);
         AppUser user = getUserById(id)
                 .orElseThrow(() -> new IllegalArgumentException("用户不存在，无法修改角色"));
         user.setRole(role);
@@ -85,6 +100,7 @@ public class SettingsServiceImpl implements SettingsService {
 
     @Override
     public AppUser updateUserStatus(Long id, Integer status) {
+        validateStatus(status);
         AppUser user = getUserById(id)
                 .orElseThrow(() -> new IllegalArgumentException("用户不存在，无法修改状态"));
         user.setStatus(status);
@@ -97,7 +113,7 @@ public class SettingsServiceImpl implements SettingsService {
     public Map<String, Object> backup() {
         saveOperationLog(1L, "SETTINGS", "BACKUP", "执行系统备份");
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("status", "SUCCESS");
+        result.put("status", "SIMULATED");
         result.put("backupName", "backup-" + LocalDateTime.now());
         result.put("message", "当前为 MySQL 版本，备份接口返回模拟结果");
         return result;
@@ -105,9 +121,13 @@ public class SettingsServiceImpl implements SettingsService {
 
     @Override
     public Map<String, Object> restore(String backupName) {
+        if (!StringUtils.hasText(backupName)) {
+            throw new IllegalArgumentException("备份名称不能为空");
+        }
+        backupName = backupName.trim();
         saveOperationLog(1L, "SETTINGS", "RESTORE", "执行系统恢复：" + backupName);
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("status", "SUCCESS");
+        result.put("status", "SIMULATED");
         result.put("backupName", backupName);
         result.put("message", "当前为 MySQL 版本，恢复接口返回模拟结果");
         return result;
@@ -130,5 +150,50 @@ public class SettingsServiceImpl implements SettingsService {
         log.setDetail(detail);
         log.setCreateTime(LocalDateTime.now());
         operationLogRepository.save(log);
+    }
+
+    private void fillUserDefaults(AppUser user) {
+        if (user == null) {
+            throw new IllegalArgumentException("用户不能为空");
+        }
+        if (user.getStatus() == null) {
+            user.setStatus(1);
+        }
+    }
+
+    private void validateUser(AppUser user) {
+        if (!StringUtils.hasText(user.getUsername())) {
+            throw new IllegalArgumentException("用户名不能为空");
+        }
+        if (!StringUtils.hasText(user.getName())) {
+            throw new IllegalArgumentException("用户姓名不能为空");
+        }
+        if (!StringUtils.hasText(user.getPassword())) {
+            throw new IllegalArgumentException("密码不能为空");
+        }
+        user.setUsername(user.getUsername().trim());
+        user.setName(user.getName().trim());
+        validateRole(user.getRole());
+        validateStatus(user.getStatus());
+    }
+
+    private void validateRole(String role) {
+        if (!"ADMIN".equals(role) && !"CLERK".equals(role)) {
+            throw new IllegalArgumentException("用户角色只能是 ADMIN 或 CLERK");
+        }
+    }
+
+    private void validateStatus(Integer status) {
+        if (status == null || (status != 0 && status != 1)) {
+            throw new IllegalArgumentException("用户状态只能是 0 或 1");
+        }
+    }
+
+    private void ensureUsernameAvailable(String username, Long currentUserId) {
+        appUserRepository.findByUsername(username).ifPresent(existing -> {
+            if (currentUserId == null || !currentUserId.equals(existing.getId())) {
+                throw new IllegalArgumentException("用户名已存在");
+            }
+        });
     }
 }

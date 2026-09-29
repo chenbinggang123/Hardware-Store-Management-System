@@ -45,6 +45,10 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     public Inventory saveInventory(Inventory inventory) {
+        validateInventory(inventory);
+        if (inventoryRepository.findByProductId(inventory.getProductId()).isPresent()) {
+            throw new IllegalArgumentException("该商品已存在库存记录");
+        }
         if (inventory.getLastUpdateTime() == null) {
             inventory.setLastUpdateTime(LocalDateTime.now());
         }
@@ -59,8 +63,15 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     public Inventory updateInventory(Inventory inventory) {
+        if (inventory == null || inventory.getId() == null) {
+            throw new IllegalArgumentException("库存记录不能为空");
+        }
+        validateInventory(inventory);
         Inventory existingInventory = getInventoryById(inventory.getId())
                 .orElseThrow(() -> new IllegalArgumentException("库存记录不存在，无法更新"));
+        if (!existingInventory.getProductId().equals(inventory.getProductId())) {
+            throw new IllegalArgumentException("库存记录不允许更换关联商品");
+        }
         existingInventory.setProductId(inventory.getProductId());
         existingInventory.setQuantity(inventory.getQuantity());
         existingInventory.setLocationId(inventory.getLocationId());
@@ -87,7 +98,7 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public List<Inventory> getAllInventories(String keyword, String locationId, Boolean warningOnly) {
         ensureInventoryForProducts();
         return inventoryRepository.findAll().stream()
@@ -100,6 +111,12 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     public Inventory adjustInventory(Long id, InventoryAdjustRequest request) {
+        if (request == null || request.getActualQuantity() == null) {
+            throw new IllegalArgumentException("实际库存数量不能为空");
+        }
+        if (request.getActualQuantity() < 0) {
+            throw new IllegalArgumentException("实际库存数量不能小于 0");
+        }
         Inventory inventory = getInventoryById(id)
                 .orElseThrow(() -> new IllegalArgumentException("库存记录不存在，无法盘点调整"));
         int beforeQuantity = defaultInteger(inventory.getQuantity());
@@ -136,9 +153,24 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public List<Inventory> getWarnings() {
         return getAllInventories(null, null, true);
+    }
+
+    private void validateInventory(Inventory inventory) {
+        if (inventory == null || inventory.getProductId() == null) {
+            throw new IllegalArgumentException("库存关联商品不能为空");
+        }
+        if (inventory.getQuantity() == null || inventory.getQuantity() < 0) {
+            throw new IllegalArgumentException("库存数量不能小于 0");
+        }
+        if (inventory.getWarningThreshold() != null && inventory.getWarningThreshold() < 0) {
+            throw new IllegalArgumentException("库存预警阈值不能小于 0");
+        }
+        if (productRepository.findById(inventory.getProductId()).isEmpty()) {
+            throw new IllegalArgumentException("商品不存在：" + inventory.getProductId());
+        }
     }
 
     private void ensureInventoryForProducts() {

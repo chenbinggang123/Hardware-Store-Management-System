@@ -140,8 +140,8 @@ ON DUPLICATE KEY UPDATE
     last_update_time = VALUES(last_update_time);
 
 INSERT INTO app_user (id, username, password, name, phone, role, status, create_time) VALUES
-    (1, 'admin', '123456', '系统管理员', '13600000000', 'ADMIN', 1, '2026-03-27 08:30:00'),
-    (2, 'clerk01', '123456', '营业员小张', '13600000001', 'CLERK', 1, '2026-03-27 08:40:00')
+    (1, 'admin', '$2a$10$fhDff3zZkxQG6Zy3bgNv/.gbZ5WiznJQzagd8qCeLQWwOXGMVBDHO', '系统管理员', '13600000000', 'ADMIN', 1, '2026-03-27 08:30:00'),
+    (2, 'clerk01', '$2a$10$fhDff3zZkxQG6Zy3bgNv/.gbZ5WiznJQzagd8qCeLQWwOXGMVBDHO', '营业员小张', '13600000001', 'CLERK', 1, '2026-03-27 08:40:00')
 ON DUPLICATE KEY UPDATE
     username = VALUES(username),
     password = VALUES(password),

@@ -1,10 +1,14 @@
 package com.example.demo.config;
 
+import com.example.demo.security.AuthSession;
 import com.example.demo.service.impl.AuthServiceImpl;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
+
+import static org.springframework.http.HttpStatus.FORBIDDEN;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * 登录态校验拦截器
@@ -22,7 +26,16 @@ public class AuthInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
-        request.setAttribute(AUTH_SESSION_ATTRIBUTE, authService.requireSession(resolveToken(request)));
+        AuthSession session = authService.requireSession(resolveToken(request));
+        request.setAttribute(AUTH_SESSION_ATTRIBUTE, session);
+        String path = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        if (contextPath != null && !contextPath.isEmpty() && path.startsWith(contextPath)) {
+            path = path.substring(contextPath.length());
+        }
+        if (path.startsWith("/settings") && !"ADMIN".equals(session.getUser().getRole())) {
+            throw new ResponseStatusException(FORBIDDEN, "需要管理员权限");
+        }
         return true;
     }
 

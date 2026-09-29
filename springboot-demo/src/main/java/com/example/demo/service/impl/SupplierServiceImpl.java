@@ -42,6 +42,7 @@ public class SupplierServiceImpl implements SupplierService {
 
     @Override
     public Supplier saveSupplier(Supplier supplier) {
+        validateSupplier(supplier);
         if (supplier.getCreateTime() == null) {
             supplier.setCreateTime(LocalDateTime.now());
         }
@@ -52,6 +53,7 @@ public class SupplierServiceImpl implements SupplierService {
 
     @Override
     public Supplier updateSupplier(Supplier supplier) {
+        validateSupplier(supplier);
         Supplier existingSupplier = getSupplierById(supplier.getId())
                 .orElseThrow(() -> new IllegalArgumentException("供应商不存在，无法更新"));
         existingSupplier.setName(supplier.getName());
@@ -68,6 +70,9 @@ public class SupplierServiceImpl implements SupplierService {
     public void deleteSupplier(Long id) {
         Supplier supplier = getSupplierById(id)
                 .orElseThrow(() -> new IllegalArgumentException("供应商不存在，无法删除"));
+        if (!purchaseOrderRepository.findBySupplierId(id).isEmpty()) {
+            throw new IllegalArgumentException("供应商存在采购订单，不允许删除");
+        }
         supplierRepository.deleteById(id);
         saveOperationLog("SUPPLIER", "DELETE", "删除供应商：" + supplier.getName(), 1L);
     }
@@ -125,6 +130,13 @@ public class SupplierServiceImpl implements SupplierService {
         return containsText(supplier.getName(), normalized)
                 || containsText(supplier.getContact(), normalized)
                 || containsText(supplier.getPhone(), normalized);
+    }
+
+    private void validateSupplier(Supplier supplier) {
+        if (supplier == null || !StringUtils.hasText(supplier.getName())) {
+            throw new IllegalArgumentException("供应商名称不能为空");
+        }
+        supplier.setName(supplier.getName().trim());
     }
 
     private boolean containsText(String value, String keyword) {
