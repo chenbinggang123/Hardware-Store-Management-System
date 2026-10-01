@@ -1,0 +1,23 @@
+.upload-screen { padding-top: 18rpx; }
+.flow-head { padding: 6rpx 0 22rpx; }
+.flow-step-label { color: #245E9B; font-size: 22rpx; font-weight: 700; }
+.flow-title { margin-top: 6rpx; color: #17231E; font-size: 40rpx; font-weight: 750; }
+.flow-desc { margin-top: 10rpx; color: #66746E; font-size: 24rpx; line-height: 1.7; }
+.flow-progress { height: 8rpx; overflow: hidden; border-radius: 8rpx; background: #DDE4E0; }
+.flow-progress-value { height: 100%; background: #245E9B; }
+.file-drop { min-height: 250rpx; margin-top: 30rpx; padding: 34rpx 24rpx; display: flex; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box; border: 3rpx dashed #AEBAB4; border-radius: 18rpx; background: #F9FBFA; text-align: center; }
+.file-drop.selected { border-style: solid; border-color: #86A9C8; background: #F3F8FC; }
+.file-mark { width: 70rpx; height: 70rpx; display: flex; align-items: center; justify-content: center; border-radius: 16rpx; color: #FFF; background: #245E9B; font-size: 20rpx; font-weight: 750; }
+.file-title { max-width: 100%; margin-top: 20rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #17231E; font-size: 29rpx; font-weight: 700; }
+.file-desc { margin-top: 7rpx; color: #718079; font-size: 22rpx; }
+.demo-file-link { padding: 18rpx 0 4rpx; color: #245E9B; font-size: 23rpx; text-align: center; }
+.upload-form { margin-top: 34rpx; border-top: 1rpx solid #D6DEDA; }
+.upload-field { padding: 24rpx 2rpx; border-bottom: 1rpx solid #D6DEDA; }
+.upload-label { margin-bottom: 10rpx; color: #58665F; font-size: 23rpx; }
+.upload-picker { min-height: 58rpx; display: flex; align-items: center; justify-content: space-between; color: #17231E; font-size: 29rpx; font-weight: 650; }
+.upload-picker text { color: #83908A; font-size: 34rpx; }
+.upload-hint { margin-top: 8rpx; color: #83908A; font-size: 21rpx; }
+.safety-line { margin-top: 30rpx; padding: 20rpx; display: flex; align-items: flex-start; gap: 14rpx; color: #40534B; background: #E8F0EC; border-radius: 14rpx; }
+.safety-mark { width: 44rpx; height: 44rpx; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; border-radius: 12rpx; color: #247052; background: #D7E9DF; font-size: 19rpx; font-weight: 750; }
+.safety-title { font-size: 24rpx; font-weight: 700; }
+.safety-desc { margin-top: 4rpx; color: #66746E; font-size: 21rpx; line-height: 1.6; }

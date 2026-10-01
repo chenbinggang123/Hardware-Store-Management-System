@@ -1,0 +1,15 @@
+.contacts-screen { padding-top: 20rpx; }
+.contacts-head { padding: 8rpx 0 26rpx; border-bottom: 1rpx solid #D6DEDA; }
+.contacts-title { color: #17231E; font-size: 42rpx; font-weight: 750; }
+.contacts-subtitle { margin-top: 7rpx; color: #66746E; font-size: 23rpx; }
+.contacts-switch { margin-top: 22rpx; display: grid; grid-template-columns: 1fr 1fr; padding: 6rpx; border-radius: 14rpx; background: #E5EAE7; }
+.contacts-switch view { min-height: 64rpx; display: flex; align-items: center; justify-content: center; border-radius: 10rpx; color: #64716B; font-size: 24rpx; font-weight: 650; }
+.contacts-switch view.active { color: #245E9B; background: #FFF; box-shadow: 0 3rpx 10rpx rgba(33,55,46,.08); }
+.contacts-ledger { margin-top: 22rpx; border-top: 1rpx solid #D6DEDA; border-bottom: 1rpx solid #D6DEDA; background: #FFF; }
+.contact-row { min-height: 104rpx; padding: 16rpx 18rpx; display: flex; align-items: center; gap: 15rpx; border-bottom: 1rpx solid #E1E6E3; }
+.contact-row:last-child { border-bottom: 0; }
+.contact-mark { width: 54rpx; height: 54rpx; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; border-radius: 14rpx; color: #245E9B; background: #E6F0F7; font-size: 20rpx; font-weight: 750; }
+.contact-copy { flex: 1; min-width: 0; }
+.contact-name { color: #26332E; font-size: 26rpx; font-weight: 700; }
+.contact-meta { margin-top: 4rpx; color: #718079; font-size: 21rpx; }
+.contact-arrow { color: #8A9690; font-size: 34rpx; }

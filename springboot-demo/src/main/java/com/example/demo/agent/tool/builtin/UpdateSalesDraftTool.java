@@ -47,7 +47,8 @@ public class UpdateSalesDraftTool implements AgentTool {
                                 "customerId", Map.of("type", "integer"),
                                 "receivedAmount", Map.of("type", "number", "minimum", 0),
                                 "items", Map.of("type", "array", "minItems", 1, "items", itemSchema)),
-                        "required", List.of("draftId", "draftVersion", "customerId", "items")));
+                        "required", List.of("draftId", "draftVersion", "customerId", "items")),
+                "确认修改销售草稿");
     }
 
     @Override

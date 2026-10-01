@@ -48,6 +48,13 @@
     </view>
   </view>
 
+  <view class="supply-section">
+    <view class="supply-title"><view><text>供应链关系</text><text>让小五处理复杂表格时认得更准</text></view><view class="supply-badge">AGENT MEMORY</view></view>
+    <view class="supply-row" bindtap="openMappings"><view class="supply-index">01</view><view class="supply-main"><view>厂家货号与买家叫法</view><text>查看、停用商品识别关系</text></view><view class="supply-arrow">→</view></view>
+    <view class="supply-row" bindtap="openPriceHistory"><view class="supply-index">02</view><view class="supply-main"><view>价格变化记录</view><text>按来源追溯成本与售价变化</text></view><view class="supply-arrow">→</view></view>
+    <view class="supply-row" bindtap="openPriceSync"><view class="supply-index">03</view><view class="supply-main"><view>同步厂家价格</view><text>先预览变化，再确认更新成本</text></view><view class="supply-arrow">→</view></view>
+  </view>
+
   <view class="form-card">
     <view class="form-section-title">价格策略</view>
     <view class="detail-grid">

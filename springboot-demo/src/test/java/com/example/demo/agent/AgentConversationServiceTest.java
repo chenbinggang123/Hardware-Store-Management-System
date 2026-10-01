@@ -20,6 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class AgentConversationServiceTest {
@@ -114,5 +116,49 @@ class AgentConversationServiceTest {
         assertEquals(2, detail.getMessages().size());
         assertEquals("user", detail.getMessages().get(0).getRole());
         assertEquals("assistant", detail.getMessages().get(1).getRole());
+    }
+
+    @Test
+    void deletesConversationLinksButKeepsCompletedRunAudit() {
+        AgentConversation conversation = new AgentConversation();
+        conversation.setId(3L);
+        conversation.setOperatorId(7L);
+        when(conversationRepository.findByIdAndOperatorId(3L, 7L)).thenReturn(Optional.of(conversation));
+
+        AgentConversationRun link = new AgentConversationRun();
+        link.setConversationId(3L);
+        link.setRunId(20L);
+        when(linkRepository.findByConversationIdOrderByCreateTimeAsc(3L)).thenReturn(List.of(link));
+        AgentRun run = new AgentRun();
+        run.setId(20L);
+        run.setStatus(AgentRunStatus.COMPLETED);
+        when(runRepository.findAllById(any())).thenReturn(List.of(run));
+
+        service.delete(3L, 7L);
+
+        verify(linkRepository).deleteByConversationId(3L);
+        verify(conversationRepository).delete(conversation);
+        verify(runRepository, never()).delete(any());
+    }
+
+    @Test
+    void refusesToDeleteConversationWaitingForApproval() {
+        AgentConversation conversation = new AgentConversation();
+        conversation.setId(3L);
+        conversation.setOperatorId(7L);
+        when(conversationRepository.findByIdAndOperatorId(3L, 7L)).thenReturn(Optional.of(conversation));
+        AgentConversationRun link = new AgentConversationRun();
+        link.setConversationId(3L);
+        link.setRunId(20L);
+        when(linkRepository.findByConversationIdOrderByCreateTimeAsc(3L)).thenReturn(List.of(link));
+        AgentRun run = new AgentRun();
+        run.setId(20L);
+        run.setStatus(AgentRunStatus.WAITING_APPROVAL);
+        when(runRepository.findAllById(any())).thenReturn(List.of(run));
+
+        assertThrows(IllegalArgumentException.class, () -> service.delete(3L, 7L));
+
+        verify(linkRepository, never()).deleteByConversationId(3L);
+        verify(conversationRepository, never()).delete(any());
     }
 }

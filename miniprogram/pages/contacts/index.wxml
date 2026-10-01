@@ -1,0 +1,12 @@
+<view class="screen contacts-screen">
+  <view class="contacts-head"><view class="contacts-title">往来单位</view><view class="contacts-subtitle">统一查看源头厂商与买家，后续文件映射会记住这些关系。</view></view>
+  <view class="contacts-switch"><view class="{{type === 'supplier' ? 'active' : ''}}" data-type="supplier" bindtap="selectType">源头厂商 {{suppliers.length}}</view><view class="{{type === 'customer' ? 'active' : ''}}" data-type="customer" bindtap="selectType">买家 {{customers.length}}</view></view>
+  <view class="loading-state" wx:if="{{loading}}">正在读取往来单位…</view>
+  <view class="contacts-ledger" wx:else>
+    <view class="contact-row" wx:for="{{visible}}" wx:key="id" data-id="{{item.id}}" bindtap="openDetail">
+      <view class="contact-mark">{{type === 'supplier' ? '厂' : '买'}}</view>
+      <view class="contact-copy"><view class="contact-name">{{item.name}}</view><view class="contact-meta">{{item.contact || item.level || '未填写联系人'}} · {{item.phone || '未填写电话'}}</view></view>
+      <view class="contact-arrow">›</view>
+    </view>
+  </view>
+</view>

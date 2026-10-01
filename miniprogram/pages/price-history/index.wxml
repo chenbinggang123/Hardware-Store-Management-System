@@ -1,0 +1,20 @@
+<view class="screen history-screen">
+  <view class="page-kicker">PRICE LEDGER</view>
+  <view class="page-title">{{productName}}价格记录</view>
+  <view class="page-summary">每次价格变化都保留来源和操作人，方便直接查看，也方便小五在复杂报价时追溯依据。</view>
+
+  <scroll-view class="filter-strip" scroll-x enhanced show-scrollbar="{{false}}"><view class="filter-list"><view wx:for="{{filters}}" wx:key="*this" class="filter-chip {{filter === item ? 'active' : ''}}" data-filter="{{item}}" bindtap="changeFilter">{{item}}</view></view></scroll-view>
+
+  <view class="history-head"><text>日期 / 类型</text><text>价格变化</text></view>
+  <view class="history-list">
+    <view class="history-row" wx:for="{{visibleHistory}}" wx:key="id">
+      <view class="timeline"><view class="timeline-dot"></view><view class="timeline-line"></view></view>
+      <view class="history-main">
+        <view class="history-top"><view><view class="history-date">{{item.date}}</view><view class="history-type">{{item.type}}</view></view><view class="change {{item.direction}}">{{item.changeText}}</view></view>
+        <view class="history-flow"><text>¥{{item.before}}</text><text>→</text><text>¥{{item.after}}</text></view>
+        <view class="history-source">{{item.source}} · {{item.operator}}</view>
+      </view>
+    </view>
+  </view>
+  <view class="empty-ledger" wx:if="{{!visibleHistory.length}}">暂无这个类型的价格变化</view>
+</view>

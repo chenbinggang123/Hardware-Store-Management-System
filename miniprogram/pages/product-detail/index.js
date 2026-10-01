@@ -69,6 +69,18 @@ Page({
     })
   },
 
+  openMappings() {
+    openPage('/pages/product-mappings/index', { id: this.data.id, name: this.data.product.name })
+  },
+
+  openPriceHistory() {
+    openPage('/pages/price-history/index', { id: this.data.id, name: this.data.product.name })
+  },
+
+  openPriceSync() {
+    openPage('/pages/price-sync-review/index', { productId: this.data.id })
+  },
+
   toggleStatus() {
     const product = this.data.product
     if (!product) {
@@ -88,7 +100,7 @@ Page({
     wx.showModal({
       title: '删除商品',
       content: `确认删除“${product.name}”吗？`,
-      confirmColor: '#B75A1A',
+      confirmColor: '#B94C3A',
       success: (result) => {
         if (!result.confirm) {
           return

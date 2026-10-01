@@ -1,0 +1,35 @@
+<view class="screen task-screen">
+  <view class="task-page-head">
+    <view><view class="task-page-title">文件任务</view><view class="task-page-subtitle">Excel 和 CSV 都在这里处理、复核和追踪</view></view>
+    <view class="task-upload-button" bindtap="openUpload">选择文件</view>
+  </view>
+
+  <view class="task-summary-line">
+    <view class="summary-cell warning"><text class="summary-number">{{summary.attention}}</text><text>待处理</text></view>
+    <view class="summary-cell"><text class="summary-number">{{summary.processing}}</text><text>处理中</text></view>
+    <view class="summary-cell"><text class="summary-number">{{summary.completed}}</text><text>已完成</text></view>
+  </view>
+
+  <scroll-view class="task-filters" scroll-x enable-flex>
+    <view class="task-filter {{filter === item.key ? 'active' : ''}}" wx:for="{{filters}}" wx:key="key" data-filter="{{item.key}}" bindtap="selectFilter">{{item.label}}</view>
+  </scroll-view>
+
+  <view class="task-ledger" wx:if="{{visibleTasks.length}}">
+    <view class="task-row tone-{{item.statusTone}}" wx:for="{{visibleTasks}}" wx:key="id" data-id="{{item.id}}" bindtap="openTask">
+      <view class="task-row-top">
+        <view class="task-purpose">{{item.purpose}}</view>
+        <view class="task-status {{item.statusTone}}">{{item.statusText}}</view>
+      </view>
+      <view class="task-file-name">{{item.fileName}}</view>
+      <view class="task-relation">{{item.relationType}} · {{item.relationName}}</view>
+      <view class="task-progress-track"><view class="task-progress-value {{item.statusTone}}" style="width: {{item.progress}}%;"></view></view>
+      <view class="task-row-foot"><text>{{item.progressText}}</text><text>{{item.updatedAt}} ›</text></view>
+    </view>
+  </view>
+
+  <view class="empty-state" wx:else>
+    <view class="empty-icon"></view><view class="empty-title">这个分类还没有文件任务</view>
+    <view class="empty-desc">选择 Excel 或 CSV，系统会先识别内容，不会直接写入业务数据。</view>
+    <view class="btn btn-primary btn-block" bindtap="openUpload">选择文件处理</view>
+  </view>
+</view>

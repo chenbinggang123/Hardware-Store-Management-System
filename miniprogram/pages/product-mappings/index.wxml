@@ -1,0 +1,34 @@
+<view class="screen mapping-screen">
+  <view class="page-kicker">PRODUCT MEMORY</view>
+  <view class="page-title">{{productName}}的识别关系</view>
+  <view class="page-summary">这些关系帮助小五认出不同厂家货号和买家的习惯叫法。简单查询仍可直接使用，不必每次都经过对话。</view>
+
+  <view class="mapping-overview">
+    <view><text>{{activeCount}}</text><text>正在使用</text></view>
+    <view class="memory-state"><text>自动</text><text>下次识别</text></view>
+    <view class="add-link" bindtap="addMapping">＋ 新增关系</view>
+  </view>
+
+  <scroll-view class="filter-strip" scroll-x enhanced show-scrollbar="{{false}}"><view class="filter-list"><view wx:for="{{filters}}" wx:key="key" class="filter-chip {{filter === item.key ? 'active' : ''}}" data-key="{{item.key}}" bindtap="changeFilter">{{item.label}}</view></view></scroll-view>
+
+  <view class="relation-list">
+    <view class="relation-row {{item.status === 'REVOKED' ? 'revoked' : ''}}" wx:for="{{visibleMappings}}" wx:key="id">
+      <view class="relation-source">
+        <view class="source-type">{{item.sourceType}}</view>
+        <view class="source-name">{{item.sourceName}}</view>
+        <view class="source-spec">{{item.sourceSpec}} · {{item.relationName}}</view>
+      </view>
+      <view class="relation-link"><view class="link-line"></view><view class="link-arrow">→</view></view>
+      <view class="relation-target">
+        <view class="target-type">店内商品</view>
+        <view class="target-name">{{item.productName}}</view>
+        <view class="source-spec">{{item.productSpec}}</view>
+      </view>
+      <view class="relation-foot">
+        <text wx:if="{{item.status === 'ACTIVE'}}">已使用 {{item.useCount}} 次 · 最近 {{item.lastUsed}}</text>
+        <text wx:else>已停用，历史记录保留</text>
+        <view wx:if="{{item.status === 'ACTIVE'}}" data-id="{{item.id}}" catchtap="revoke">停用</view>
+      </view>
+    </view>
+  </view>
+</view>

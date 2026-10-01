@@ -11,6 +11,8 @@ import com.example.demo.agent.repository.AgentConversationRepository;
 import com.example.demo.agent.repository.AgentConversationRunRepository;
 import com.example.demo.agent.repository.AgentRunRepository;
 import com.example.demo.agent.repository.AgentAttachmentRepository;
+import com.example.demo.agent.service.attachment.AttachmentStorage;
+import com.example.demo.agent.harness.AgentRunStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,24 +31,35 @@ public class AgentConversationService {
     private final AgentConversationRunRepository conversationRunRepository;
     private final AgentRunRepository runRepository;
     private final AgentAttachmentRepository attachmentRepository;
+    private final AttachmentStorage attachmentStorage;
 
     @Autowired
     public AgentConversationService(
             AgentConversationRepository conversationRepository,
             AgentConversationRunRepository conversationRunRepository,
             AgentRunRepository runRepository,
-            AgentAttachmentRepository attachmentRepository) {
+            AgentAttachmentRepository attachmentRepository,
+            AttachmentStorage attachmentStorage) {
         this.conversationRepository = conversationRepository;
         this.conversationRunRepository = conversationRunRepository;
         this.runRepository = runRepository;
         this.attachmentRepository = attachmentRepository;
+        this.attachmentStorage = attachmentStorage;
+    }
+
+    public AgentConversationService(
+            AgentConversationRepository conversationRepository,
+            AgentConversationRunRepository conversationRunRepository,
+            AgentRunRepository runRepository,
+            AgentAttachmentRepository attachmentRepository) {
+        this(conversationRepository, conversationRunRepository, runRepository, attachmentRepository, null);
     }
 
     public AgentConversationService(
             AgentConversationRepository conversationRepository,
             AgentConversationRunRepository conversationRunRepository,
             AgentRunRepository runRepository) {
-        this(conversationRepository, conversationRunRepository, runRepository, null);
+        this(conversationRepository, conversationRunRepository, runRepository, null, null);
     }
 
     public AgentConversation resolve(Long conversationId, Long operatorId, String firstInput) {
@@ -143,6 +156,33 @@ public class AgentConversationService {
             }
         }
         return new AgentConversationDetail(conversation.getId(), conversation.getTitle(), messages);
+    }
+
+    public List<String> delete(Long conversationId, Long operatorId) {
+        AgentConversation conversation = conversationRepository.findByIdAndOperatorId(conversationId, operatorId)
+                .orElseThrow(() -> new IllegalArgumentException("会话不存在或无权访问"));
+        boolean hasActiveRun = runs(conversationId).stream().anyMatch(run ->
+                run.getStatus() == AgentRunStatus.RUNNING || run.getStatus() == AgentRunStatus.WAITING_APPROVAL);
+        if (hasActiveRun) {
+            throw new IllegalArgumentException("该会话还有正在处理或等待确认的操作，请先完成或取消操作");
+        }
+        List<String> cloudFileIds = List.of();
+        if (attachmentRepository != null) {
+            var attachments = attachmentRepository.findByConversationIdOrderByCreateTimeAsc(conversationId);
+            cloudFileIds = attachments.stream()
+                    .map(item -> item.getObjectKey())
+                    .filter(key -> key != null && key.startsWith("cloud://"))
+                    .toList();
+            if (attachmentStorage != null) {
+                attachments.stream()
+                        .filter(item -> item.getObjectKey() != null && !item.getObjectKey().startsWith("cloud://"))
+                        .forEach(item -> attachmentStorage.delete(item.getObjectKey()));
+            }
+            attachmentRepository.deleteAll(attachments);
+        }
+        conversationRunRepository.deleteByConversationId(conversationId);
+        conversationRepository.delete(conversation);
+        return cloudFileIds;
     }
 
     private List<AgentRun> runs(Long conversationId) {

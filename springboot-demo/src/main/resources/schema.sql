@@ -159,6 +159,96 @@ CREATE TABLE IF NOT EXISTS agent_tool_call (
     KEY idx_agent_tool_call_run_id (run_id)
 );
 
+CREATE TABLE IF NOT EXISTS excel_task (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    operator_id BIGINT NOT NULL,
+    purpose VARCHAR(32) NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    original_name VARCHAR(255) NOT NULL,
+    object_key VARCHAR(500) NOT NULL,
+    mime_type VARCHAR(100) NOT NULL,
+    file_size BIGINT NOT NULL,
+    sha256 VARCHAR(64) NOT NULL,
+    sheet_count INT NOT NULL DEFAULT 0,
+    row_count INT NOT NULL DEFAULT 0,
+    error_message VARCHAR(1000),
+    create_time DATETIME NOT NULL,
+    update_time DATETIME NOT NULL,
+    version BIGINT NOT NULL DEFAULT 0,
+    KEY idx_excel_task_operator_update (operator_id, update_time),
+    KEY idx_excel_task_operator_status (operator_id, status)
+);
+
+CREATE TABLE IF NOT EXISTS excel_task_sheet (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    task_id BIGINT NOT NULL,
+    sheet_index INT NOT NULL,
+    sheet_name VARCHAR(100) NOT NULL,
+    header_row_number INT NOT NULL,
+    data_start_row_number INT NOT NULL,
+    row_count INT NOT NULL DEFAULT 0,
+    column_count INT NOT NULL DEFAULT 0,
+    columns_json LONGTEXT NOT NULL,
+    UNIQUE KEY uk_excel_task_sheet_index (task_id, sheet_index),
+    KEY idx_excel_task_sheet_task (task_id)
+);
+
+CREATE TABLE IF NOT EXISTS excel_task_row (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    task_id BIGINT NOT NULL,
+    sheet_id BIGINT NOT NULL,
+    source_row_number INT NOT NULL,
+    review_status VARCHAR(32) NOT NULL,
+    cells_json LONGTEXT NOT NULL,
+    UNIQUE KEY uk_excel_task_row_number (sheet_id, source_row_number),
+    KEY idx_excel_task_row_task_sheet (task_id, sheet_id, source_row_number)
+);
+
+CREATE TABLE IF NOT EXISTS excel_task_mapping (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    task_id BIGINT NOT NULL,
+    sheet_id BIGINT NOT NULL,
+    source_column_index INT NOT NULL,
+    source_column_name VARCHAR(255) NOT NULL,
+    target_field VARCHAR(32) NOT NULL,
+    create_time DATETIME NOT NULL,
+    UNIQUE KEY uk_excel_task_mapping_source (sheet_id, source_column_index),
+    KEY idx_excel_task_mapping_task_sheet (task_id, sheet_id)
+);
+
+CREATE TABLE IF NOT EXISTS excel_task_row_result (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    task_id BIGINT NOT NULL,
+    sheet_id BIGINT NOT NULL,
+    row_id BIGINT NOT NULL,
+    source_row_number INT NOT NULL,
+    match_status VARCHAR(32) NOT NULL,
+    matched_product_id BIGINT,
+    match_reason VARCHAR(255),
+    action_type VARCHAR(32) NOT NULL,
+    normalized_json LONGTEXT NOT NULL,
+    candidates_json LONGTEXT NOT NULL,
+    before_json LONGTEXT NOT NULL,
+    after_json LONGTEXT NOT NULL,
+    issues_json LONGTEXT NOT NULL,
+    UNIQUE KEY uk_excel_task_row_result_row (row_id),
+    KEY idx_excel_task_result_task_sheet (task_id, sheet_id, source_row_number),
+    KEY idx_excel_task_result_match (task_id, match_status)
+);
+
+CREATE TABLE IF NOT EXISTS excel_task_commit (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    task_id BIGINT NOT NULL,
+    operator_id BIGINT NOT NULL,
+    idempotency_key VARCHAR(100) NOT NULL,
+    request_version BIGINT NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    summary_json LONGTEXT NOT NULL,
+    create_time DATETIME NOT NULL,
+    UNIQUE KEY uk_excel_task_commit_task (task_id),
+    UNIQUE KEY uk_excel_task_commit_idempotency (operator_id, idempotency_key)
+);
+
 CREATE TABLE IF NOT EXISTS inventory (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     product_id BIGINT NOT NULL,

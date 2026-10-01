@@ -27,11 +27,26 @@
       <view class="history-loading" wx:if="{{loadingHistory}}">正在读取历史…</view>
       <view class="history-empty" wx:elif="{{!conversations.length}}">还没有历史会话<br/><text>发送第一条消息后会自动保存在这里</text></view>
       <view class="history-entry {{item.id === conversationId ? 'active' : ''}}" wx:for="{{conversations}}" wx:key="id" data-id="{{item.id}}" bindtap="chooseConversation">
-        <view class="history-entry-top"><text class="history-entry-title">{{item.title}}</text><text class="history-entry-time">{{item.timeText}}</text></view>
+        <view class="history-entry-top">
+          <text class="history-entry-title">{{item.title}}</text>
+          <text class="history-entry-time">{{item.timeText}}</text>
+          <view class="history-entry-delete" data-id="{{item.id}}" catchtap="deleteConversation">{{deletingConversationId === item.id ? '删除中' : '删除'}}</view>
+        </view>
         <view class="history-entry-preview">{{item.preview}}</view>
       </view>
     </scroll-view>
     <view class="history-new" bindtap="startNew">＋ 开始新对话</view>
+  </view>
+
+  <view class="agent-entry-grid" wx:if="{{!messages.length && !run}}">
+    <view class="agent-entry excel" bindtap="openExcelWorkflow">
+      <view class="agent-entry-mark">XLS</view><view class="agent-entry-title">处理 Excel</view>
+      <view class="agent-entry-desc">询价、报价、厂家价格、盘点和到货文件</view><view class="agent-entry-link">选择文件 ›</view>
+    </view>
+    <view class="agent-entry question" bindtap="focusQuestion">
+      <view class="agent-entry-mark">问</view><view class="agent-entry-title">问经营问题</view>
+      <view class="agent-entry-desc">查商品、查记录，或解释任务里的异常</view><view class="agent-entry-link">开始提问 ›</view>
+    </view>
   </view>
 
   <view class="suggestions" wx:if="{{!messages.length && !run}}">
@@ -89,6 +104,14 @@
       <view class="risk-badge">{{run.pendingAction.risk === 'R2_WRITE' ? '正式写入' : '草稿操作'}}</view>
     </view>
     <view class="customer-line" wx:if="{{run.pendingAction.preview.customerName}}"><text>客户</text><text class="customer-name">{{run.pendingAction.preview.customerName}}</text></view>
+    <view class="operation-preview" wx:if="{{run.pendingAction.preview.productName}}">
+      <view class="operation-row"><text>商品</text><text class="operation-value">{{run.pendingAction.preview.productName}}</text></view>
+      <view class="operation-row" wx:if="{{run.pendingAction.preview.barcode}}"><text>条码</text><text class="operation-value">{{run.pendingAction.preview.barcode}}</text></view>
+      <view class="operation-row" wx:if="{{run.pendingAction.preview.spec}}"><text>规格</text><text class="operation-value">{{run.pendingAction.preview.spec}}</text></view>
+      <view class="operation-row" wx:if="{{run.pendingAction.preview.statusText}}"><text>目标状态</text><text class="operation-value">{{run.pendingAction.preview.statusText}}</text></view>
+      <view class="operation-row" wx:if="{{run.pendingAction.preview.beforeQuantity !== undefined}}"><text>库存变化</text><text class="operation-value">{{run.pendingAction.preview.beforeQuantity}} → {{run.pendingAction.preview.actualQuantity}}</text></view>
+      <view class="operation-row" wx:if="{{run.pendingAction.preview.reason}}"><text>原因</text><text class="operation-value">{{run.pendingAction.preview.reason}}</text></view>
+    </view>
     <view class="amount-grid" wx:if="{{run.pendingAction.preview.totalAmount !== undefined}}">
       <view class="amount-cell"><text>订单金额</text><text class="amount-value">¥{{run.pendingAction.preview.totalAmount}}</text></view>
       <view class="amount-cell"><text>已收金额</text><text class="amount-value">¥{{run.pendingAction.preview.receivedAmount || 0}}</text></view>
@@ -125,7 +148,7 @@
     </view>
     <view class="composer-row">
       <view class="attach-button" bindtap="chooseAttachment">＋</view>
-      <textarea class="composer-input" value="{{input}}" bindinput="updateInput" auto-height maxlength="500" placeholder="输入问题，或上传订单图片 / Excel" disabled="{{sending || resolving || uploading || (run && run.status === 'WAITING_APPROVAL')}}" />
+      <textarea class="composer-input" value="{{input}}" focus="{{inputFocus}}" bindblur="blurQuestion" bindinput="updateInput" auto-height maxlength="500" placeholder="例如：查一下冲击电钻库存" disabled="{{sending || resolving || uploading || (run && run.status === 'WAITING_APPROVAL')}}" />
       <button class="send-button" bindtap="send" disabled="{{(!input && !pendingAttachments.length) || sending || resolving || uploading || (run && run.status === 'WAITING_APPROVAL')}}">发送</button>
     </view>
   </view>

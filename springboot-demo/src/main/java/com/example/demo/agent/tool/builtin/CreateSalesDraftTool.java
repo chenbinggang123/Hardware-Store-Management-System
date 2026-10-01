@@ -43,7 +43,8 @@ public class CreateSalesDraftTool implements AgentTool {
                                 "customerId", Map.of("type", "integer", "description", "客户 ID"),
                                 "receivedAmount", Map.of("type", "number", "minimum", 0, "description", "本次已收金额，默认 0"),
                                 "items", Map.of("type", "array", "minItems", 1, "items", itemSchema)),
-                        "required", List.of("customerId", "items")));
+                        "required", List.of("customerId", "items")),
+                "确认创建销售草稿");
     }
 
     @Override

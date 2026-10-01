@@ -1,7 +1,7 @@
 const TAB_PAGES = new Set([
-  '/pages/home/index',
+  '/pages/workbench/index',
+  '/pages/excel-tasks/index',
   '/pages/products/index',
-  '/pages/sales-orders/index',
   '/pages/inventories/index',
   '/pages/agent/index'
 ])

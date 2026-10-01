@@ -1,0 +1,48 @@
+.review-screen { min-height: 100vh; padding-bottom: 40rpx; background: #F3F5F2; }
+.review-head { padding: 24rpx 28rpx 0; background: #FFF; border-bottom: 1rpx solid #D6DEDA; }
+.review-title { margin-top: 5rpx; color: #17231E; font-size: 38rpx; font-weight: 750; }
+.review-file { margin-top: 7rpx; color: #66746E; font-size: 23rpx; }
+.review-file-line { display: flex; align-items: center; justify-content: space-between; gap: 18rpx; }
+.original-link { flex: 0 0 auto; color: #245E9B; font-size: 22rpx; font-weight: 650; }
+.review-progress { height: 8rpx; margin-top: 21rpx; overflow: hidden; border-radius: 8rpx; background: #E0E6E3; }
+.review-progress-value { height: 100%; background: #245E9B; }
+.review-summary { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 20rpx; border-top: 1rpx solid #E1E6E3; }
+.review-summary view { min-height: 96rpx; display: flex; flex-direction: column; align-items: center; justify-content: center; border-right: 1rpx solid #E1E6E3; }
+.review-summary view:last-child { border-right: 0; }
+.review-summary text:first-child { color: #247052; font-size: 31rpx; font-weight: 750; font-variant-numeric: tabular-nums; }
+.review-summary text:last-child { color: #718079; font-size: 19rpx; }
+.review-summary .warning text:first-child { color: #B87418; }
+.review-summary .danger text:first-child { color: #B94C3A; }
+.review-filters { padding: 20rpx 28rpx 12rpx; box-sizing: border-box; white-space: nowrap; }
+.review-filter { min-height: 56rpx; margin-right: 10rpx; padding: 0 22rpx; display: inline-flex; align-items: center; border-radius: 12rpx; color: #5F6D66; background: #E4E9E6; font-size: 23rpx; }
+.review-filter.active { color: #FFF; background: #245E9B; }
+.review-list { margin-top: 4rpx; border-top: 1rpx solid #D6DEDA; border-bottom: 1rpx solid #D6DEDA; background: #FFF; }
+.review-row { position: relative; padding: 22rpx 26rpx 20rpx 30rpx; border-bottom: 1rpx solid #E1E6E3; }
+.review-row:last-child { border-bottom: 0; }
+.review-row::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 7rpx; background: #247052; }
+.review-row.tone-warning::before { background: #B87418; }
+.review-row.tone-danger::before { background: #B94C3A; }
+.review-row.tone-neutral::before { background: #87938D; }
+.review-row-head { display: flex; justify-content: space-between; align-items: center; }
+.row-number { color: #7A8681; font-size: 20rpx; }
+.row-status { padding: 4rpx 11rpx; border-radius: 8rpx; color: #216846; background: #E2F2E9; font-size: 18rpx; font-weight: 700; }
+.row-status.warning { color: #8A560E; background: #FFF0D5; }
+.row-status.danger { color: #A83F32; background: #FCE9E4; }
+.row-status.neutral { color: #5D6963; background: #E9EEEB; }
+.row-product { margin-top: 12rpx; display: grid; grid-template-columns: minmax(0,.8fr) auto minmax(0,1.2fr); align-items: center; gap: 12rpx; }
+.row-name { color: #17231E; font-size: 27rpx; font-weight: 700; }
+.row-spec { margin-top: 3rpx; color: #718079; font-size: 21rpx; }
+.row-arrow { color: #8A9791; font-size: 34rpx; }
+.row-match { min-width: 0; text-align: right; }
+.row-match view { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #2F3C36; font-size: 24rpx; font-weight: 650; }
+.row-match text { color: #245E9B; font-size: 22rpx; }
+.row-note { margin-top: 13rpx; color: #66746E; font-size: 21rpx; }
+.row-expand { margin-top: 18rpx; padding-top: 14rpx; border-top: 1rpx dashed #CAD3CE; }
+.row-detail { min-height: 50rpx; display: flex; align-items: center; justify-content: space-between; color: #718079; font-size: 21rpx; }
+.row-detail text:last-child { color: #34413C; font-weight: 650; }
+.row-actions { margin-top: 12rpx; display: grid; grid-template-columns: 1fr 1fr; gap: 12rpx; }
+.row-action { min-height: 66rpx; display: flex; align-items: center; justify-content: center; border-radius: 12rpx; color: #40504A; background: #E9EEEB; font-size: 22rpx; font-weight: 650; }
+.row-action.primary { color: #FFF; background: #245E9B; }
+.review-tip { padding: 60rpx 20rpx; color: #718079; text-align: center; font-size: 24rpx; }
+.review-segment { min-height: 76rpx; padding: 0 28rpx; display: flex; align-items: center; justify-content: space-between; gap: 18rpx; color: #718079; font-size: 20rpx; }
+.review-segment view { color: #245E9B; font-weight: 650; }

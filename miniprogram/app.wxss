@@ -1090,3 +1090,45 @@ page { background: #F5F7F6; color: #182126; font-size: 30rpx; line-height: 1.6; 
   .agent-assist { min-height: 70rpx; }
   .home-status-tip { display: none; }
 }
+
+/* =====================================================
+   Supply-chain ledger tokens
+   Canonical visual layer from the Excel workflow handoff.
+   ===================================================== */
+page { background: #F3F5F2; color: #17231E; }
+.screen { background: #F3F5F2; }
+.text-accent, .section-link, .page-kicker { color: #245E9B; }
+.text-success { color: #247052; }
+.text-warning { color: #B87418; }
+.text-danger { color: #B94C3A; }
+.section-title, .list-title, .form-section-title, .detail-value { color: #17231E; }
+.card, .data-card, .list-card, .form-card, .table-card { border-color: #D6DEDA; box-shadow: 0 5rpx 16rpx rgba(28,48,41,.035); }
+.btn-primary { background: #245E9B; box-shadow: 0 7rpx 18rpx rgba(36,94,155,.18); }
+.btn-outline { color: #245E9B; background: #E8F1F8; border-color: #B9D0E2; }
+.chip.active { background: #245E9B; border-color: #245E9B; }
+.tag-success { color: #216846; background: #E2F2E9; }
+.tag-warning { color: #8A560E; background: #FFF0D5; }
+.tag-danger { color: #A83F32; background: #FCE9E4; }
+.tag-info, .tag-primary { color: #245E9B; background: #E7F0F8; }
+.avatar, .login-brand-icon, .image-placeholder-icon { background: #245E9B; }
+.agent-assist { background: #1D405D; }
+.page-heading-badge { color: #315B49; background: #E4EFE9; }
+.badge-dot { background: #247052; }
+
+/* Shared four-step file workflow */
+.flow-head { padding: 6rpx 0 22rpx; }
+.flow-step-label { color: #245E9B; font-size: 22rpx; font-weight: 700; }
+.flow-title { margin-top: 6rpx; color: #17231E; font-size: 40rpx; line-height: 1.35; font-weight: 750; }
+.flow-desc { margin-top: 10rpx; color: #66746E; font-size: 24rpx; line-height: 1.7; }
+.flow-progress { height: 8rpx; overflow: hidden; border-radius: 8rpx; background: #DDE4E0; }
+.flow-progress-value { height: 100%; background: #245E9B; }
+.fixed-action-space { height: 150rpx; }
+.fixed-action { position: fixed; z-index: 18; left: 0; right: 0; bottom: 0; padding: 16rpx 28rpx calc(16rpx + env(safe-area-inset-bottom)); border-top: 1rpx solid #D6DEDA; background: rgba(255,255,255,.98); }
+.fixed-primary { min-height: 86rpx; display: flex; align-items: center; justify-content: center; border-radius: 15rpx; color: #FFF; background: #245E9B; font-size: 27rpx; font-weight: 750; text-align: center; }
+.fixed-primary.warning { background: #B87418; }
+.fixed-primary.disabled { opacity: .48; }
+
+@media (max-width: 350px) {
+  .flow-title { font-size: 36rpx; }
+  .fixed-action { padding-left: 22rpx; padding-right: 22rpx; }
+}

@@ -32,7 +32,8 @@ public class CommitSalesDraftTool implements AgentTool {
                         "properties", Map.of(
                                 "draftId", Map.of("type", "integer", "description", "销售草稿 ID"),
                                 "draftVersion", Map.of("type", "integer", "description", "草稿预览中的版本号")),
-                        "required", List.of("draftId", "draftVersion")));
+                        "required", List.of("draftId", "draftVersion")),
+                "确认提交正式销售单");
     }
 
     @Override

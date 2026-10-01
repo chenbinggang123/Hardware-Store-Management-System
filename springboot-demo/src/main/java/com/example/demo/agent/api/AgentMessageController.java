@@ -111,6 +111,13 @@ public class AgentMessageController {
         return ApiResponse.ok(conversationService.detail(conversationId, currentUserId(request)));
     }
 
+    @DeleteMapping("/conversations/{conversationId}")
+    public ApiResponse<List<String>> deleteConversation(
+            @PathVariable Long conversationId,
+            HttpServletRequest request) {
+        return ApiResponse.ok("会话已删除", conversationService.delete(conversationId, currentUserId(request)));
+    }
+
     @PostMapping("/runs/{runId}/approval")
     public ApiResponse<AgentRunResult> resolveApproval(
             @PathVariable Long runId,

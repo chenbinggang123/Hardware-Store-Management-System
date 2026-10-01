@@ -1,0 +1,27 @@
+<view class="screen mapping-screen" wx:if="{{task}}">
+  <view class="flow-head"><view class="flow-step-label">第 2 步，共 4 步</view><view class="flow-title">确认每一列代表什么</view><view class="flow-desc">系统已读取“{{task.sheetName}}”，请用真实样例核对字段。</view></view>
+  <view class="flow-progress"><view class="flow-progress-value" style="width: 50%;"></view></view>
+
+  <view class="sheet-facts">
+    <view><text>文件</text><text>{{task.fileName}}</text></view>
+    <view><text>工作表</text><text>{{task.sheetName}}</text></view>
+    <view><text>数据范围</text><text>A1:F{{task.rowCount + 1}} · 共 {{task.rowCount}} 行</text></view>
+  </view>
+
+  <view class="template-memory"><view class="template-mark">记</view><view><view class="template-title">已应用“{{task.relationName}}”字段模板</view><view class="template-desc">这次修改后会记住，下次同类文件仍会展示确认。</view></view></view>
+
+  <view class="mapping-title-row"><view><view class="mapping-title">字段映射</view><view class="mapping-subtitle">必填字段已标记，请逐项核对</view></view><view class="mapping-count">{{mappings.length}} 列</view></view>
+  <view class="mapping-ledger">
+    <view class="mapping-row" wx:for="{{mappings}}" wx:key="source">
+      <view class="mapping-source"><view class="source-name">{{item.source}}<text wx:if="{{item.required}}">必填</text></view><view class="source-samples">样例：{{item.samples}}</view></view>
+      <view class="mapping-arrow">›</view>
+      <picker class="mapping-picker-wrap" range="{{targetOptions}}" data-index="{{index}}" bindchange="changeTarget">
+        <view class="mapping-target"><view>{{item.target}}</view><text>{{item.confidence}}%</text></view>
+      </picker>
+    </view>
+  </view>
+
+  <view class="mapping-note">如果文件没有表头，可在这里把 A、B、C 列分别指定为商品名称、规格和单位。</view>
+  <view class="fixed-action-space"></view>
+  <view class="fixed-action"><view class="fixed-primary" bindtap="continueReview">确认字段并开始匹配</view></view>
+</view>

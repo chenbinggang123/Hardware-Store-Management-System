@@ -282,7 +282,7 @@ class AppTest {
         AgentTool draftTool = new AgentTool() {
             public AgentToolDefinition definition() {
                 return new AgentToolDefinition("create_sales_draft", "创建销售草稿",
-                        AgentToolRisk.R1_DRAFT, Map.of());
+                        AgentToolRisk.R1_DRAFT, Map.of(), "确认创建销售草稿");
             }
 
             public Object execute(AgentToolContext context, Map<String, Object> arguments) {

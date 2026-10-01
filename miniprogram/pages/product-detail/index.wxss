@@ -1,1 +1,12 @@
 /* Product detail overrides */
+.supply-section { margin: 24rpx 0; border-top: 1rpx solid #CBD5D0; }
+.supply-title { min-height: 112rpx; display: flex; align-items: center; justify-content: space-between; gap: 18rpx; border-bottom: 1rpx solid #CBD5D0; }
+.supply-title > view:first-child { display: flex; flex-direction: column; }
+.supply-title text:first-child { color: #17231E; font-size: 29rpx; font-weight: 750; }
+.supply-title text:last-child { margin-top: 3rpx; color: #75817B; font-size: 19rpx; font-weight: 400; }
+.supply-badge { color: #245E9B; font-size: 16rpx; font-weight: 750; letter-spacing: 1rpx; }
+.supply-row { min-height: 102rpx; display: grid; grid-template-columns: 54rpx 1fr 34rpx; align-items: center; border-bottom: 1rpx solid #D7DEDA; }
+.supply-index { color: #A0AAA5; font-size: 18rpx; font-weight: 700; }
+.supply-main view { color: #26342D; font-size: 24rpx; font-weight: 700; }
+.supply-main text { color: #75817B; font-size: 19rpx; }
+.supply-arrow { color: #245E9B; font-size: 25rpx; text-align: right; }

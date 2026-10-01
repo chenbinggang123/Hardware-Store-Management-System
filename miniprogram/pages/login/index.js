@@ -29,7 +29,7 @@ Page({
       getApp().setSession(session)
       showToast('登录成功', 'success')
       wx.switchTab({
-        url: '/pages/home/index'
+        url: '/pages/workbench/index'
       })
     }).catch((error) => {
       const message = (error && (error.message || (error.data && error.data.message) || error.errMsg)) || '登录失败'

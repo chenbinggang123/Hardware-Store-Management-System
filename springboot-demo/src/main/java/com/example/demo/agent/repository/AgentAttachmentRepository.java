@@ -8,4 +8,5 @@ import java.util.List;
 public interface AgentAttachmentRepository extends JpaRepository<AgentAttachment, Long> {
     List<AgentAttachment> findByIdInAndOperatorId(List<Long> ids, Long operatorId);
     List<AgentAttachment> findByRunIdOrderByCreateTimeAsc(Long runId);
+    List<AgentAttachment> findByConversationIdOrderByCreateTimeAsc(Long conversationId);
 }

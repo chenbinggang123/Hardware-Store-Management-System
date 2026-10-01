@@ -1,0 +1,31 @@
+<view class="screen compare-screen" wx:if="{{comparison}}">
+  <view class="page-kicker">VERSION DIFFERENCE</view>
+  <view class="page-title">只看第二版改了什么</view>
+  <view class="page-summary">原表内容不覆盖，变化按原始行号列出。你可以先核对，再让小五继续处理最新版。</view>
+
+  <view class="version-line">
+    <view class="version-block old"><view class="version-label">{{comparison.base.version}} 原版本</view><view>{{comparison.base.fileName}}</view><text>{{comparison.base.uploadedAt}} · {{comparison.base.rows}} 行</text></view>
+    <view class="version-arrow">→</view>
+    <view class="version-block current"><view class="version-label">{{comparison.current.version}} 当前版本</view><view>{{comparison.current.fileName}}</view><text>{{comparison.current.uploadedAt}} · {{comparison.current.rows}} 行</text></view>
+  </view>
+
+  <view class="compare-summary">
+    <view class="added"><text>+{{comparison.summary.added}}</text><text>新增</text></view>
+    <view><text>{{comparison.summary.quantityChanged}}</text><text>数量变化</text></view>
+    <view><text>{{comparison.summary.noteChanged}}</text><text>备注变化</text></view>
+    <view class="quiet"><text>{{comparison.summary.unchanged}}</text><text>未变化</text></view>
+  </view>
+
+  <scroll-view class="filter-strip" scroll-x enhanced show-scrollbar="{{false}}"><view class="filter-list"><view wx:for="{{filters}}" wx:key="key" class="filter-chip {{filter === item.key ? 'active' : ''}}" data-key="{{item.key}}" bindtap="changeFilter">{{item.label}}</view></view></scroll-view>
+
+  <view class="difference-list">
+    <view class="difference-row {{item.tone}}" wx:for="{{visibleRows}}" wx:key="id">
+      <view class="row-index">原表 {{item.sourceRow}} 行</view>
+      <view class="row-title"><text>{{item.name}}</text><text>{{item.field}}</text></view>
+      <view class="row-spec">{{item.spec}}</view>
+      <view class="difference-flow"><view><text>V1</text><text>{{item.before}}</text></view><view class="flow-arrow">→</view><view><text>V2</text><text>{{item.after}}</text></view></view>
+    </view>
+  </view>
+  <view class="bottom-safe-space"></view>
+  <view class="fixed-action fixed-split"><view class="selection-note">原版本仍保留</view><view class="fixed-primary" bindtap="continueWithCurrent">使用 V2 继续处理</view></view>
+</view>

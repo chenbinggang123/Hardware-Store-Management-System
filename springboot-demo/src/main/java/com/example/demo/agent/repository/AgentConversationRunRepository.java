@@ -10,4 +10,6 @@ public interface AgentConversationRunRepository extends JpaRepository<AgentConve
     List<AgentConversationRun> findByConversationIdOrderByCreateTimeAsc(Long conversationId);
 
     Optional<AgentConversationRun> findByRunId(Long runId);
+
+    void deleteByConversationId(Long conversationId);
 }

@@ -484,6 +484,10 @@ module.exports = {
   getAgentConversation(conversationId) {
     return agentRequest(`/agent/conversations/${conversationId}`)
   },
+  deleteAgentConversation(conversationId) {
+    return agentRequest(`/agent/conversations/${conversationId}`, { method: 'DELETE' })
+      .then((cloudFileIds) => Promise.all((cloudFileIds || []).map(removeCloudFile)))
+  },
   getAgentRun(runId) {
     return agentRequest(`/agent/runs/${runId}`)
   },

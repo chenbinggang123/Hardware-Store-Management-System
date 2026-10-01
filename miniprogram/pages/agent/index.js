@@ -1,5 +1,6 @@
 const api = require('../../utils/api')
 const { formatAgentContent } = require('../../utils/agent-format')
+const { openPage } = require('../../utils/router')
 
 const ACTIVE_RUN_KEY = 'agent_active_run_id'
 const ACTIVE_CONVERSATION_KEY = 'agent_active_conversation_id'
@@ -64,10 +65,10 @@ function attachmentView(item) {
 
 Page({
   data: {
-    input: '', sending: false, resolving: false, loadingHistory: false,
+    input: '', inputFocus: false, sending: false, resolving: false, loadingHistory: false, deletingConversationId: null,
     run: null, conversationId: null, conversations: [], historyOpen: false, messages: [],
     pendingAttachments: [], uploading: false,
-    suggestions: ['查一下电钻库存', '给老王开两把电钻，按以前价格记账', '看看 12 号销售草稿']
+    suggestions: ['查一下电钻库存', '把商品 2 上架', '把商品 2 的实际库存调整为 20，原因是门店盘点']
   },
 
   onShow() {
@@ -88,6 +89,9 @@ Page({
 
   updateInput(event) { this.setData({ input: event.detail.value }) },
   useSuggestion(event) { this.setData({ input: event.currentTarget.dataset.text || '' }) },
+  openExcelWorkflow() { openPage('/pages/excel-upload/index') },
+  focusQuestion() { this.setData({ inputFocus: true }) },
+  blurQuestion() { this.setData({ inputFocus: false }) },
 
   chooseAttachment() {
     if (this.data.uploading || this.data.pendingAttachments.length >= 3) return
@@ -146,6 +150,37 @@ Page({
     if (!conversationId) return
     this.setData({ historyOpen: false })
     this.loadConversation(conversationId)
+  },
+
+  deleteConversation(event) {
+    const conversationId = Number(event.currentTarget.dataset.id)
+    if (!conversationId || this.data.deletingConversationId) return
+    const conversation = this.data.conversations.find((item) => Number(item.id) === conversationId)
+    wx.showModal({
+      title: '删除历史会话',
+      content: `确定删除“${(conversation && conversation.title) || '这条会话'}”吗？聊天记录删除后无法恢复。`,
+      confirmText: '删除',
+      confirmColor: '#C4473A'
+    }).then((result) => {
+      if (!result.confirm) return null
+      this.setData({ deletingConversationId: conversationId })
+      return api.deleteAgentConversation(conversationId).then(() => {
+        const update = {
+          conversations: this.data.conversations.filter((item) => Number(item.id) !== conversationId)
+        }
+        if (Number(this.data.conversationId) === conversationId) {
+          wx.removeStorageSync(ACTIVE_RUN_KEY)
+          wx.removeStorageSync(ACTIVE_CONVERSATION_KEY)
+          Object.assign(update, {
+            conversationId: null, run: null, messages: [], input: '', pendingAttachments: []
+          })
+        }
+        this.setData(update)
+        wx.showToast({ title: '会话已删除', icon: 'success' })
+      }).catch((error) => {
+        wx.showToast({ title: errorMessage(error, '会话删除失败'), icon: 'none', duration: 3000 })
+      }).finally(() => this.setData({ deletingConversationId: null }))
+    }).catch(() => {})
   },
 
   loadConversation(conversationId) {

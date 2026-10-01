@@ -1,0 +1,41 @@
+<view class="screen sync-screen">
+  <view class="page-kicker">SUPPLIER PRICE SYNC</view>
+  <view class="page-title">厂家价格同步</view>
+  <view class="page-summary">小五已完成匹配，常规变动默认勾选；涨幅较大和未匹配项留给你决定。</view>
+
+  <view class="source-ledger">
+    <view class="source-mark">XLS</view>
+    <view class="source-main"><view>秋季电动工具价格表.xlsx</view><text>江苏机电设备厂 · 今日 09:28</text></view>
+    <view class="source-state">已解析</view>
+  </view>
+
+  <view class="sync-summary">
+    <view><text>286</text><text>原表行数</text></view>
+    <view><text>{{normalCount}}</text><text>常规样例</text></view>
+    <view class="attention"><text>{{attentionCount}}</text><text>需留意</text></view>
+  </view>
+
+  <scroll-view class="filter-strip" scroll-x enhanced show-scrollbar="{{false}}">
+    <view class="filter-list"><view wx:for="{{filters}}" wx:key="key" class="filter-chip {{filter === item.key ? 'active' : ''}}" data-key="{{item.key}}" bindtap="changeFilter">{{item.label}}</view></view>
+  </scroll-view>
+
+  <view class="sync-ledger">
+    <view class="sync-row tone-{{item.tone}} {{item.selected ? 'selected' : ''}}" wx:for="{{visibleRows}}" wx:key="id" data-id="{{item.id}}" bindtap="toggleRow">
+      <view class="row-check"><view class="check-box">{{item.selected ? '✓' : ''}}</view><text>原表 {{item.sourceRow}} 行</text></view>
+      <view class="row-core">
+        <view class="row-title"><text>{{item.name}}</text><text class="change-tag {{item.direction}}">{{item.changeText}}</text></view>
+        <view class="row-meta">{{item.factoryCode}} · {{item.spec}}</view>
+        <view class="price-flow"><text>¥{{item.oldCost}}</text><text class="flow-arrow">→</text><text>¥{{item.newCost}}</text></view>
+        <view class="match-line">匹配：{{item.match}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="empty-ledger" wx:if="{{!visibleRows.length}}">当前筛选下没有数据</view>
+  <view class="bottom-safe-space"></view>
+
+  <view class="fixed-action fixed-split">
+    <view class="selection-note"><text>{{selectedCount}}</text> 条将被更新</view>
+    <view class="fixed-primary {{!selectedCount ? 'disabled' : ''}}" bindtap="confirmSync">确认更新 {{selectedCount}} 条商品成本</view>
+  </view>
+</view>

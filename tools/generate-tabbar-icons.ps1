@@ -63,6 +63,20 @@ function Draw-Icon([string]$name, [string]$color, [string]$fileName) {
       $graphics.DrawLine($pen, 30, 53, 45, 53)
       $path.Dispose()
     }
+    'files' {
+      $path = [System.Drawing.Drawing2D.GraphicsPath]::new()
+      $path.AddLine(20, 14, 49, 14)
+      $path.AddLine(49, 14, 63, 28)
+      $path.AddLine(63, 28, 63, 67)
+      $path.AddLine(63, 67, 20, 67)
+      $path.CloseFigure()
+      $graphics.DrawPath($pen, $path)
+      $graphics.DrawLine($pen, 49, 14, 49, 29)
+      $graphics.DrawLine($pen, 49, 29, 63, 29)
+      $graphics.DrawLine($pen, 29, 40, 54, 40)
+      $graphics.DrawLine($pen, 29, 52, 49, 52)
+      $path.Dispose()
+    }
     'inventory' {
       $graphics.DrawLines($pen, [System.Drawing.PointF[]]@(
         [System.Drawing.PointF]::new(14, 31),
@@ -98,10 +112,10 @@ function Draw-Icon([string]$name, [string]$color, [string]$fileName) {
   $bitmap.Dispose()
 }
 
-$icons = @('home', 'products', 'orders', 'inventory', 'agent')
+$icons = @('home', 'files', 'products', 'inventory', 'agent')
 foreach ($icon in $icons) {
   Draw-Icon $icon '#66716D' "$icon.png"
-  Draw-Icon $icon '#2865D7' "$icon-active.png"
+  Draw-Icon $icon '#245E9B' "$icon-active.png"
 }
 
 Write-Output "Generated tab bar icons in $resolvedOutput"

@@ -1,7 +1,19 @@
 {
   "pages": [
     "pages/login/index",
+    "pages/workbench/index",
     "pages/home/index",
+    "pages/excel-tasks/index",
+    "pages/excel-upload/index",
+    "pages/excel-mapping/index",
+    "pages/excel-review/index",
+    "pages/excel-confirm/index",
+    "pages/excel-task-detail/index",
+    "pages/excel-version-compare/index",
+    "pages/price-sync-review/index",
+    "pages/product-mappings/index",
+    "pages/price-history/index",
+    "pages/contacts/index",
     "pages/agent/index",
     "pages/products/index",
     "pages/product-detail/index",
@@ -30,34 +42,34 @@
   ],
   "window": {
     "navigationBarTitleText": "恒丰五金",
-    "navigationBarBackgroundColor": "#F5F7F6",
+    "navigationBarBackgroundColor": "#F3F5F2",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#F5F7F6",
+    "backgroundColor": "#F3F5F2",
     "backgroundTextStyle": "dark"
   },
   "tabBar": {
     "color": "#66716D",
-    "selectedColor": "#2865D7",
+    "selectedColor": "#245E9B",
     "backgroundColor": "#FFFFFF",
     "borderStyle": "black",
     "list": [
       {
-        "pagePath": "pages/home/index",
-        "text": "首页",
+        "pagePath": "pages/workbench/index",
+        "text": "工作台",
         "iconPath": "assets/tabbar/home.png",
         "selectedIconPath": "assets/tabbar/home-active.png"
+      },
+      {
+        "pagePath": "pages/excel-tasks/index",
+        "text": "文件",
+        "iconPath": "assets/tabbar/files.png",
+        "selectedIconPath": "assets/tabbar/files-active.png"
       },
       {
         "pagePath": "pages/products/index",
         "text": "商品",
         "iconPath": "assets/tabbar/products.png",
         "selectedIconPath": "assets/tabbar/products-active.png"
-      },
-      {
-        "pagePath": "pages/sales-orders/index",
-        "text": "单据",
-        "iconPath": "assets/tabbar/orders.png",
-        "selectedIconPath": "assets/tabbar/orders-active.png"
       },
       {
         "pagePath": "pages/inventories/index",

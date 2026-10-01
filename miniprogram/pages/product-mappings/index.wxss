@@ -1,0 +1,27 @@
+.mapping-screen { padding-top: 24rpx; }
+.page-kicker { color: #245E9B; font-size: 19rpx; font-weight: 750; letter-spacing: 2rpx; }
+.page-title { margin-top: 5rpx; color: #17231E; font-size: 40rpx; font-weight: 750; }
+.page-summary { margin-top: 9rpx; color: #64716B; font-size: 23rpx; line-height: 1.65; }
+.mapping-overview { margin-top: 24rpx; min-height: 100rpx; display: grid; grid-template-columns: 1fr 1fr 1.25fr; align-items: center; border-top: 1rpx solid #CBD5D0; border-bottom: 1rpx solid #CBD5D0; }
+.mapping-overview > view { display: flex; flex-direction: column; justify-content: center; }
+.mapping-overview text:first-child { color: #17231E; font-size: 28rpx; font-weight: 750; }
+.mapping-overview text:last-child { color: #77827D; font-size: 19rpx; }
+.mapping-overview .memory-state text:first-child { color: #247052; }
+.mapping-overview .add-link { align-items: flex-end; color: #245E9B; font-size: 22rpx; font-weight: 700; }
+.filter-strip { margin: 22rpx -24rpx 18rpx; padding-left: 24rpx; white-space: nowrap; }
+.filter-list { display: inline-flex; padding-right: 40rpx; gap: 12rpx; }
+.filter-chip { padding: 11rpx 21rpx; color: #59665F; background: #E8ECEA; font-size: 21rpx; }
+.filter-chip.active { color: #245E9B; background: #E7F0F8; font-weight: 700; }
+.relation-list { border-top: 1rpx solid #CBD5D0; }
+.relation-row { position: relative; padding: 22rpx 0 18rpx; display: grid; grid-template-columns: 1fr 70rpx 1fr; border-bottom: 1rpx solid #D7DEDA; }
+.source-type, .target-type { color: #7A867F; font-size: 18rpx; }
+.source-name, .target-name { margin-top: 4rpx; color: #1E2C26; font-size: 24rpx; font-weight: 750; }
+.source-spec { margin-top: 4rpx; color: #69756F; font-size: 19rpx; line-height: 1.45; }
+.relation-link { display: flex; align-items: center; }
+.link-line { width: 38rpx; height: 2rpx; background: #9CB1A8; }
+.link-arrow { color: #245E9B; font-size: 24rpx; }
+.relation-target { padding-left: 4rpx; }
+.relation-foot { grid-column: 1 / 4; margin-top: 18rpx; padding-top: 12rpx; display: flex; align-items: center; justify-content: space-between; border-top: 1rpx dashed #D9E0DC; color: #7A867F; font-size: 18rpx; }
+.relation-foot view { color: #B94C3A; font-size: 20rpx; }
+.relation-row.revoked { opacity: .5; }
+.relation-row.revoked .relation-link { filter: grayscale(1); }
