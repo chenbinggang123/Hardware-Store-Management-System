@@ -28,6 +28,14 @@
 .result-file-mark { width: 54rpx; height: 54rpx; display: flex; align-items: center; justify-content: center; color: #247052; background: #E2F2E9; font-size: 17rpx; font-weight: 750; }
 .result-file view view { color: #26332E; font-size: 23rpx; font-weight: 650; }
 .result-file text { color: #718079; font-size: 20rpx; }
+.output-list { border-top: 1rpx solid #D6DEDA; }
+.output-row { min-height: 112rpx; padding: 18rpx 0; display: flex; align-items: center; gap: 16rpx; border-bottom: 1rpx solid #D6DEDA; }
+.output-mark { width: 58rpx; height: 58rpx; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; color: #247052; background: #E2F2E9; font-size: 20rpx; font-weight: 750; }
+.output-main { min-width: 0; flex: 1; }
+.output-name { overflow: hidden; color: #26332E; font-size: 25rpx; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.output-meta, .output-error { margin-top: 5rpx; color: #718079; font-size: 22rpx; line-height: 1.5; }
+.output-error { color: #A83F32; }
+.output-download { width: 118rpx; height: 72rpx; margin: 0; padding: 0; color: #245E9B; background: #E7F0F8; border: 0; font-size: 24rpx; font-weight: 700; line-height: 72rpx; }
 .detail-tools { margin-top: 22rpx; border-top: 1rpx solid #CBD5D0; }
 .detail-tools > view { min-height: 94rpx; display: flex; align-items: center; justify-content: space-between; gap: 20rpx; border-bottom: 1rpx solid #D7DEDA; }
 .detail-tools > view > text:first-child { color: #26332E; font-size: 23rpx; font-weight: 700; }

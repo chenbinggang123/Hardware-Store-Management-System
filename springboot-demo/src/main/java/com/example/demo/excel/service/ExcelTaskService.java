@@ -16,6 +16,7 @@ import com.example.demo.excel.parser.ParsedWorkbook;
 import com.example.demo.excel.repository.ExcelTaskRepository;
 import com.example.demo.excel.repository.ExcelTaskRowRepository;
 import com.example.demo.excel.repository.ExcelTaskSheetRepository;
+import com.example.demo.repository.SupplierRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -51,6 +52,7 @@ public class ExcelTaskService {
     private final ExcelTaskParser parser;
     private final AttachmentStorage storage;
     private final CloudBaseFileDownloader cloudFileDownloader;
+    private final SupplierRepository supplierRepository;
     private final ObjectMapper objectMapper;
     private final long maxSize;
 
@@ -60,6 +62,7 @@ public class ExcelTaskService {
                             ExcelTaskParser parser,
                             AttachmentStorage storage,
                             CloudBaseFileDownloader cloudFileDownloader,
+                            SupplierRepository supplierRepository,
                             ObjectMapper objectMapper,
                             @Value("${excel.task.max-size-bytes:10485760}") long maxSize) {
         this.taskRepository = taskRepository;
@@ -68,11 +71,23 @@ public class ExcelTaskService {
         this.parser = parser;
         this.storage = storage;
         this.cloudFileDownloader = cloudFileDownloader;
+        this.supplierRepository = supplierRepository;
         this.objectMapper = objectMapper;
         this.maxSize = maxSize;
     }
 
     public ExcelTaskDetail upload(MultipartFile file, String purpose, Long operatorId) {
+        return uploadInternal(file, purpose, null, null, operatorId);
+    }
+
+    public ExcelTaskDetail upload(MultipartFile file, String purpose, Long supplierId,
+                                  LocalDate priceEffectiveDate, Long operatorId) {
+        PriceContext context = validatePriceContext(purpose, supplierId, priceEffectiveDate);
+        return uploadInternal(file, context.purpose(), context.supplierId(), context.effectiveDate(), operatorId);
+    }
+
+    private ExcelTaskDetail uploadInternal(MultipartFile file, String purpose, Long supplierId,
+                                           LocalDate priceEffectiveDate, Long operatorId) {
         if (file == null || file.isEmpty()) throw new IllegalArgumentException("请选择要上传的表格");
         if (file.getSize() > maxSize) throw tooLarge();
         String originalName = cleanName(file.getOriginalFilename());
@@ -86,25 +101,32 @@ public class ExcelTaskService {
         String mimeType = detectedMime(extension, content);
         String objectKey = "excel-tasks/" + operatorId + "/" + LocalDate.now() + "/" + UUID.randomUUID() + "." + extension;
         storage.put(objectKey, content, mimeType);
-        return create(operatorId, purpose, objectKey, originalName, mimeType, content);
+        return create(operatorId, purpose, supplierId, priceEffectiveDate,
+                objectKey, originalName, mimeType, content);
     }
 
     public ExcelTaskDetail uploadCloud(ExcelTaskCloudRequest request, Long operatorId) {
         if (request == null) throw new IllegalArgumentException("文件信息不能为空");
+        PriceContext context = validatePriceContext(
+                request.getPurpose(), request.getSupplierId(), request.getPriceEffectiveDate());
         if (request.getFileSize() != null && request.getFileSize() > maxSize) throw tooLarge();
         String originalName = cleanName(request.getOriginalName());
         String extension = validateExtension(originalName);
         byte[] content = cloudFileDownloader.download(request.getCloudFileId(), request.getDownloadUrl(), maxSize);
         String mimeType = detectedMime(extension, content);
-        return create(operatorId, request.getPurpose(), request.getCloudFileId(), originalName, mimeType, content);
+        return create(operatorId, context.purpose(), context.supplierId(), context.effectiveDate(),
+                request.getCloudFileId(), originalName, mimeType, content);
     }
 
-    private ExcelTaskDetail create(Long operatorId, String purpose, String objectKey,
+    private ExcelTaskDetail create(Long operatorId, String purpose, Long supplierId,
+                                   LocalDate priceEffectiveDate, String objectKey,
                                    String originalName, String mimeType, byte[] content) {
         LocalDateTime now = LocalDateTime.now();
         ExcelTask task = new ExcelTask();
         task.setOperatorId(operatorId);
         task.setPurpose(normalizePurpose(purpose));
+        task.setSupplierId(supplierId);
+        task.setPriceEffectiveDate(priceEffectiveDate);
         task.setStatus("PARSING");
         task.setOriginalName(originalName);
         task.setObjectKey(objectKey);
@@ -195,12 +217,14 @@ public class ExcelTaskService {
                         sheet.getColumnCount(), read(sheet.getColumnsJson())))
                 .toList();
         return new ExcelTaskDetail(task.getId(), task.getOriginalName(), task.getPurpose(), task.getStatus(),
+                task.getSupplierId(), task.getPriceEffectiveDate(),
                 task.getMimeType(), task.getFileSize(), task.getSha256(), task.getSheetCount(), task.getRowCount(),
                 task.getErrorMessage(), task.getCreateTime(), task.getUpdateTime(), task.getVersion(), sheets);
     }
 
     private ExcelTaskSummary summary(ExcelTask task) {
         return new ExcelTaskSummary(task.getId(), task.getOriginalName(), task.getPurpose(), task.getStatus(),
+                task.getSupplierId(), task.getPriceEffectiveDate(),
                 task.getSheetCount(), task.getRowCount(), task.getErrorMessage(), task.getCreateTime(), task.getUpdateTime());
     }
 
@@ -225,6 +249,22 @@ public class ExcelTaskService {
         if (!PURPOSES.contains(purpose)) throw new IllegalArgumentException("不支持的文件用途：" + value);
         return purpose;
     }
+
+    private PriceContext validatePriceContext(String purposeValue, Long supplierId, LocalDate effectiveDate) {
+        String purpose = normalizePurpose(purposeValue);
+        if ("SUPPLIER_PRICE".equals(purpose)) {
+            if (supplierId == null) throw new IllegalArgumentException("供应商调价任务必须选择供应商");
+            if (!supplierRepository.existsById(supplierId)) throw new IllegalArgumentException("供应商不存在");
+            return new PriceContext(purpose, supplierId,
+                    effectiveDate == null ? LocalDate.now() : effectiveDate);
+        }
+        if (supplierId != null || effectiveDate != null) {
+            throw new IllegalArgumentException("只有供应商调价任务可以设置供应商和价格生效日期");
+        }
+        return new PriceContext(purpose, null, null);
+    }
+
+    private record PriceContext(String purpose, Long supplierId, LocalDate effectiveDate) { }
 
     private String cleanName(String value) {
         String normalized = StringUtils.hasText(value) ? value.replace('\\', '/') : "";

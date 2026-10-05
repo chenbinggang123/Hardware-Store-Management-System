@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 
 @Component
 @ConditionalOnProperty(name = "agent.attachment.storage", havingValue = "cos")
@@ -45,6 +46,17 @@ public class CosAttachmentStorage implements AttachmentStorage {
     @Override
     public void delete(String objectKey) {
         client.deleteObject(bucket, objectKey);
+    }
+
+    @Override
+    public InputStream openStream(String objectKey) {
+        return client.getObject(bucket, objectKey).getObjectContent();
+    }
+
+    @Override
+    public StoredObjectMetadata stat(String objectKey) {
+        ObjectMetadata metadata = client.getObjectMetadata(bucket, objectKey);
+        return new StoredObjectMetadata(metadata.getContentLength(), metadata.getContentType());
     }
 
     @PreDestroy

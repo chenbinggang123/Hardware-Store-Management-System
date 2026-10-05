@@ -2,14 +2,21 @@
   <view class="loading-state" wx:if="{{loading}}">正在核对最终影响…</view>
   <view class="error-state" wx:elif="{{loadError}}"><view class="error-state-title">写入预览没有加载成功</view><view>{{loadError}}</view><button class="btn btn-secondary" bindtap="retryLoad">重新加载</button></view>
   <block wx:elif="{{task}}">
-  <view class="flow-head"><view class="flow-step-label">第 4 步，共 4 步</view><view class="flow-title">确认这次会写入什么</view><view class="flow-desc">请核对新增、修改、跳过和异常。执行后仍会保留原文件、原行号和操作记录。</view></view>
+  <view class="flow-head"><view class="flow-step-label">第 4 步，共 4 步</view><view class="flow-title">{{isQuote ? '选择报价方式并生成文件' : '确认这次会写入什么'}}</view><view class="flow-desc">{{isQuote ? '报价只使用已复核的数据生成新文件，不会改动商品、库存或订单。' : '请核对新增、修改、跳过和异常。执行后仍会保留原文件、原行号和操作记录。'}}</view></view>
   <view class="flow-progress"><view class="flow-progress-value" style="width: 100%;"></view></view>
 
   <view class="change-summary">
-    <view class="change-cell success"><text>{{task.additions}}</text><text>将新增</text></view>
-    <view class="change-cell info"><text>{{task.modifications}}</text><text>将修改</text></view>
+    <view class="change-cell success"><text>{{task.additions}}</text><text>{{isQuote ? '可新增匹配' : '将新增'}}</text></view>
+    <view class="change-cell info"><text>{{task.modifications}}</text><text>{{isQuote ? '将报价' : '将修改'}}</text></view>
     <view class="change-cell neutral"><text>{{task.skipped}}</text><text>跳过</text></view>
     <view class="change-cell danger"><text>{{task.failures}}</text><text>异常</text></view>
+  </view>
+
+  <view class="quote-settings" wx:if="{{isQuote}}">
+    <view class="confirm-section-title">报价设置</view>
+    <view class="quote-field"><view><view class="quote-label">使用哪种价格</view><view class="quote-hint">每一行都从商品当前价格中读取</view></view><picker range="{{priceModes}}" range-key="label" value="{{priceModeIndex}}" bindchange="changePriceMode"><view class="quote-picker">{{priceModes[priceModeIndex].label}} ›</view></picker></view>
+    <view class="quote-field" wx:if="{{priceModes[priceModeIndex].code === 'CUSTOMER_TYPE_PRICE'}}"><view><view class="quote-label">报价客户</view><view class="quote-hint">根据客户类型选择零售价、批发价或老客户价</view></view><picker range="{{customerNames}}" value="{{customerIndex < 0 ? 0 : customerIndex}}" bindchange="changeCustomer"><view class="quote-picker">{{customerIndex < 0 ? '请选择客户' : customerNames[customerIndex]}} ›</view></picker></view>
+    <view class="quote-field"><view><view class="quote-label">保留未匹配行</view><view class="quote-hint">保留在“未匹配与异常”工作表，方便继续核对</view></view><switch checked="{{includeUnmatchedRows}}" color="#245E9B" bindchange="changeIncludeUnmatched" /></view>
   </view>
 
   <view class="confirm-section">
@@ -21,16 +28,16 @@
   </view>
 
   <view class="confirm-section">
-    <view class="confirm-section-title">写入后会发生</view>
+    <view class="confirm-section-title">{{isQuote ? '生成后会发生' : '写入后会发生'}}</view>
     <view class="impact-list">
       <view><text class="impact-index">1</text><text>{{impact.will}}</text></view>
-      <view><text class="impact-index">2</text><text>保留原文件和每一行的来源位置</text></view>
+      <view><text class="impact-index">2</text><text>{{isQuote ? '生成的文件保留 7 天，可在任务详情下载' : '保留原文件和每一行的来源位置'}}</text></view>
       <view><text class="impact-index">3</text><text>{{impact.willNot}}</text></view>
     </view>
   </view>
 
-  <view class="risk-confirm"><view class="risk-mark">核</view><view><view class="risk-title">这是正式写入前的最后确认</view><view class="risk-desc">返回修改不会写入任何数据；确认后只处理上方已经审核通过的行。</view></view></view>
+  <view class="risk-confirm"><view class="risk-mark">核</view><view><view class="risk-title">{{isQuote ? '生成前请核对报价方式' : '这是正式写入前的最后确认'}}</view><view class="risk-desc">{{isQuote ? '返回修改不会生成文件；确认后可在任务详情查看生成进度和下载结果。' : '返回修改不会写入任何数据；确认后只处理上方已经审核通过的行。'}}</view></view></view>
   <view class="fixed-action-space"></view>
-  <view class="fixed-action split-action"><button class="fixed-secondary" bindtap="backToReview" disabled="{{writing}}">返回修改</button><button class="fixed-primary {{writing ? 'disabled' : ''}}" bindtap="confirmWrite" disabled="{{writing}}">{{writing ? '正在写入，请稍候…' : impact.action + ' ' + (task.additions + task.modifications) + ' 行'}}</button></view>
+  <view class="fixed-action split-action"><button class="fixed-secondary" bindtap="backToReview" disabled="{{writing}}">返回修改</button><button class="fixed-primary {{writing || (isQuote && !quoteReady) ? 'disabled' : ''}}" bindtap="confirmWrite" disabled="{{writing || (isQuote && !quoteReady)}}">{{writing ? (isQuote ? '正在生成报价…' : '正在写入，请稍候…') : impact.action + ' ' + (task.additions + task.modifications) + ' 行'}}</button></view>
   </block>
 </view>

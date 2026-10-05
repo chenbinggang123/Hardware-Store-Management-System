@@ -8,6 +8,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -18,6 +19,8 @@ public class ExcelTask {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private Long operatorId;
+    private Long supplierId;
+    private LocalDate priceEffectiveDate;
     private String purpose;
     private String status;
     private String originalName;

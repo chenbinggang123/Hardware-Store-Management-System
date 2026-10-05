@@ -79,7 +79,8 @@ function cloudRequest(path, options = {}) {
     path: `${cloudConfig.apiPrefix}${path}`,
     method,
     data: options.data || options.query || {},
-    header
+    header,
+    ...(options.responseType ? { responseType: options.responseType } : {})
   }).then((response) => {
     const payload = response.data
     if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -173,7 +174,7 @@ function uploadAgentFile(file, conversationId) {
     .catch((error) => removeCloudFile(uploadedFileID).then(() => Promise.reject(error)))
 }
 
-function uploadExcelFile(file, purpose) {
+function uploadExcelFile(file, purpose, context = {}) {
   if (!wx.cloud || !wx.cloud.uploadFile || !wx.cloud.getTempFileURL) {
     return Promise.reject({ message: '当前微信基础库不支持文件上传' })
   }
@@ -193,7 +194,15 @@ function uploadExcelFile(file, purpose) {
         }
         return request('/excel-tasks/cloud', {
           method: 'POST',
-          data: { cloudFileId: uploadedFileID, downloadUrl: item.tempFileURL, originalName, fileSize, purpose }
+          data: {
+            cloudFileId: uploadedFileID,
+            downloadUrl: item.tempFileURL,
+            originalName,
+            fileSize,
+            purpose,
+            supplierId: context.supplierId || null,
+            priceEffectiveDate: context.priceEffectiveDate || null
+          }
         })
       }))
     .catch((error) => removeCloudFile(uploadedFileID).then(() => Promise.reject(error)))
@@ -529,8 +538,8 @@ module.exports = {
   resolveAgentApproval(runId, approved) {
     return agentRequest(`/agent/runs/${runId}/approval`, { method: 'POST', data: { approved } })
   },
-  uploadExcelTask(file, purpose) {
-    return uploadExcelFile(file, purpose)
+  uploadExcelTask(file, purpose, context) {
+    return uploadExcelFile(file, purpose, context)
   },
   getExcelTasks(status) {
     return request('/excel-tasks', { query: status ? { status } : {} })
@@ -558,6 +567,33 @@ module.exports = {
   },
   commitExcelTask(taskId, expectedVersion, idempotencyKey) {
     return request(`/excel-tasks/${taskId}/commit`, { method: 'POST', data: { expectedVersion, idempotencyKey } })
+  },
+  generateExcelQuote(taskId, data) {
+    return request(`/excel-tasks/${taskId}/generate-quote`, { method: 'POST', data })
+  },
+  getExcelOutputs(taskId) {
+    return request(`/excel-tasks/${taskId}/outputs`)
+  },
+  downloadExcelOutput(taskId, outputId) {
+    return request(`/excel-tasks/${taskId}/outputs/${outputId}/download`, { responseType: 'arraybuffer' })
+  },
+  createExcelComparison(data) {
+    return request('/excel-comparisons', { method: 'POST', data })
+  },
+  getExcelComparison(comparisonId) {
+    return request(`/excel-comparisons/${comparisonId}`)
+  },
+  getExcelComparisonItems(comparisonId, changeType, page = 0, size = 50) {
+    return request(`/excel-comparisons/${comparisonId}/items`, { query: { ...(changeType ? { changeType } : {}), page, size } })
+  },
+  cancelExcelComparison(comparisonId) {
+    return request(`/excel-comparisons/${comparisonId}/cancel`, { method: 'POST' })
+  },
+  getProductPriceHistory(productId, page = 0, size = 20) {
+    return request(`/products/${productId}/price-history`, { query: { page, size } })
+  },
+  getSupplierPriceHistory(supplierId, productId, page = 0, size = 20) {
+    return request(`/suppliers/${supplierId}/price-history`, { query: { ...(productId ? { productId } : {}), page, size } })
   },
   getProducts(params = {}) {
     return withFallback(() => request('/products', { data: params }), () => filterProducts(params))

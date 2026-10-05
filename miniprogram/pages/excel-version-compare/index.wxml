@@ -1,32 +1,43 @@
-<view class="screen compare-screen" wx:if="{{comparison}}">
+<view class="screen compare-screen">
   <view class="page-kicker">版本对比</view>
-  <view class="page-title">只看第二版改了什么</view>
-  <view class="page-summary">原表内容不覆盖，变化按原始行号列出。你可以先核对，再让小五继续处理最新版。</view>
-  <view class="demo-notice"><view class="demo-notice-mark">演示</view><view>版本和变化内容来自本机演示数据。</view></view>
+  <view class="page-title">只看新版改了什么</view>
+  <view class="page-summary">系统按条码匹配两份已审核文件，只生成比较结果，不覆盖原文件，也不修改任何业务数据。</view>
 
-  <view class="version-line">
-    <view class="version-block old"><view class="version-label">{{comparison.base.version}} 原版本</view><view>{{comparison.base.fileName}}</view><text>{{comparison.base.uploadedAt}} · {{comparison.base.rows}} 行</text></view>
-    <view class="version-arrow">→</view>
-    <view class="version-block current"><view class="version-label">{{comparison.current.version}} 当前版本</view><view>{{comparison.current.fileName}}</view><text>{{comparison.current.uploadedAt}} · {{comparison.current.rows}} 行</text></view>
-  </view>
-
-  <view class="compare-summary">
-    <view class="added"><text>+{{comparison.summary.added}}</text><text>新增</text></view>
-    <view><text>{{comparison.summary.quantityChanged}}</text><text>数量变化</text></view>
-    <view><text>{{comparison.summary.noteChanged}}</text><text>备注变化</text></view>
-    <view class="quiet"><text>{{comparison.summary.unchanged}}</text><text>未变化</text></view>
-  </view>
-
-  <scroll-view class="filter-strip" scroll-x enhanced show-scrollbar="{{false}}"><view class="filter-list"><view wx:for="{{filters}}" wx:key="key" class="filter-chip {{filter === item.key ? 'active' : ''}}" data-key="{{item.key}}" bindtap="changeFilter">{{item.label}}</view></view></scroll-view>
-
-  <view class="difference-list">
-    <view class="difference-row {{item.tone}}" wx:for="{{visibleRows}}" wx:key="id">
-      <view class="row-index">原表 {{item.sourceRow}} 行</view>
-      <view class="row-title"><text>{{item.name}}</text><text>{{item.field}}</text></view>
-      <view class="row-spec">{{item.spec}}</view>
-      <view class="difference-flow"><view><text>V1</text><text>{{item.before}}</text></view><view class="flow-arrow">→</view><view><text>V2</text><text>{{item.after}}</text></view></view>
+  <view class="loading-state" wx:if="{{loading}}">正在查找可比较的文件…</view>
+  <view class="error-state" wx:elif="{{loadError && !currentTask}}"><view class="error-state-title">版本比较没有准备好</view><view>{{loadError}}</view><button class="btn btn-secondary" bindtap="retryLoad">重新加载</button></view>
+  <block wx:elif="{{currentTask}}">
+    <view class="compare-setup" wx:if="{{!comparison}}">
+      <view class="setup-label">当前新版</view><view class="setup-file">{{currentTask.fileName}}</view><view class="setup-meta">{{currentTask.updatedAt}} · {{currentTask.rowCount}} 行 · {{currentTask.purpose}}</view>
+      <view class="setup-divider"></view>
+      <view class="setup-label">选择要对照的原版本</view>
+      <picker wx:if="{{candidates.length}}" range="{{candidateLabels}}" value="{{candidateIndex < 0 ? 0 : candidateIndex}}" bindchange="changeCandidate"><view class="candidate-picker">{{candidateIndex < 0 ? '请选择一份同用途文件' : candidateLabels[candidateIndex]}}<text>›</text></view></picker>
+      <view class="no-candidate" wx:else>还没有另一份已审核的“{{currentTask.purpose}}”文件。上传并完成字段确认后即可比较。</view>
+      <view class="compare-note"><text>会比较</text><text>商品名称、规格、单位、单价和数量</text></view>
+      <button class="start-compare" bindtap="startComparison" disabled="{{candidateIndex < 0 || creating}}" loading="{{creating}}">{{creating ? '正在创建比较任务…' : '开始比较两个版本'}}</button>
+      <view class="inline-error" wx:if="{{loadError}}">{{loadError}}</view>
     </view>
-  </view>
-  <view class="bottom-safe-space"></view>
-  <view class="fixed-action fixed-split"><view class="selection-note">原版本仍保留</view><view class="fixed-primary" bindtap="continueWithCurrent">使用 V2 继续处理</view></view>
+
+    <block wx:else>
+      <view class="version-line">
+        <view class="version-block old"><view class="version-label">原版本</view><view>{{selectedBase.fileName}}</view><text>{{selectedBase.updatedAt}} · {{selectedBase.rowCount}} 行</text></view>
+        <view class="version-arrow">→</view>
+        <view class="version-block current"><view class="version-label">当前新版</view><view>{{currentTask.fileName}}</view><text>{{currentTask.updatedAt}} · {{currentTask.rowCount}} 行</text></view>
+      </view>
+
+      <view class="progress-panel" wx:if="{{comparison.status === 'QUEUED' || comparison.status === 'RUNNING'}}"><view class="progress-title">{{comparison.status === 'QUEUED' ? '正在排队准备比较' : '正在逐行比较两个版本'}}</view><view class="progress-track"><view class="progress-value" style="width: {{comparison.total ? comparison.completed * 100 / comparison.total : 8}}%;"></view></view><view class="progress-meta"><text>已完成 {{comparison.completed}} / {{comparison.total || '待计算'}}</text><text bindtap="cancelComparison">取消比较</text></view><view class="progress-hint">可以离开此页，任务会继续在后台处理。</view></view>
+      <view class="terminal-state danger" wx:elif="{{comparison.status === 'FAILED'}}"><view>比较没有完成</view><text>{{comparison.errorCode || '请稍后重新发起比较'}}</text></view>
+      <view class="terminal-state" wx:elif="{{comparison.status === 'CANCELLED'}}"><view>比较已取消</view><text>两份原文件都没有改变。</text></view>
+
+      <block wx:if="{{comparison.status === 'COMPLETED' || comparison.status === 'PARTIAL'}}">
+        <view class="partial-note" wx:if="{{comparison.status === 'PARTIAL'}}">比较已完成，但有 {{comparison.issueCount}} 项匹配键缺失或重复，需要人工确认。</view>
+        <view class="compare-summary"><view class="added"><text>+{{comparison.summary.added || 0}}</text><text>新增</text></view><view><text>{{comparison.summary.changed || 0}}</text><text>修改</text></view><view class="removed"><text>{{comparison.summary.removed || 0}}</text><text>删除</text></view><view class="quiet"><text>{{comparison.summary.unchanged || 0}}</text><text>未变化</text></view></view>
+        <scroll-view class="filter-strip" scroll-x enhanced show-scrollbar="{{false}}"><view class="filter-list"><view wx:for="{{filters}}" wx:key="key" class="filter-chip {{filter === item.key ? 'active' : ''}}" data-key="{{item.key}}" bindtap="changeFilter">{{item.label}}</view></view></scroll-view>
+        <view class="difference-list"><view class="difference-row {{item.tone}}" wx:for="{{visibleRows}}" wx:key="id" data-id="{{item.productId}}" bindtap="openProduct"><view class="row-index">{{item.rowText}}</view><view class="row-title"><text>{{item.title}}</text><text>{{item.typeLabel}}</text></view><view class="issue-message" wx:if="{{item.issueMessage}}">{{item.issueMessage}}</view><view class="change-line" wx:for="{{item.changeLines}}" wx:key="key" wx:for-item="change"><view class="change-label">{{change.label}} <text wx:if="{{change.percent}}">{{change.percent}}</text></view><view class="difference-flow"><view><text>原版本</text><text>{{change.before}}</text></view><view class="flow-arrow">→</view><view><text>新版本</text><text>{{change.after}}</text></view></view></view><view class="product-link" wx:if="{{item.productId}}">查看关联商品 ›</view></view></view>
+        <view class="empty-ledger" wx:if="{{!visibleRows.length && !loadingMore}}">这个分类没有记录</view>
+        <button class="load-more" wx:if="{{hasMore}}" bindtap="loadMore" loading="{{loadingMore}}">{{loadingMore ? '正在加载…' : '加载更多结果'}}</button>
+      </block>
+      <view class="bottom-safe-space"></view>
+      <view class="fixed-action"><button class="fixed-primary" bindtap="returnToTask">返回当前文件任务</button></view>
+    </block>
+  </block>
 </view>

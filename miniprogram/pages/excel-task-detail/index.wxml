@@ -17,6 +17,13 @@
   <view class="detail-action retry" wx:if="{{task.status === 'FAILED'}}" bindtap="reopenUpload">重新选择文件</view>
   <view class="detail-info" wx:if="{{task.status === 'COMMITTED'}}">业务数据已经写入。原文件和每一行的审核结果仍保留在任务中。</view>
 
+  <block wx:if="{{task.purposeCode === 'BUYER_QUOTE' && outputs.length}}">
+    <view class="detail-section-title">生成的报价文件</view>
+    <view class="output-list"><view class="output-row" wx:for="{{outputs}}" wx:key="id"><view class="output-mark">XLS</view><view class="output-main"><view class="output-name">{{item.name}}</view><view class="output-meta">{{item.statusText}} · {{item.sizeText}} · 有效至 {{item.expiresText}}</view><view class="output-error" wx:if="{{item.errorMessage}}">{{item.errorMessage}}</view></view><button wx:if="{{item.status === 'READY'}}" class="output-download" data-id="{{item.id}}" bindtap="downloadOutput" loading="{{downloadingId === item.id}}">下载</button></view></view>
+  </block>
+
+  <view class="detail-tools" wx:if="{{task.status === 'READY_FOR_REVIEW' || task.status === 'COMMITTED'}}"><view bindtap="openComparison"><text>比较两个 Excel 版本</text><text>选择同用途文件，只看新增、删除和修改 ›</text></view></view>
+
   <view class="detail-section-title">处理结果</view>
   <view class="result-summary"><view><text>{{task.matched}}</text><text>成功匹配</text></view><view><text>{{task.modifications}}</text><text>写入记录</text></view><view><text>{{task.skipped}}</text><text>跳过</text></view><view class="danger"><text>{{task.failures}}</text><text>失败</text></view></view>
 

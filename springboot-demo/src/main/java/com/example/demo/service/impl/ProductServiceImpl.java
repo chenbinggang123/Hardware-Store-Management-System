@@ -4,7 +4,9 @@ import com.example.demo.entity.OperationLog;
 import com.example.demo.entity.Product;
 import com.example.demo.repository.OperationLogRepository;
 import com.example.demo.repository.ProductRepository;
+import com.example.demo.price.service.ProductPriceHistoryService;
 import com.example.demo.service.ProductService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -13,6 +15,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -24,33 +27,71 @@ public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
     private final OperationLogRepository operationLogRepository;
+    private final ProductPriceHistoryService priceHistoryService;
 
     public ProductServiceImpl(ProductRepository productRepository, OperationLogRepository operationLogRepository) {
+        this(productRepository, operationLogRepository, null);
+    }
+
+    @Autowired
+    public ProductServiceImpl(ProductRepository productRepository, OperationLogRepository operationLogRepository,
+                              ProductPriceHistoryService priceHistoryService) {
         this.productRepository = productRepository;
         this.operationLogRepository = operationLogRepository;
+        this.priceHistoryService = priceHistoryService;
     }
 
     @Override
     public Product saveProduct(Product product) {
+        return saveProduct(product, 1L);
+    }
+
+    @Override
+    public Product saveProduct(Product product, Long operatorId) {
         fillProductDefaults(product);
         validateProduct(product);
         ensureBarcodeAvailable(product.getBarcode(), null);
         Product saved = productRepository.save(product);
-        saveOperationLog("PRODUCT", "CREATE", "新增商品：" + saved.getName(), 1L);
+        if (priceHistoryService != null) {
+            priceHistoryService.recordInitialPrices(saved, operatorId, "PRODUCT_CREATE",
+                    "product-create:" + UUID.randomUUID() + ":" + saved.getId());
+        }
+        saveOperationLog("PRODUCT", "CREATE", "新增商品：" + saved.getName(), operatorId);
         return saved;
     }
 
     @Override
     public Product updateProduct(Product product) {
+        return updateProduct(product, 1L);
+    }
+
+    @Override
+    public Product updateProduct(Product product, Long operatorId) {
         Product existingProduct = getProductById(product.getId())
                 .orElseThrow(() -> new IllegalArgumentException("商品不存在，无法更新"));
+        Product before = priceSnapshot(existingProduct);
         mergeProduct(existingProduct, product);
         fillProductDefaults(existingProduct);
         validateProduct(existingProduct);
         ensureBarcodeAvailable(existingProduct.getBarcode(), existingProduct.getId());
         Product saved = productRepository.save(existingProduct);
-        saveOperationLog("PRODUCT", "UPDATE", "更新商品：" + saved.getName(), 1L);
+        if (priceHistoryService != null) {
+            priceHistoryService.recordMasterChanges(before, saved, operatorId, "MANUAL_PRODUCT_EDIT",
+                    null, saved.getId(), null,
+                    "manual:" + UUID.randomUUID() + ":" + saved.getId());
+        }
+        saveOperationLog("PRODUCT", "UPDATE", "更新商品：" + saved.getName(), operatorId);
         return saved;
+    }
+
+    private Product priceSnapshot(Product value) {
+        Product copy = new Product();
+        copy.setId(value.getId());
+        copy.setCostPrice(value.getCostPrice());
+        copy.setRetailPrice(value.getRetailPrice());
+        copy.setWholesalePrice(value.getWholesalePrice());
+        copy.setOldCustomerPrice(value.getOldCustomerPrice());
+        return copy;
     }
 
     @Override

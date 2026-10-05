@@ -5,6 +5,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -34,6 +35,25 @@ public class LocalAttachmentStorage implements AttachmentStorage {
             Files.deleteIfExists(target(objectKey));
         } catch (IOException exception) {
             throw new IllegalStateException("附件删除失败", exception);
+        }
+    }
+
+    @Override
+    public InputStream openStream(String objectKey) {
+        try {
+            return Files.newInputStream(target(objectKey));
+        } catch (IOException exception) {
+            throw new IllegalArgumentException("文件不存在或无法读取", exception);
+        }
+    }
+
+    @Override
+    public StoredObjectMetadata stat(String objectKey) {
+        Path path = target(objectKey);
+        try {
+            return new StoredObjectMetadata(Files.size(path), Files.probeContentType(path));
+        } catch (IOException exception) {
+            throw new IllegalArgumentException("文件不存在或无法读取", exception);
         }
     }
 

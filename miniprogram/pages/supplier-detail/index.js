@@ -47,5 +47,9 @@ Page({
 
   openEdit() {
     openPage('/pages/supplier-form/index', { id: this.data.id, mode: 'edit' })
+  },
+
+  openPriceHistory() {
+    openPage('/pages/price-history/index', { supplierId: this.data.id, supplierName: this.data.supplier.name })
   }
 })

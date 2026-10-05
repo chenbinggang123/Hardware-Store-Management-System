@@ -4,6 +4,7 @@
     <view class="hero-title">{{supplier.name}}</view>
     <view class="hero-subtitle">{{supplier.contact}} · {{supplier.phone}} · {{supplier.address}}</view>
     <view class="top-actions">
+      <view class="btn btn-secondary btn-sm" bindtap="openPriceHistory">查看价格记录</view>
       <view class="btn btn-primary btn-sm" bindtap="openEdit">编辑供应商</view>
     </view>
   </view>

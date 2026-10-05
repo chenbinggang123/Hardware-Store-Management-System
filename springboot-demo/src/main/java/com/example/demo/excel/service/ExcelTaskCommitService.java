@@ -21,10 +21,12 @@ import com.example.demo.repository.InventoryLogRepository;
 import com.example.demo.repository.InventoryRepository;
 import com.example.demo.repository.OperationLogRepository;
 import com.example.demo.repository.ProductRepository;
+import com.example.demo.price.service.ProductPriceHistoryService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -54,6 +56,7 @@ public class ExcelTaskCommitService {
     private final InventoryLogRepository inventoryLogRepository;
     private final OperationLogRepository operationLogRepository;
     private final ObjectMapper objectMapper;
+    private final ProductPriceHistoryService priceHistoryService;
 
     public ExcelTaskCommitService(ExcelTaskRepository taskRepository,
                                   ExcelTaskMappingRepository mappingRepository,
@@ -65,6 +68,23 @@ public class ExcelTaskCommitService {
                                   InventoryLogRepository inventoryLogRepository,
                                   OperationLogRepository operationLogRepository,
                                   ObjectMapper objectMapper) {
+        this(taskRepository, mappingRepository, rowRepository, resultRepository, commitRepository,
+                productRepository, inventoryRepository, inventoryLogRepository, operationLogRepository,
+                objectMapper, null);
+    }
+
+    @Autowired
+    public ExcelTaskCommitService(ExcelTaskRepository taskRepository,
+                                  ExcelTaskMappingRepository mappingRepository,
+                                  ExcelTaskRowRepository rowRepository,
+                                  ExcelTaskRowResultRepository resultRepository,
+                                  ExcelTaskCommitRepository commitRepository,
+                                  ProductRepository productRepository,
+                                  InventoryRepository inventoryRepository,
+                                  InventoryLogRepository inventoryLogRepository,
+                                  OperationLogRepository operationLogRepository,
+                                  ObjectMapper objectMapper,
+                                  ProductPriceHistoryService priceHistoryService) {
         this.taskRepository = taskRepository;
         this.mappingRepository = mappingRepository;
         this.rowRepository = rowRepository;
@@ -75,6 +95,7 @@ public class ExcelTaskCommitService {
         this.inventoryLogRepository = inventoryLogRepository;
         this.operationLogRepository = operationLogRepository;
         this.objectMapper = objectMapper;
+        this.priceHistoryService = priceHistoryService;
     }
 
     public void reviewRow(Long taskId, Long sheetId, Long resultId,
@@ -296,16 +317,25 @@ public class ExcelTaskCommitService {
             switch (task.getPurpose()) {
                 case "SUPPLIER_PRICE" -> {
                     Product product = requiredProduct(row);
+                    Product before = priceSnapshot(product);
                     product.setCostPrice(decimal(values.get("UNIT_PRICE")));
                     productRepository.save(product);
+                    recordExcelPriceChanges(task, row, before, product, operatorId);
                     updated++;
                 }
                 case "PRODUCT_IMPORT" -> {
                     if ("READY_TO_CREATE".equals(row.getMatchStatus())) {
-                        createProduct(values);
+                        Product product = createProduct(values);
+                        if (priceHistoryService != null) {
+                            priceHistoryService.recordInitialPrices(product, operatorId, "EXCEL_PRODUCT_IMPORT",
+                                    excelRequestKey(task, row));
+                        }
                         created++;
                     } else {
-                        updateProduct(requiredProduct(row), values);
+                        Product product = requiredProduct(row);
+                        Product before = priceSnapshot(product);
+                        updateProduct(product, values);
+                        recordExcelPriceChanges(task, row, before, product, operatorId);
                         updated++;
                     }
                 }
@@ -364,6 +394,30 @@ public class ExcelTaskCommitService {
         setTextIfPresent(values, "UNIT", product::setUnit);
         if (values.get("UNIT_PRICE") != null) product.setCostPrice(decimal(values.get("UNIT_PRICE")));
         productRepository.save(product);
+    }
+
+    private void recordExcelPriceChanges(ExcelTask task, ExcelTaskRowResult row, Product before,
+                                         Product after, Long operatorId) {
+        if (priceHistoryService == null) return;
+        priceHistoryService.recordMasterChanges(
+                before, after, task.getSupplierId(), task.getPriceEffectiveDate(), operatorId,
+                "SUPPLIER_PRICE".equals(task.getPurpose())
+                        ? "EXCEL_SUPPLIER_PRICE" : "EXCEL_PRODUCT_IMPORT",
+                task.getId(), row.getId(), "row-result:" + row.getId(), excelRequestKey(task, row));
+    }
+
+    private String excelRequestKey(ExcelTask task, ExcelTaskRowResult row) {
+        return "excel:" + task.getId() + ":" + row.getId() + ":" + task.getVersion();
+    }
+
+    private Product priceSnapshot(Product value) {
+        Product copy = new Product();
+        copy.setId(value.getId());
+        copy.setCostPrice(value.getCostPrice());
+        copy.setRetailPrice(value.getRetailPrice());
+        copy.setWholesalePrice(value.getWholesalePrice());
+        copy.setOldCustomerPrice(value.getOldCustomerPrice());
+        return copy;
     }
 
     private void changeInventory(Product product, int sourceQuantity, boolean increment,

@@ -17,7 +17,10 @@
 .upload-label { margin-bottom: 10rpx; color: #58665F; font-size: 23rpx; }
 .upload-picker { min-height: 58rpx; display: flex; align-items: center; justify-content: space-between; color: #17231E; font-size: 29rpx; font-weight: 650; }
 .upload-picker text { color: #83908A; font-size: 34rpx; }
+.upload-picker .picker-value { min-width: 0; overflow: hidden; color: #17231E; font-size: 29rpx; text-overflow: ellipsis; white-space: nowrap; }
 .upload-hint { margin-top: 8rpx; color: #83908A; font-size: 21rpx; }
+.supplier-error { margin-top: 9rpx; color: #A83F32; font-size: 23rpx; }
+.supplier-error text { color: #245E9B; font-weight: 700; }
 .safety-line { margin-top: 30rpx; padding: 20rpx; display: flex; align-items: flex-start; gap: 14rpx; color: #40534B; background: #E8F0EC; border-radius: 14rpx; }
 .safety-mark { width: 44rpx; height: 44rpx; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; border-radius: 12rpx; color: #247052; background: #D7E9DF; font-size: 19rpx; font-weight: 750; }
 .safety-title { font-size: 24rpx; font-weight: 700; }

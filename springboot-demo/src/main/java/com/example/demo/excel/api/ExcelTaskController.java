@@ -32,6 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/excel-tasks")
@@ -50,8 +51,11 @@ public class ExcelTaskController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<ExcelTaskDetail> upload(@RequestPart("file") MultipartFile file,
                                                @RequestParam(required = false) String purpose,
+                                               @RequestParam(required = false) Long supplierId,
+                                               @RequestParam(required = false) LocalDate priceEffectiveDate,
                                                HttpServletRequest request) {
-        return ApiResponse.ok("文件任务创建完成", service.upload(file, purpose, currentUserId(request)));
+        return ApiResponse.ok("文件任务创建完成",
+                service.upload(file, purpose, supplierId, priceEffectiveDate, currentUserId(request)));
     }
 
     @PostMapping("/cloud")

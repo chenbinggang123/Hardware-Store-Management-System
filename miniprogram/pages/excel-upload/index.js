@@ -10,10 +10,30 @@ Page({
   data: {
     purposes: PURPOSE_OPTIONS.map((item) => item.label),
     purposeIndex: 0,
+    suppliers: [],
+    supplierNames: [],
+    supplierIndex: -1,
+    supplierLoadError: '',
+    effectiveDate: '',
     file: null,
     recognizing: false,
     uploadError: ''
   },
+
+  onLoad() {
+    const now = new Date()
+    const pad = (value) => `${value}`.padStart(2, '0')
+    this.setData({ effectiveDate: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}` })
+    this.loadSuppliers()
+  },
+
+  loadSuppliers() {
+    this.setData({ supplierLoadError: '' })
+    api.getSuppliers().then((suppliers) => {
+      this.setData({ suppliers: suppliers || [], supplierNames: (suppliers || []).map((item) => item.name || `供应商 ${item.id}`) })
+    }).catch((error) => this.setData({ supplierLoadError: (error && error.message) || '供应商没有加载成功' }))
+  },
+  retrySuppliers() { this.loadSuppliers() },
 
   chooseFile() {
     if (this.data.recognizing) return
@@ -30,13 +50,20 @@ Page({
   },
 
   changePurpose(event) { this.setData({ purposeIndex: Number(event.detail.value), uploadError: '' }) },
+  changeSupplier(event) { this.setData({ supplierIndex: Number(event.detail.value), uploadError: '' }) },
+  changeEffectiveDate(event) { this.setData({ effectiveDate: event.detail.value, uploadError: '' }) },
 
   startRecognition() {
     if (!this.data.file) return showToast('请先选择 Excel 或 CSV 文件')
     if (this.data.recognizing) return
     const purpose = PURPOSE_OPTIONS[this.data.purposeIndex]
+    if (purpose.code === 'SUPPLIER_PRICE' && this.data.supplierIndex < 0) return showToast('请选择这份价格表的供应商')
+    const supplier = this.data.suppliers[this.data.supplierIndex]
     this.setData({ recognizing: true, uploadError: '' })
-    api.uploadExcelTask(this.data.file, purpose.code).then((result) => {
+    api.uploadExcelTask(this.data.file, purpose.code, {
+      supplierId: supplier && supplier.id,
+      priceEffectiveDate: purpose.code === 'SUPPLIER_PRICE' ? this.data.effectiveDate : null
+    }).then((result) => {
       const task = normalizeTask(result)
       if (task.status === 'FAILED') {
         this.setData({ uploadError: task.errorMessage || '文件读取失败，请检查表格后重试' })

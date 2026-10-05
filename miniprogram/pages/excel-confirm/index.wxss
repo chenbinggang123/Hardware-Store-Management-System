@@ -30,3 +30,9 @@
 .risk-mark { width: 44rpx; height: 44rpx; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; border-radius: 10rpx; color: #8A560E; background: #FFE8BD; font-size: 19rpx; font-weight: 750; }
 .risk-title { color: #6F480D; font-size: 24rpx; font-weight: 700; }
 .risk-desc { margin-top: 3rpx; color: #8B6A39; font-size: 21rpx; }
+.quote-settings { margin-top: 30rpx; border-top: 1rpx solid #CBD5D0; }
+.quote-field { min-height: 104rpx; display: flex; align-items: center; justify-content: space-between; gap: 22rpx; border-bottom: 1rpx solid #D7DEDA; }
+.quote-field > view:first-child { min-width: 0; }
+.quote-label { color: #26332E; font-size: 27rpx; font-weight: 700; }
+.quote-hint { margin-top: 4rpx; color: #718079; font-size: 24rpx; line-height: 1.5; }
+.quote-picker { max-width: 290rpx; overflow: hidden; color: #245E9B; font-size: 25rpx; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }

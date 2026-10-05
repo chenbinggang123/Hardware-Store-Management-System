@@ -11,7 +11,9 @@ import com.example.demo.repository.InventoryRepository;
 import com.example.demo.repository.OperationLogRepository;
 import com.example.demo.repository.ProductRepository;
 import com.example.demo.repository.PurchaseOrderRepository;
+import com.example.demo.price.service.ProductPriceHistoryService;
 import com.example.demo.service.PurchaseOrderService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -38,6 +40,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     private final InventoryRepository inventoryRepository;
     private final InventoryLogRepository inventoryLogRepository;
     private final OperationLogRepository operationLogRepository;
+    private final ProductPriceHistoryService priceHistoryService;
 
     public PurchaseOrderServiceImpl(
             PurchaseOrderRepository purchaseOrderRepository,
@@ -45,11 +48,24 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             InventoryRepository inventoryRepository,
             InventoryLogRepository inventoryLogRepository,
             OperationLogRepository operationLogRepository) {
+        this(purchaseOrderRepository, productRepository, inventoryRepository,
+                inventoryLogRepository, operationLogRepository, null);
+    }
+
+    @Autowired
+    public PurchaseOrderServiceImpl(
+            PurchaseOrderRepository purchaseOrderRepository,
+            ProductRepository productRepository,
+            InventoryRepository inventoryRepository,
+            InventoryLogRepository inventoryLogRepository,
+            OperationLogRepository operationLogRepository,
+            ProductPriceHistoryService priceHistoryService) {
         this.purchaseOrderRepository = purchaseOrderRepository;
         this.productRepository = productRepository;
         this.inventoryRepository = inventoryRepository;
         this.inventoryLogRepository = inventoryLogRepository;
         this.operationLogRepository = operationLogRepository;
+        this.priceHistoryService = priceHistoryService;
     }
 
     @Override
@@ -115,7 +131,9 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         if ("已入库".equals(order.getStatus())) {
             return order;
         }
-        for (PurchaseOrderItem item : safePurchaseItems(order.getItems())) {
+        List<PurchaseOrderItem> items = safePurchaseItems(order.getItems());
+        for (int lineIndex = 0; lineIndex < items.size(); lineIndex++) {
+            PurchaseOrderItem item = items.get(lineIndex);
             if (item == null || item.getProductId() == null) {
                 throw new IllegalArgumentException("采购商品不能为空");
             }
@@ -138,6 +156,12 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
             product.setStock(afterQuantity);
             productRepository.save(product);
+            if (priceHistoryService != null && item.getPrice() != null) {
+                priceHistoryService.recordPurchasePrice(
+                        product.getId(), order.getSupplierId(), product.getCostPrice(), item.getPrice(),
+                        order.getId(), lineIndex + ":" + product.getId(), order.getOperatorId(),
+                        order.getOrderTime() == null ? LocalDate.now() : order.getOrderTime().toLocalDate());
+            }
 
             InventoryLog log = new InventoryLog();
             log.setProductId(product.getId());

@@ -1,6 +1,6 @@
 # 恒迪五金小程序——“小五”与 Excel 后端补全任务说明
 
-> 文档状态：后端设计修订稿（尚未全部实现）  
+> 文档状态：后端设计修订稿（P1-A/P1-B/P1-C 已完成基础实现，其余阶段尚未全部实现）
 > 目标版本：下一轮前后端联调版本  
 > 适用项目：`Hardware-Store-Management-System/springboot-demo`  
 > 不在范围：外层 `Hardware-Store-Agent` 文件夹
@@ -34,11 +34,29 @@
 - **P0-A（协议与迁移基础）**：状态枚举、进度/结果/错误 DTO、数据库迁移、Agent 审批版本。
 - **P0-B（可恢复后台任务）**：Excel 异步解析、数据库租约、取消、重试、断线恢复。
 - **P0-C（Agent 接入 Excel）**：查询进度、审核摘要、校验和正式提交工具。
-- **P1-A（文件输出）**：买家报价、输出文件表、安全下载。
-- **P1-B（经营数据增强）**：供应商价格历史、Excel 版本比较。
+- **P1-A（价格数据基础）**：统一价格修改服务、真实价格历史和旧采购数据回填。
+- **P1-B（报价文件）**：买家报价、输出文件表、安全下载。
+- **P1-C（版本比较）**：Excel 快照比较和分页差异明细。
 - **P2（读取模型治理）**：列表 DTO 与分页兼容升级。
 
 P0-A、P0-B、P0-C 分别验收，不把整份文档作为一次发布的大事务。
+
+### 0.2 业务能力实施优先级
+
+P0 基础闭环完成后，业务能力按以下顺序交付：
+
+1. **真实价格历史**：先统一所有价格写入口，保证手工修改、采购价格和 Excel 调价都有可验证来源。
+2. **报价文件下载**：在可靠的商品与价格数据上生成可直接交付客户的报价文件。
+3. **Excel 版本比较**：复用稳定的字段标准化和商品匹配规则，支持厂家大批量调价分析。
+
+后两项都依赖第一项的数据口径。报价生成必须能指出价格来源；版本比较发现的价格变化在正式应用后必须进入价格历史，不能形成旁路。
+
+当前基础实现状态（2026-10-06）：
+
+- P1-A 已接入手工商品修改、采购入库、Excel 供应商调价和商品导入；供应商 Excel 任务支持记录供应商与价格生效日期。
+- P1-B 已提供报价生成、输出列表和鉴权下载接口，输出为真实 XLSX。
+- P1-C 已提供异步比较、查询、分页明细和取消接口。
+- 这三项目前是业务 REST 能力，尚未注册为“小五”的模型工具；Agent 工具接入、统一错误码和数据库租约仍按本文后续章节实施。
 
 ## 1. 任务背景
 
@@ -541,7 +559,7 @@ Agent Excel 工具只做应用服务适配：
 - 工具预览生成后保存任务版本和业务数据摘要；执行前再次调用 Excel 校验服务。
 - Agent Run 被取消时，只取消尚未进入 `COMMITTING` 的 Excel 任务；不能用取消 Run 回滚已经提交的业务事务。
 
-## 9. P1：买家报价文件
+## 9. P1-B（业务优先级 2）：买家报价文件
 
 当前 `BUYER_QUOTE` 只支持审核预览，需要增加独立的文件生成语义，不与业务写入 `commit` 混用。
 
@@ -573,7 +591,68 @@ GET  /excel-tasks/{taskId}/outputs/{outputId}/download
 - 文件生成结果记录操作人、任务、客户、定价模式和时间。
 - 相同幂等键不得重复生成多份相同文件。
 
-## 10. P1：输出文件存储与下载
+### 9.4 报价价格解析规则
+
+`pricingMode` 必须显式指定，首版只允许：
+
+```text
+RETAIL_PRICE
+WHOLESALE_PRICE
+OLD_CUSTOMER_PRICE
+CUSTOMER_TYPE_PRICE
+```
+
+- 前三种直接读取生成时的商品价格快照。
+- `CUSTOMER_TYPE_PRICE` 必须提供 `customerId`，后端根据客户类型确定价格字段。
+- 价格为空或小于 0 的行进入异常，不得默认补 0。
+- 报价生成不修改商品、库存、订单或客户欠款。
+- 输出中为每一行保存 `priceType`、`priceSource` 和价格历史快照 ID（存在时），便于解释报价来源。
+
+报价文件反映“生成时快照”。生成之后商品价格变化，不修改已经生成的文件；重新生成必须产生新的输出版本。
+
+### 9.5 生成任务与幂等
+
+报价生成请求规范化后计算 `requestDigest`，内容至少包含：`taskId`、任务版本、客户、计价模式、是否保留未匹配行和已审核行摘要。`idempotencyKey` 与 `requestDigest` 一起校验：
+
+- 相同键、相同摘要：返回已有输出。
+- 相同键、不同摘要：返回 409 `QUOTE_IDEMPOTENCY_CONFLICT`。
+- 任务版本已经变化：返回 409 `EXCEL_TASK_VERSION_CONFLICT`。
+
+生成在后台执行，接口返回 `202 Accepted` 和 `outputId`。进度沿用输出状态 `GENERATING/READY/FAILED/EXPIRED`，不复用 Excel 正式提交状态。
+
+### 9.6 文件内容与安全
+
+首版只生成 `.xlsx`，至少包含：
+
+1. `报价明细`：原始行号、客户商品名称、匹配商品、规格、单位、数量、报价单价、小计和备注。
+2. `未匹配与异常`：原始行号、原始内容、问题码和可读原因。
+3. `报价说明`：报价客户、生成时间、计价模式、有效期和总计。
+
+所有单元格都按普通文本或数值写入。来自上传文件的字符串若以 `= + - @` 开头，必须转义，防止电子表格公式注入。金额由后端计算并写确定值，不依赖客户端打开文件后计算公式。
+
+文件名使用受控格式，例如 `报价单-客户名-20261006-108.xlsx`，并过滤路径字符。HTTP 下载设置正确的 `Content-Type`、长度和 RFC 5987 文件名。
+
+### 9.7 下载契约
+
+```http
+GET /excel-tasks/{taskId}/outputs/{outputId}/download
+```
+
+- 本地存储环境由后端鉴权后流式返回文件。
+- COS 环境可以在鉴权后返回 302 到 10 分钟签名地址，或由后端代理流式输出；接口行为由部署配置固定。
+- `GENERATING/FAILED/EXPIRED` 均不能下载，并返回稳定错误码。
+- 每次成功签发或下载记录操作人、输出 ID、时间和 Trace ID，不记录签名 URL。
+
+### 9.8 报价下载验收
+
+- 286 行报价请求快速返回，后台完成后可以下载真实 XLSX。
+- 相同幂等键不会产生第二份文件，不同请求不能错误复用旧文件。
+- 未匹配行按配置保留并带原因，不静默丢行。
+- 其他操作人即使猜到 `outputId` 也无法获取文件。
+- 过期、删除或生成失败的输出无法下载。
+- 恶意公式字符串在 Excel 中按文本显示，不会执行。
+
+## 10. P1-B：输出文件存储与下载
 
 现有 `AttachmentStorage` 只有保存和删除能力，需要增加安全读取能力：
 
@@ -598,9 +677,14 @@ mime_type VARCHAR(100) NOT NULL,
 file_size BIGINT NOT NULL,
 sha256 VARCHAR(64) NOT NULL,
 status VARCHAR(32) NOT NULL,
+request_digest VARCHAR(64) NOT NULL,
+idempotency_key VARCHAR(100) NOT NULL,
+summary_json LONGTEXT,
 error_message VARCHAR(1000),
 create_time DATETIME NOT NULL,
-expires_at DATETIME
+expires_at DATETIME,
+UNIQUE KEY uk_excel_output_idempotency (operator_id, idempotency_key),
+KEY idx_excel_output_task_time (task_id, create_time)
 ```
 
 下载要求：
@@ -615,7 +699,7 @@ expires_at DATETIME
 
 `GET /outputs/{outputId}/download` 不直接把签名 URL 永久写入数据库。每次请求校验后动态生成，默认有效期 10 分钟。
 
-## 11. P1：厂家价格同步与价格历史
+## 11. P1-A（业务优先级 1）：真实价格历史
 
 ### 11.1 Excel 任务业务上下文
 
@@ -631,9 +715,7 @@ expires_at DATETIME
 }
 ```
 
-建议存储为独立字段或 `business_context_json`，但 `supplierId` 必须经过权限和存在性校验。
-
-修订决定：首版使用 `business_context_json` 保持任务表稳定，同时在创建请求中使用强类型 DTO。`SUPPLIER_PRICE` 必须提供有效 `supplierId`；`priceEffectiveDate` 为空时由服务端取门店时区当天日期，并把最终值写入上下文，不能在提交时重新计算。
+首版将 `supplierId` 和 `priceEffectiveDate` 作为 `excel_task` 的独立字段保存，并在创建请求中使用强类型 DTO。`SUPPLIER_PRICE` 必须提供有效 `supplierId`；`priceEffectiveDate` 为空时由服务端取门店时区当天日期，并把最终值写入任务，不能在提交时重新计算。
 
 ### 11.2 新增价格历史表
 
@@ -643,16 +725,24 @@ CREATE TABLE product_price_history (
   product_id BIGINT NOT NULL,
   supplier_id BIGINT,
   price_type VARCHAR(32) NOT NULL,
+  event_type VARCHAR(32) NOT NULL,
   before_price DECIMAL(12,2),
-  after_price DECIMAL(12,2) NOT NULL,
+  after_price DECIMAL(12,2),
   change_percent DECIMAL(9,4),
+  applied_to_product TINYINT NOT NULL DEFAULT 1,
   source_type VARCHAR(32) NOT NULL,
   source_task_id BIGINT,
+  source_record_id BIGINT,
+  source_line_key VARCHAR(160),
   operator_id BIGINT NOT NULL,
   effective_date DATE,
+  reason VARCHAR(255),
+  idempotency_key VARCHAR(160) NOT NULL,
   create_time DATETIME NOT NULL,
+  UNIQUE KEY uk_price_history_idempotency (idempotency_key),
   KEY idx_price_history_product_time (product_id, create_time),
-  KEY idx_price_history_supplier_time (supplier_id, create_time)
+  KEY idx_price_history_supplier_time (supplier_id, create_time),
+  KEY idx_price_history_source (source_type, source_record_id)
 );
 ```
 
@@ -677,7 +767,105 @@ CREATE TABLE product_price_history (
 }
 ```
 
-## 12. P1：Excel 版本比较
+### 11.3 价格历史的统一口径
+
+价格历史区分“商品主数据真的被修改”和“业务单据出现了一个成交/采购价格”：
+
+| `eventType` | 含义 | 是否修改商品主数据 |
+| --- | --- | --- |
+| `MASTER_PRICE_CHANGED` | 零售价、批发价、老客户价或进价发生变化 | 是 |
+| `PURCHASE_PRICE_OBSERVED` | 采购单出现供应商报价或实际采购价 | 否 |
+| `SALES_PRICE_OBSERVED` | 正式销售单产生实际成交价 | 否 |
+| `INITIAL_PRICE_SET` | 新建商品时首次设置价格 | 是 |
+
+`priceType` 首版支持：
+
+```text
+COST
+RETAIL
+WHOLESALE
+OLD_CUSTOMER
+PURCHASE
+SALE
+```
+
+采购价不能自动等同于商品进价。当前采购明细保存在 `items_json`，没有独立行 ID，因此首版在采购入库这个订单不可再修改的节点，按“订单 ID + 行序号 + 商品 ID”记录 `PURCHASE_PRICE_OBSERVED`。只有用户明确选择更新进价并通过预览确认时，才额外写 `MASTER_PRICE_CHANGED/COST` 并更新 `product.cost_price`。后续如增加移动加权平均成本，必须作为新的明确策略，不能静默改变现有口径。
+
+### 11.4 所有价格写入口统一收口
+
+新增 `ProductPriceChangeService`，任何代码都不能直接修改商品价格字段：
+
+```java
+PriceChangeResult changeMasterPrice(PriceChangeCommand command);
+void recordObservedPrice(ObservedPriceCommand command);
+```
+
+接入范围：
+
+- 商品编辑页手工修改四类主价格。
+- 新建商品的初始价格。
+- 采购入库时产生的最终采购价格观察值；采购草稿保存暂不写历史。
+- 用户确认“用采购价更新进价”的操作。
+- `SUPPLIER_PRICE` Excel 正式提交。
+- `PRODUCT_IMPORT` 中包含价格字段的正式提交。
+- 后续 Agent 价格工具。
+
+每次主价格修改必须在同一事务内：锁定商品、读取旧值、校验非负与精度、写价格历史、更新商品、写操作日志。`operatorId` 必须来自认证上下文或可信系统账号，修复当前部分商品操作固定写 `1L` 的做法。
+
+Excel 提交不得继续在 `ExcelTaskCommitService` 中直接 `setCostPrice`；它只能调用统一价格服务。这样手工、采购和 Excel 才使用相同校验与历史格式。
+
+### 11.5 来源与幂等规则
+
+`sourceType` 首版支持：
+
+```text
+MANUAL_PRODUCT_EDIT
+PRODUCT_CREATE
+PURCHASE_ORDER
+PURCHASE_STOCK_IN
+EXCEL_SUPPLIER_PRICE
+EXCEL_PRODUCT_IMPORT
+AGENT_TOOL
+MIGRATION_PURCHASE_BACKFILL
+```
+
+幂等键由服务端生成：
+
+- 手工修改：`manual:{requestId}:{productId}:{priceType}`
+- 采购观察值：`purchase-stock-in:{orderId}:{lineIndex}:{productId}:PURCHASE`
+- Excel：`excel:{taskId}:{rowResultId}:{priceType}:{taskVersion}`
+- Agent：`agent:{runId}:{actionId}:{productId}:{priceType}`
+
+同一幂等键、相同请求重复调用返回已有结果；同一幂等键但金额或来源不同返回 409。不得依赖“时间相同”去重。
+
+### 11.6 查询接口
+
+```http
+GET /products/{productId}/price-history?page=0&size=20&priceType=COST&sourceType=EXCEL_SUPPLIER_PRICE
+GET /suppliers/{supplierId}/price-history?page=0&size=20&productId=26
+GET /price-history/{historyId}
+```
+
+返回 DTO 至少包含商品、供应商、价格类型、事件类型、变更前后值、是否已应用到商品、来源类型、来源业务 ID、生效日期、操作人和时间。列表统一分页，不能再由采购单临时拼装“价格趋势”。
+
+现有 `/suppliers/{id}/price-trends` 暂时兼容，但内部改读新历史表，并在响应中标记来源；一个联调版本后再评估下线。
+
+### 11.7 历史数据回填
+
+- 已有采购单明细可以回填为 `PURCHASE_PRICE_OBSERVED`，`appliedToProduct=false`。
+- 旧数据无法可靠推断当时商品进价是否被修改，因此不得伪造 `MASTER_PRICE_CHANGED`。
+- 回填使用确定性幂等键，可重复执行，并输出成功、跳过和异常数量。
+- 回填完成前，新旧查询可以并行校验；完成后价格趋势只读历史表。
+
+### 11.8 价格历史验收
+
+- 手工修改任一价格后，商品值、历史和操作日志在同一事务成功或一起回滚。
+- Excel 多行调价失败时，商品和历史整体回滚，不出现孤立历史。
+- 重复提交同一采购、Excel 或 Agent 操作不产生重复历史。
+- 采购价格观察值不会未经确认覆盖商品进价。
+- 操作人 A 无法读取操作人 B 无权访问的价格来源详情。
+
+## 12. P1-C（业务优先级 3）：Excel 版本比较
 
 建立独立比较任务：
 
@@ -723,7 +911,144 @@ POST /excel-comparisons/{comparisonId}/cancel
 
 比较结果必须可分页，避免把大量差异一次返回。
 
-比较任务创建前校验两个源任务都属于当前操作人、都已完成解析且用途兼容。首版默认键为 `BARCODE`；用户可以显式增加 `SPEC`。任一侧出现空键或重复键时，该行进入问题列表，不得任意配对。比较结果写独立明细表并按 `comparison_id + change_type + id` 分页，排序必须稳定。
+比较任务创建前校验两个源任务都属于当前操作人、都已完成解析且用途兼容。首版默认键为 `BARCODE`；同一供应商的 `SUPPLIER_PRICE` 文件可以显式选择 `SUPPLIER_SKU`，用户也可以增加 `SPEC`。任一侧出现空键或重复键时，该行进入问题列表，不得任意配对。比较结果写独立明细表并按 `comparison_id + change_type + id` 分页，排序必须稳定。
+
+### 12.1 比较对象与快照
+
+比较输入不是原始单元格，而是字段映射、标准化和人工审核后的行快照。创建比较任务时固定：
+
+- 两个源任务 ID 与各自 `version`。
+- 两侧标准化结果摘要 SHA-256。
+- 匹配键、比较字段和金额精度。
+- 当前操作人和请求幂等键。
+
+源任务之后重新映射或审核，不修改已创建的比较结果。用户需要基于新版本重新创建比较任务，避免同一个比较页面中的数据悄悄变化。
+
+### 12.2 匹配和差异算法
+
+首版匹配顺序：
+
+1. 规范化条码精确匹配。
+2. 两个任务均为同一供应商的 `SUPPLIER_PRICE` 且请求显式选择时，允许使用 `supplierId + SUPPLIER_SKU`。
+3. 请求显式包含 `SPEC` 时，把规范化规格加入组合键。
+4. 空键、同侧重复键或一对多结果进入 `ISSUE`，不得退化为名称模糊匹配。
+
+默认比较字段：
+
+```text
+PRODUCT_NAME
+SPEC
+UNIT
+UNIT_PRICE
+QUANTITY
+```
+
+字段比较按类型执行：金额使用 `BigDecimal.compareTo`，文本经过首尾空白和全半角规范化，数量使用整数。结果分类：
+
+- `ADDED`：只在新版本出现。
+- `REMOVED`：只在基准版本出现。
+- `CHANGED`：匹配成功且至少一个字段变化。
+- `UNCHANGED`：匹配成功且所有选定字段相同。
+- `ISSUE`：缺少匹配键、重复键或行本身无效。
+
+`changePercent` 仅用于数值字段且基准值不为 0；基准值为 0 时返回 `null` 并提供 `changeDirection=INCREASED_FROM_ZERO`。
+
+### 12.3 比较任务数据表
+
+```sql
+CREATE TABLE excel_comparison (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  operator_id BIGINT NOT NULL,
+  base_task_id BIGINT NOT NULL,
+  base_task_version BIGINT NOT NULL,
+  new_task_id BIGINT NOT NULL,
+  new_task_version BIGINT NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  match_keys_json VARCHAR(500) NOT NULL,
+  compare_fields_json VARCHAR(1000) NOT NULL,
+  request_digest VARCHAR(64) NOT NULL,
+  idempotency_key VARCHAR(100) NOT NULL,
+  summary_json LONGTEXT,
+  progress_completed INT,
+  progress_total INT,
+  issue_count INT NOT NULL DEFAULT 0,
+  cancel_requested_at DATETIME,
+  error_code VARCHAR(64),
+  create_time DATETIME NOT NULL,
+  update_time DATETIME NOT NULL,
+  UNIQUE KEY uk_excel_comparison_idempotency (operator_id, idempotency_key),
+  KEY idx_excel_comparison_operator_time (operator_id, create_time)
+);
+
+CREATE TABLE excel_comparison_item (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  comparison_id BIGINT NOT NULL,
+  change_type VARCHAR(32) NOT NULL,
+  match_key VARCHAR(500),
+  product_id BIGINT,
+  product_name VARCHAR(255),
+  base_row_number INT,
+  new_row_number INT,
+  changes_json LONGTEXT NOT NULL,
+  issue_code VARCHAR(64),
+  issue_message VARCHAR(500),
+  KEY idx_excel_comparison_item_page (comparison_id, change_type, id)
+);
+```
+
+状态使用 `QUEUED/RUNNING/COMPLETED/PARTIAL/FAILED/CANCELLED`。存在 `ISSUE` 但其余行成功比较时为 `PARTIAL`；比较任务本身不修改商品或价格。
+
+### 12.4 完整接口契约
+
+```http
+POST /excel-comparisons
+GET  /excel-comparisons/{comparisonId}
+GET  /excel-comparisons/{comparisonId}/items?changeType=CHANGED&page=0&size=50
+POST /excel-comparisons/{comparisonId}/cancel
+```
+
+创建请求增加：
+
+```json
+{
+  "baseTaskId": 101,
+  "baseTaskVersion": 4,
+  "newTaskId": 108,
+  "newTaskVersion": 6,
+  "matchKeys": ["BARCODE", "SPEC"],
+  "compareFields": ["PRODUCT_NAME", "SPEC", "UNIT", "UNIT_PRICE"],
+  "idempotencyKey": "compare-101-4-108-6"
+}
+```
+
+取消为幂等操作，只允许 `QUEUED/RUNNING`。分页结果只返回当前操作人的比较任务，`size` 最大 200。
+
+### 12.5 从比较到正式调价
+
+比较结果只负责说明差异，不直接提供“应用全部变化”的写入口。需要正式调价时，以新版本 Excel 任务重新执行审核、预览和 `commit_excel_task`：
+
+```text
+版本比较
+→ 用户查看新增/删除/变化/问题行
+→ 回到新 Excel 任务处理异常与排除项
+→ 重新校验任务版本和商品数据
+→ 展示 R2 影响预览
+→ 用户确认
+→ 单事务提交
+→ 写入真实价格历史
+```
+
+这样比较快照不会成为绕过 Excel 审核与审批的第二条写入通道。
+
+### 12.6 版本比较验收
+
+- 同一组输入和幂等键只生成一个比较任务。
+- 条码重复、空条码和无效行进入问题清单，不被错误配对。
+- 金额、文本和数量按照各自规则比较，结果稳定可重复。
+- 上万条差异通过分页读取，不在详情响应中一次返回。
+- 比较中取消后不再写新明细，已写明细不可被当成完整结果。
+- 源任务更新后旧比较保持原快照，新请求必须携带新版本。
+- 比较结果不能直接修改商品；正式应用后价格历史完整记录来源任务。
 
 ## 13. P1：统一错误与重试协议
 
@@ -762,6 +1087,13 @@ FILE_TOO_LARGE
 FILE_TYPE_NOT_SUPPORTED
 OUTPUT_FILE_NOT_FOUND
 OUTPUT_FILE_EXPIRED
+OUTPUT_FILE_NOT_READY
+QUOTE_IDEMPOTENCY_CONFLICT
+QUOTE_PRICE_MISSING
+PRICE_CHANGE_IDEMPOTENCY_CONFLICT
+EXCEL_COMPARISON_VERSION_CONFLICT
+EXCEL_COMPARISON_DUPLICATE_KEY
+EXCEL_COMPARISON_ALREADY_FINISHED
 ```
 
 服务端日志保留完整异常，客户端只接收安全、可理解的用户文案和 `traceId`。
@@ -902,8 +1234,8 @@ springboot-demo/src/main/resources/db/migration/
   V1__baseline_existing_schema.sql
   V2__agent_progress_and_approval.sql
   V3__excel_async_task_columns.sql
-  V4__excel_outputs.sql
-  V5__product_price_history.sql
+  V4__product_price_history.sql
+  V5__excel_outputs.sql
   V6__excel_comparisons.sql
 ```
 
@@ -945,8 +1277,12 @@ springboot-demo/src/main/resources/db/migration/
 - 正式写入异常整体回滚。
 - 用户排除行正确计入跳过数量。
 - 报价文件生成、重复请求幂等、下载鉴权。
-- 价格同步同时写价格历史。
-- 版本比较大结果分页。
+- 手工修改、新建商品、采购观察值和 Excel 调价均写入正确类型的价格历史。
+- 价格更新失败时商品、价格历史和操作日志整体回滚。
+- 采购观察值默认不覆盖商品进价，明确确认后才产生主价格变更。
+- 报价价格缺失、公式注入字符串、输出过期和幂等键冲突。
+- 版本比较空键、重复键、0 基准涨幅、源任务版本变化和大结果分页。
+- 比较取消后不能把不完整明细标记为 `COMPLETED`。
 
 ### 18.3 安全
 
@@ -966,9 +1302,10 @@ springboot-demo/src/main/resources/db/migration/
 - 确认请求能够防止旧预览、重复确认和越权确认。
 - Agent 结果返回成功、跳过、失败数量和业务跳转目标。
 - Excel 上传后立即获得任务 ID，并能观察解析过程。
-- 买家报价可以生成并安全下载真实文件。
-- 厂家价格同步可以追溯供应商、原价、新价和来源任务。
-- Excel 版本比较可以返回新增、删除、变化和未变化数量。
+- 手工、采购、Excel 和 Agent 产生的价格事件均可按商品、供应商和来源追溯。
+- 买家报价可以生成并安全下载真实 XLSX，每行能够说明采用的价格类型与快照来源。
+- 厂家价格同步可以追溯供应商、原价、新价、来源行和生效日期。
+- Excel 版本比较可以稳定返回新增、删除、变化、未变化和问题数量，并分页查看字段差异。
 - 所有正式批量写入保持事务和幂等。
 - 正常、空、失败、部分成功、网络恢复、用户取消均有稳定接口状态。
 
@@ -980,9 +1317,9 @@ springboot-demo/src/main/resources/db/migration/
 4. 上线新版审批契约和预览摘要校验；旧布尔审批进入兼容期。
 5. 拆分 Excel 创建协调器与后台 Worker，完成异步解析、租约、进度、取消和重试。
 6. 将 Excel 查询、审核摘要和校验封装成 Agent 工具；最后接入 R2 正式提交工具。
-7. 实现输出文件表、存储读取接口、报价生成、鉴权下载和清理任务。
-8. 增加供应商业务上下文、价格历史及同事务写入。
-9. 实现 Excel 比较任务和分页差异明细。
+7. 建立统一价格修改服务和价格历史，接入手工、采购、Excel 与 Agent 入口，并完成采购历史回填。
+8. 实现输出文件表、存储读取接口、报价生成、鉴权下载和清理任务。
+9. 实现 Excel 快照比较任务和分页差异明细，正式应用仍回到 Excel 审批提交链路。
 10. 增加读取 DTO 与分页，保留旧列表接口一个版本。
 11. 完成故障注入、多实例竞争和全量回归后再开启前端功能开关。
 
@@ -1007,7 +1344,7 @@ springboot-demo/src/main/resources/db/migration/
 1. 按可能多实例设计；首版使用数据库租约与取消标记，本机 Future 仅作优化。
 2. 输出文件通过 `AttachmentStorage` 抽象；开发环境本地存储，生产 COS，数据库不保存临时 URL。
 3. `SUPPLIER_PRICE` 必须选择供应商；价格生效日期为空时取门店时区当天并持久化。
-4. Excel 版本比较默认使用条码，允许显式增加规格；重复键进入问题列表。
+4. Excel 版本比较默认使用条码，允许同一供应商文件改用厂家货号并增加规格；重复键进入问题列表。
 5. `PARTIAL` 只用于非写入任务。
 6. 旧接口兼容一个联调版本；新增 R2 Excel 工具只支持新版审批。
 7. 签名下载 URL 默认有效 10 分钟。

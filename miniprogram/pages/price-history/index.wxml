@@ -1,21 +1,30 @@
 <view class="screen history-screen">
   <view class="page-kicker">价格账本</view>
-  <view class="page-title">{{productName}}价格记录</view>
-  <view class="page-summary">每次价格变化都保留来源和操作人，方便直接查看，也方便小五在复杂报价时追溯依据。</view>
-  <view class="demo-notice"><view class="demo-notice-mark">演示</view><view>当前价格历史来自本机演示数据，不代表真实业务记录。</view></view>
+  <view class="page-title">{{supplierId ? (supplierName || '供应商') : (productName ? productName + '的价格记录' : '查看商品价格变化')}}</view>
+  <view class="page-summary">真实记录每次价格变化的前后金额、来源和生效日期，查报价依据不用再翻聊天记录。</view>
 
-  <scroll-view class="filter-strip" scroll-x enhanced show-scrollbar="{{false}}"><view class="filter-list"><view wx:for="{{filters}}" wx:key="*this" class="filter-chip {{filter === item ? 'active' : ''}}" data-filter="{{item}}" bindtap="changeFilter">{{item}}</view></view></scroll-view>
+  <view class="selector-row" wx:if="{{!supplierId && products.length}}"><view><view class="selector-label">当前商品</view><view class="selector-hint">切换后立即查看对应价格账本</view></view><picker range="{{productNames}}" value="{{productIndex < 0 ? 0 : productIndex}}" bindchange="selectProduct"><view class="selector-action">{{productName || '选择商品'}} ›</view></picker></view>
+  <scroll-view class="filter-strip" scroll-x enhanced show-scrollbar="{{false}}" wx:if="{{productId || supplierId}}"><view class="filter-list"><view wx:for="{{filters}}" wx:key="key" class="filter-chip {{filter === item.key ? 'active' : ''}}" data-key="{{item.key}}" bindtap="changeFilter">{{item.label}}</view></view></scroll-view>
 
+  <view class="loading-state" wx:if="{{loading}}">正在读取真实价格记录…</view>
+  <view class="error-state" wx:elif="{{loadError}}"><view class="error-state-title">价格记录没有加载成功</view><view>{{loadError}}</view><button class="btn btn-secondary" bindtap="retryLoad">重新加载</button></view>
+  <view class="choose-empty" wx:elif="{{!productId && !supplierId}}"><view class="empty-title">先选择一个商品</view><view>价格记录按商品保存，选择后会显示真实历史。</view></view>
+  <block wx:else>
   <view class="history-head"><text>日期 / 类型</text><text>价格变化</text></view>
   <view class="history-list">
     <view class="history-row" wx:for="{{visibleHistory}}" wx:key="id">
       <view class="timeline"><view class="timeline-dot"></view><view class="timeline-line"></view></view>
       <view class="history-main">
-        <view class="history-top"><view><view class="history-date">{{item.date}}</view><view class="history-type">{{item.type}}</view></view><view class="change {{item.direction}}">{{item.changeText}}</view></view>
-        <view class="history-flow"><text>¥{{item.before}}</text><text>→</text><text>¥{{item.after}}</text></view>
-        <view class="history-source">{{item.source}} · {{item.operator}}</view>
+        <view class="history-top"><view><view class="history-date">{{item.dateText}}</view><view class="history-type">{{item.typeLabel}} · {{item.appliedText}}</view></view><view class="change {{item.direction}}">{{item.changeText}}</view></view>
+        <view class="history-flow"><text>{{item.beforeText}}</text><text>→</text><text>{{item.afterText}}</text></view>
+        <view class="history-source">{{item.sourceText}} · {{item.operatorText}} · 记录于 {{item.timeText}}</view>
+        <view class="history-reason" wx:if="{{item.reason}}">说明：{{item.reason}}</view>
+        <view class="source-link" wx:if="{{item.sourceTaskId}}" data-id="{{item.sourceTaskId}}" bindtap="openSourceTask">查看来源文件任务 ›</view>
+        <view class="source-link" wx:if="{{supplierId && item.productId}}" data-id="{{item.productId}}" bindtap="openProduct">查看这个商品 ›</view>
       </view>
     </view>
   </view>
-  <view class="empty-ledger" wx:if="{{!visibleHistory.length}}">暂无这个类型的价格变化</view>
+  <view class="empty-ledger" wx:if="{{!visibleHistory.length}}">暂无这个类型的真实价格记录</view>
+  <button class="load-more" wx:if="{{hasMore}}" bindtap="loadMore" loading="{{loadingMore}}">{{loadingMore ? '正在加载…' : '加载更多记录'}}</button>
+  </block>
 </view>

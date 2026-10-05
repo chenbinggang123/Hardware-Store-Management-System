@@ -14,6 +14,18 @@
       <picker range="{{purposes}}" value="{{purposeIndex}}" bindchange="changePurpose"><view class="upload-picker">{{purposes[purposeIndex]}}<text>›</text></view></picker>
       <view class="upload-hint">用途会决定必填字段和最后允许修改的数据。</view>
     </view>
+    <block wx:if="{{purposes[purposeIndex] === '厂家价格'}}">
+      <view class="upload-field">
+        <view class="upload-label">这是哪家供应商的价格表</view>
+        <picker range="{{supplierNames}}" value="{{supplierIndex < 0 ? 0 : supplierIndex}}" bindchange="changeSupplier"><view class="upload-picker"><text class="picker-value">{{supplierIndex < 0 ? '请选择供应商' : supplierNames[supplierIndex]}}</text><text>›</text></view></picker>
+        <view class="upload-hint">用于记录真实价格来源，也用于以后比较同一厂家的版本。</view>
+        <view class="supplier-error" wx:if="{{supplierLoadError}}">{{supplierLoadError}}，<text bindtap="retrySuppliers">重新加载</text></view>
+      </view>
+      <view class="upload-field">
+        <view class="upload-label">价格生效日期</view>
+        <picker mode="date" value="{{effectiveDate}}" bindchange="changeEffectiveDate"><view class="upload-picker"><text class="picker-value">{{effectiveDate}}</text><text>›</text></view></picker>
+      </view>
+    </block>
   </view>
 
   <view class="upload-error" wx:if="{{uploadError}}"><view class="upload-error-title">文件没有上传成功</view><view>{{uploadError}}</view><view>文件仍保留在手机中，可以直接再次尝试。</view></view>
