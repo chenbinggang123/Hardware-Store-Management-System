@@ -15,6 +15,7 @@ Page({
     warningOnly: false,
     inventories: [],
     loading: true,
+    loadError: '',
     metrics: { total: 0, warning: 0, quantity: 0 }
   },
 
@@ -39,12 +40,20 @@ Page({
   },
 
   loadInventories(stopPullDownRefresh) {
-    this.setData({ loading: true })
-    api.getInventories({ warningOnly: this.data.warningOnly, keyword: this.data.keyword }).then((inventories) => {
-      const items = inventories || []
+    this.setData({ loading: true, loadError: '' })
+    Promise.all([api.getInventories({ warningOnly: this.data.warningOnly }), api.getProducts()]).then(([inventories, products]) => {
+      const productMap = (products || []).reduce((map, product) => {
+        map[String(product.id)] = product
+        return map
+      }, {})
+      const keyword = String(this.data.keyword || '').trim().toLowerCase()
+      const items = (inventories || []).map((item) => {
+        const product = productMap[String(item.productId)] || {}
+        return { ...item, productName: product.name || `商品 ${item.productId}`, productSpec: product.spec || product.barcode || '未填写规格' }
+      }).filter((item) => !keyword || `${item.productName} ${item.productSpec} ${item.productId}`.toLowerCase().includes(keyword))
       this.setData({ inventories: items, loading: false, metrics: buildMetrics(items) })
-    }).catch(() => {
-      this.setData({ inventories: [], loading: false, metrics: { total: 0, warning: 0, quantity: 0 } })
+    }).catch((error) => {
+      this.setData({ inventories: [], loading: false, loadError: (error && (error.message || error.errMsg)) || '库存数据加载失败', metrics: { total: 0, warning: 0, quantity: 0 } })
     }).finally(() => {
       if (stopPullDownRefresh) wx.stopPullDownRefresh()
     })
@@ -60,5 +69,9 @@ Page({
 
   openAgent() {
     openPage('/pages/agent/index')
+  },
+
+  retryLoad() {
+    this.loadInventories()
   }
 })

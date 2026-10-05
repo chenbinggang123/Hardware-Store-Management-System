@@ -36,6 +36,7 @@ Page({
     keyword: '',
     status: '',
     loading: true,
+    loadError: '',
     hasProducts: false,
     products: [],
     metrics: { total: 0, online: 0, lowStock: 0 },
@@ -71,7 +72,7 @@ Page({
     if (this.data.keyword) params.keyword = this.data.keyword
     if (this.data.status !== '') params.status = this.data.status
 
-    this.setData({ loading: true })
+    this.setData({ loading: true, loadError: '' })
 
     Promise.all([api.getProducts(params), api.getProducts()])
       .then((result) => {
@@ -85,11 +86,12 @@ Page({
           metrics: buildMetrics(allProducts)
         })
       })
-      .catch(() => {
+      .catch((error) => {
         this.setData({
           loading: false,
           products: [],
           hasProducts: false,
+          loadError: (error && (error.message || error.errMsg)) || '商品数据加载失败',
           currentCount: 0,
           metrics: { total: 0, online: 0, lowStock: 0 }
         })
@@ -118,11 +120,29 @@ Page({
   toggleStatus(event) {
     const id = event.currentTarget.dataset.id
     const status = event.currentTarget.dataset.status
-    api.changeProductStatus(id, status).then(() => {
-      showToast('商品状态已更新', 'success')
-      this.loadProducts()
-    })
+    const actionText = Number(status) === 1 ? '上架' : '下架'
+    wx.showModal({
+      title: `${actionText}商品`,
+      content: `${actionText}后会改变商品在开单和查询时的可用状态，不会修改库存和价格。`,
+      confirmText: `确认${actionText}`
+    }).then((result) => {
+      if (!result.confirm) return null
+      return api.changeProductStatus(id, status).then(() => {
+        showToast(`商品已${actionText}`, 'success')
+        this.loadProducts()
+      })
+    }).catch((error) => showToast((error && (error.message || error.errMsg)) || '状态更新失败'))
   },
+
+  manageProduct(event) {
+    const data = event.currentTarget.dataset
+    wx.showActionSheet({ itemList: [data.statusText, '删除商品'] }).then((result) => {
+      if (result.tapIndex === 0) this.toggleStatus({ currentTarget: { dataset: data } })
+      if (result.tapIndex === 1) this.deleteProduct({ currentTarget: { dataset: data } })
+    }).catch(() => {})
+  },
+
+  retryLoad() { this.loadProducts() },
 
   deleteProduct(event) {
     const id = event.currentTarget.dataset.id
@@ -136,7 +156,7 @@ Page({
         api.deleteProduct(id).then(() => {
           showToast('商品已删除', 'success')
           this.loadProducts()
-        })
+        }).catch((error) => showToast((error && (error.message || error.errMsg)) || '商品删除失败'))
       }
     })
   }

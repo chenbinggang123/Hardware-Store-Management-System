@@ -5,7 +5,7 @@
     <view class="hero-subtitle">供应商 {{supplierName}} · 状态 {{order.status}} · 经办人 {{order.operatorId}}</view>
     <view class="top-actions">
       <view class="btn btn-primary btn-sm" bindtap="openEdit">编辑采购单</view>
-      <view class="btn btn-outline btn-sm" wx:if="{{order.status !== '已入库'}}" bindtap="stockIn">确认入库</view>
+      <view class="btn btn-outline btn-sm" wx:if="{{order.status !== '已入库'}}" bindtap="stockIn">{{saving ? '处理中…' : '确认采购入库'}}</view>
     </view>
   </view>
 

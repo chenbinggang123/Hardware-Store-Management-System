@@ -7,4 +7,15 @@ import java.util.List;
 
 public interface AgentModelGateway {
     AgentModelResponse respond(AgentRunContext context, List<AgentToolDefinition> tools);
+
+    default AgentModelResponse respondStreaming(
+            AgentRunContext context,
+            List<AgentToolDefinition> tools,
+            AgentModelStreamListener listener) {
+        AgentModelResponse response = respond(context, tools);
+        if (response != null && response.hasFinalOutput()) {
+            listener.onDelta(response.getFinalOutput());
+        }
+        return response;
+    }
 }

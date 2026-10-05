@@ -1,3 +1,7 @@
 /* Inventories details */
 .list-card { position: relative; overflow: hidden; }
 .inventory-warning-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 7rpx; background: #B95034; }
+/* Parent-friendly inventory ledger */
+.inventory-amount { margin-top: 18rpx; display: flex; align-items: baseline; flex-wrap: wrap; gap: 12rpx; color: #52605A; font-size: 24rpx; }
+.inventory-number { color: #17231E; font-size: 34rpx; font-weight: 750; }
+.inventory-warning-card .inventory-number { color: #A83F32; }

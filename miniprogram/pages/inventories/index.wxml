@@ -40,22 +40,24 @@
       <view class="list-card {{item.quantity <= item.warningThreshold ? 'inventory-warning-card' : ''}}">
         <view class="list-head">
           <view style="flex:1; min-width:0;">
-            <view class="list-title">商品 ID {{item.productId}}</view>
-            <view class="list-meta">库位 {{item.locationId}} · {{item.lastUpdateTime}}</view>
+            <view class="list-title">{{item.productName}}</view>
+            <view class="list-meta">{{item.productSpec}} · 库位 {{item.locationId || '未设置'}}</view>
           </view>
           <view class="tag {{item.quantity <= item.warningThreshold ? 'tag-danger' : 'tag-success'}}">{{item.quantity <= item.warningThreshold ? '库存预警' : '库存正常'}}</view>
         </view>
-        <view class="list-meta" style="font-weight: 600;">库存 {{item.quantity}} · 预警阈值 {{item.warningThreshold}}</view>
-        <view class="action-row card-actions">
-          <view class="btn btn-primary btn-sm" bindtap="openDetail" data-id="{{item.id}}">查看详情</view>
-          <view class="btn btn-outline btn-sm" bindtap="openAdjust" data-id="{{item.id}}">盘点调整</view>
-          <view class="btn btn-ghost btn-sm" bindtap="openDetail" data-id="{{item.id}}">库存日志</view>
+        <view class="inventory-amount"><text>当前库存</text><text class="inventory-number">{{item.quantity}} 件</text><text>预警线 {{item.warningThreshold}} 件</text></view>
+        <view class="ledger-actions">
+          <view class="ledger-action primary" bindtap="openAdjust" data-id="{{item.id}}">盘点调整</view>
+          <view class="ledger-action" bindtap="openDetail" data-id="{{item.id}}">详情与日志</view>
         </view>
       </view>
     </block>
   </view>
 
-  <view class="empty-state" wx:if="{{!loading && !inventories.length}}">
+  <view class="empty-state" wx:if="{{!loading && loadError}}">
+    <text class="empty-icon">!</text><view class="empty-title">库存加载失败</view><view class="empty-desc">{{loadError}}，请检查网络后重试。</view><view class="state-action" bindtap="retryLoad">重新加载库存</view>
+  </view>
+  <view class="empty-state" wx:if="{{!loading && !loadError && !inventories.length}}">
     <text class="empty-icon">📋</text>
     <view class="empty-title">暂无库存数据</view>
     <view class="empty-desc">添加商品后，这里会自动生成库存记录</view>

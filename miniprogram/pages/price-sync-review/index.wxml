@@ -1,7 +1,8 @@
 <view class="screen sync-screen">
-  <view class="page-kicker">SUPPLIER PRICE SYNC</view>
+  <view class="page-kicker">厂家价格</view>
   <view class="page-title">厂家价格同步</view>
   <view class="page-summary">小五已完成匹配，常规变动默认勾选；涨幅较大和未匹配项留给你决定。</view>
+  <view class="demo-notice"><view class="demo-notice-mark">演示</view><view>当前价格变化来自本机演示数据，不会修改真实商品成本。</view></view>
 
   <view class="source-ledger">
     <view class="source-mark">XLS</view>

@@ -17,6 +17,10 @@
 .change-values { flex: 0 0 auto; display: flex; align-items: center; gap: 10rpx; font-size: 22rpx; font-variant-numeric: tabular-nums; }
 .change-values text:first-child { color: #87938D; text-decoration: line-through; }
 .change-values text:last-child { color: #245E9B; font-weight: 750; }
+.change-values.vertical { max-width: 52%; flex-direction: column; align-items: flex-end; gap: 4rpx; text-align: right; }
+.change-values.vertical text { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.split-action { display: grid; grid-template-columns: .72fr 1.45fr; gap: 14rpx; }
+.fixed-secondary { min-height: 88rpx; margin: 0; padding: 0 18rpx; display: flex; align-items: center; justify-content: center; border: 1rpx solid #AEBAB4; border-radius: 14rpx; color: #40504A; background: #FFF; font-size: 25rpx; font-weight: 700; }
 .change-legend { margin-top: 9rpx; display: flex; justify-content: flex-end; gap: 24rpx; color: #7A8681; font-size: 19rpx; }
 .impact-list { border-top: 1rpx solid #D6DEDA; border-bottom: 1rpx solid #D6DEDA; background: #FFF; }
 .impact-list > view { min-height: 76rpx; padding: 0 20rpx; display: flex; align-items: center; gap: 14rpx; color: #34413C; font-size: 23rpx; border-bottom: 1rpx solid #E1E6E3; }

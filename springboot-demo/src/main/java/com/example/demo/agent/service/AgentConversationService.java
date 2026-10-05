@@ -76,6 +76,22 @@ public class AgentConversationService {
         return conversationRepository.save(conversation);
     }
 
+    public AgentConversation rename(Long conversationId, Long operatorId, String requestedTitle) {
+        AgentConversation conversation = conversationRepository.findByIdAndOperatorId(conversationId, operatorId)
+                .orElseThrow(() -> new IllegalArgumentException("会话不存在或无权访问"));
+        String normalized = StringUtils.hasText(requestedTitle)
+                ? requestedTitle.trim().replaceAll("\\s+", " ") : "";
+        if (normalized.isEmpty()) {
+            throw new IllegalArgumentException("会话标题不能为空");
+        }
+        if (normalized.length() > 50) {
+            throw new IllegalArgumentException("会话标题不能超过 50 个字符");
+        }
+        conversation.setTitle(normalized);
+        touch(conversation);
+        return conversation;
+    }
+
     public void attachRun(AgentConversation conversation, Long runId) {
         AgentConversationRun link = new AgentConversationRun();
         link.setConversationId(conversation.getId());

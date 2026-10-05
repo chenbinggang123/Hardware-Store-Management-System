@@ -70,7 +70,7 @@ Page({
         if (!result.confirm) return
         memory.savePriceSyncRows(this.data.rows)
         this.setData({ confirmed: true })
-        showToast(`已更新 ${count} 条成本`, 'success')
+        showToast(`演示完成：已记录 ${count} 条选择`, 'success')
       }
     })
   }

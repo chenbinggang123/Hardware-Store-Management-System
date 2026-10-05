@@ -1,4 +1,7 @@
-<view class="screen detail-screen" wx:if="{{task}}">
+<view class="screen detail-screen">
+  <view class="loading-state" wx:if="{{loading && !task}}">正在读取任务详情…</view>
+  <view class="error-state" wx:elif="{{loadError && !task}}"><view class="error-state-title">任务详情没有加载成功</view><view>{{loadError}}</view><button class="btn btn-secondary" bindtap="retryLoad">重新加载</button></view>
+  <block wx:elif="{{task}}">
   <view class="detail-status-head tone-{{task.statusTone}}">
     <view class="detail-status-top"><view><view class="detail-purpose">{{task.purpose}}</view><view class="detail-id">任务 {{task.id}}</view></view><view class="task-status {{task.statusTone}}">{{task.statusText}}</view></view>
     <view class="detail-progress-track"><view class="detail-progress-value" style="width: {{task.progress}}%;"></view></view>
@@ -6,19 +9,13 @@
   </view>
 
   <view class="detail-facts">
-    <view><text>原文件</text><text>{{task.fileName}}</text></view><view><text>关联对象</text><text>{{task.relationName}}</text></view>
+    <view><text>原文件</text><text>{{task.fileName}}</text></view><view><text>文件用途</text><text>{{task.purpose}}</text></view>
     <view><text>工作表</text><text>{{task.sheetName}} · {{task.rowCount}} 行</text></view><view><text>创建时间</text><text>{{task.createdAt}}</text></view>
   </view>
 
-  <view class="detail-action primary" wx:if="{{task.status !== 'COMPLETED' && task.status !== 'PROCESSING' && task.status !== 'PARTIAL'}}" bindtap="continueTask">继续处理这个任务</view>
-  <view class="detail-action retry" wx:if="{{task.status === 'PARTIAL'}}" bindtap="retryFailures">只重试失败的 {{task.failures}} 行</view>
-  <view class="detail-action primary" wx:if="{{task.outputName}}" bindtap="downloadResult">下载处理结果 Excel</view>
-  <view class="result-file" wx:if="{{task.outputName}}"><view class="result-file-mark">XLS</view><view><view>{{task.outputName}}</view><text>已生成 · 保留原始行序</text></view></view>
-
-  <view class="detail-tools">
-    <view wx:if="{{task.purpose === '厂家价格'}}" bindtap="openPriceSync"><text>价格同步预览</text><text>先看涨跌，再决定更新哪些商品 →</text></view>
-    <view bindtap="openVersionCompare"><text>与上一版对比</text><text>只看新增和修改过的行 →</text></view>
-  </view>
+  <view class="detail-action primary" wx:if="{{task.status === 'READY_FOR_MAPPING' || task.status === 'READY_FOR_REVIEW'}}" bindtap="continueTask">继续处理这个任务</view>
+  <view class="detail-action retry" wx:if="{{task.status === 'FAILED'}}" bindtap="reopenUpload">重新选择文件</view>
+  <view class="detail-info" wx:if="{{task.status === 'COMMITTED'}}">业务数据已经写入。原文件和每一行的审核结果仍保留在任务中。</view>
 
   <view class="detail-section-title">处理结果</view>
   <view class="result-summary"><view><text>{{task.matched}}</text><text>成功匹配</text></view><view><text>{{task.modifications}}</text><text>写入记录</text></view><view><text>{{task.skipped}}</text><text>跳过</text></view><view class="danger"><text>{{task.failures}}</text><text>失败</text></view></view>
@@ -26,4 +23,5 @@
   <view class="detail-section-title">处理记录</view>
   <view class="audit-list"><view class="audit-row" wx:for="{{task.logs}}" wx:key="time"><view class="audit-dot"></view><view><view class="audit-title">{{item.title}}</view><view class="audit-detail">{{item.detail}}</view><view class="audit-time">{{item.time}}</view></view></view></view>
   <view class="back-tasks" bindtap="openTasks">返回全部文件任务</view>
+  </block>
 </view>

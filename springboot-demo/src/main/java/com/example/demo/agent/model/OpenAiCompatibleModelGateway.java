@@ -13,7 +13,12 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -59,6 +64,46 @@ public class OpenAiCompatibleModelGateway implements AgentModelGateway {
 
     @Override
     public AgentModelResponse respond(AgentRunContext context, List<AgentToolDefinition> tools) {
+        Map<String, Object> body = requestBody(context, tools);
+
+        JsonNode response = restClient.post()
+                .uri("/chat/completions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + properties.getApiKey())
+                .body(body)
+                .retrieve()
+                .body(JsonNode.class);
+        return parseResponse(response);
+    }
+
+    @Override
+    public AgentModelResponse respondStreaming(
+            AgentRunContext context,
+            List<AgentToolDefinition> tools,
+            AgentModelStreamListener listener) {
+        Map<String, Object> body = requestBody(context, tools);
+        body.put("stream", true);
+        return restClient.post()
+                .uri("/chat/completions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + properties.getApiKey())
+                .body(body)
+                .exchange((request, response) -> {
+                    if (response.getStatusCode().isError()) {
+                        throw new IllegalStateException("模型流式请求失败：HTTP " + response.getStatusCode().value());
+                    }
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+                            response.getBody(), StandardCharsets.UTF_8))) {
+                        return parseStreamingResponse(reader, listener == null ? AgentModelStreamListener.NONE : listener);
+                    } catch (IOException exception) {
+                        throw new IllegalStateException("读取模型流式响应失败", exception);
+                    }
+                });
+    }
+
+    private Map<String, Object> requestBody(
+            AgentRunContext context,
+            List<AgentToolDefinition> tools) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", properties.getModel());
         body.put("messages", buildMessages(context));
@@ -71,15 +116,64 @@ public class OpenAiCompatibleModelGateway implements AgentModelGateway {
             // non-thinking tool-call protocol.
             body.put("thinking", Map.of("type", "disabled"));
         }
+        return body;
+    }
 
-        JsonNode response = restClient.post()
-                .uri("/chat/completions")
-                .contentType(MediaType.APPLICATION_JSON)
-                .header("Authorization", "Bearer " + properties.getApiKey())
-                .body(body)
-                .retrieve()
-                .body(JsonNode.class);
-        return parseResponse(response);
+    private AgentModelResponse parseStreamingResponse(
+            BufferedReader reader,
+            AgentModelStreamListener listener) throws IOException {
+        StringBuilder content = new StringBuilder();
+        Map<Integer, StreamedToolCall> calls = new LinkedHashMap<>();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            if (!line.startsWith("data:")) continue;
+            String data = line.substring(5).trim();
+            if (data.isEmpty() || "[DONE]".equals(data)) continue;
+            JsonNode event;
+            try {
+                event = objectMapper.readTree(data);
+            } catch (JsonProcessingException exception) {
+                throw new IllegalStateException("模型流式响应不是有效 JSON", exception);
+            }
+            JsonNode delta = event.path("choices").path(0).path("delta");
+            JsonNode contentNode = delta.path("content");
+            if (contentNode.isTextual() && !contentNode.asText().isEmpty()) {
+                String text = contentNode.asText();
+                content.append(text);
+                listener.onDelta(text);
+            }
+            JsonNode toolCalls = delta.path("tool_calls");
+            if (toolCalls.isArray()) {
+                for (JsonNode node : toolCalls) {
+                    int index = node.path("index").asInt(calls.size());
+                    StreamedToolCall call = calls.computeIfAbsent(index, ignored -> new StreamedToolCall());
+                    if (node.path("id").isTextual()) call.id.append(node.path("id").asText());
+                    JsonNode function = node.path("function");
+                    if (function.path("name").isTextual()) call.name.append(function.path("name").asText());
+                    if (function.path("arguments").isTextual()) call.arguments.append(function.path("arguments").asText());
+                }
+            }
+        }
+        if (!calls.isEmpty()) {
+            List<AgentToolCall> result = calls.entrySet().stream()
+                    .sorted(Comparator.comparingInt(Map.Entry::getKey))
+                    .map(entry -> {
+                        StreamedToolCall call = entry.getValue();
+                        String arguments = call.arguments.isEmpty() ? "{}" : call.arguments.toString();
+                        return new AgentToolCall(call.id.toString(), call.name.toString(), readArguments(arguments));
+                    }).toList();
+            return AgentModelResponse.tools(result);
+        }
+        if (content.isEmpty()) {
+            throw new IllegalStateException("模型未返回可用内容");
+        }
+        return AgentModelResponse.finalAnswer(content.toString());
+    }
+
+    private static final class StreamedToolCall {
+        private final StringBuilder id = new StringBuilder();
+        private final StringBuilder name = new StringBuilder();
+        private final StringBuilder arguments = new StringBuilder();
     }
 
     private List<Map<String, Object>> buildMessages(AgentRunContext context) {

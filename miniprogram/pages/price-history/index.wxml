@@ -1,7 +1,8 @@
 <view class="screen history-screen">
-  <view class="page-kicker">PRICE LEDGER</view>
+  <view class="page-kicker">价格账本</view>
   <view class="page-title">{{productName}}价格记录</view>
   <view class="page-summary">每次价格变化都保留来源和操作人，方便直接查看，也方便小五在复杂报价时追溯依据。</view>
+  <view class="demo-notice"><view class="demo-notice-mark">演示</view><view>当前价格历史来自本机演示数据，不代表真实业务记录。</view></view>
 
   <scroll-view class="filter-strip" scroll-x enhanced show-scrollbar="{{false}}"><view class="filter-list"><view wx:for="{{filters}}" wx:key="*this" class="filter-chip {{filter === item ? 'active' : ''}}" data-filter="{{item}}" bindtap="changeFilter">{{item}}</view></view></scroll-view>
 

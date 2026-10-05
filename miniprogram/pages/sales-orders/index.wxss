@@ -1,1 +1,4 @@
 /* Sales orders overrides */
+.order-switch { margin-top: 22rpx; padding: 6rpx; display: grid; grid-template-columns: 1fr 1fr; gap: 6rpx; background: #E1E7E4; }
+.order-switch view { min-height: 76rpx; display: flex; align-items: center; justify-content: center; color: #52605A; font-size: 28rpx; font-weight: 700; }
+.order-switch .active { color: #17231E; background: #FFF; }

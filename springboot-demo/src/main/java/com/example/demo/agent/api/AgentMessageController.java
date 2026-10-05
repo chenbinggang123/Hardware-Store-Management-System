@@ -4,6 +4,7 @@ import com.example.demo.agent.dto.AgentMessageRequest;
 import com.example.demo.agent.dto.AgentApprovalRequest;
 import com.example.demo.agent.dto.AgentConversationDetail;
 import com.example.demo.agent.dto.AgentConversationSummary;
+import com.example.demo.agent.dto.AgentConversationTitleRequest;
 import com.example.demo.agent.dto.AgentAttachmentResponse;
 import com.example.demo.agent.dto.CloudAttachmentRequest;
 import com.example.demo.agent.harness.AgentHarness;
@@ -11,6 +12,7 @@ import com.example.demo.agent.harness.AgentRunResult;
 import com.example.demo.agent.model.AgentModelGateway;
 import com.example.demo.agent.service.AgentConversationService;
 import com.example.demo.agent.service.AgentAttachmentService;
+import com.example.demo.agent.service.AgentStreamingService;
 import com.example.demo.common.ApiResponse;
 import com.example.demo.config.AuthInterceptor;
 import com.example.demo.security.AuthSession;
@@ -25,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.http.MediaType;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -37,16 +40,19 @@ public class AgentMessageController {
     private final ObjectProvider<AgentModelGateway> gatewayProvider;
     private final AgentConversationService conversationService;
     private final AgentAttachmentService attachmentService;
+    private final AgentStreamingService streamingService;
 
     public AgentMessageController(
             AgentHarness harness,
             ObjectProvider<AgentModelGateway> gatewayProvider,
             AgentConversationService conversationService,
-            AgentAttachmentService attachmentService) {
+            AgentAttachmentService attachmentService,
+            AgentStreamingService streamingService) {
         this.harness = harness;
         this.gatewayProvider = gatewayProvider;
         this.conversationService = conversationService;
         this.attachmentService = attachmentService;
+        this.streamingService = streamingService;
     }
 
     @PostMapping("/messages")
@@ -72,6 +78,32 @@ public class AgentMessageController {
         attachmentService.bindToRun(request == null ? null : request.getAttachmentIds(), result.getRunId(),
                 result.getConversationId(), operatorId);
         return ApiResponse.ok("Agent 任务执行完成", result);
+    }
+
+    @PostMapping("/messages/stream")
+    public ApiResponse<AgentRunResult> sendStreaming(
+            @RequestBody AgentMessageRequest request,
+            HttpServletRequest httpRequest) {
+        AgentModelGateway gateway = gatewayProvider.getIfAvailable();
+        if (gateway == null) {
+            throw new IllegalArgumentException("Agent 模型尚未启用");
+        }
+        Long operatorId = currentUserId(httpRequest);
+        Long conversationId = attachmentService.resolveConversationId(
+                request == null ? null : request.getConversationId(),
+                request == null ? null : request.getAttachmentIds(), operatorId);
+        String displayInput = request == null ? null : request.getContent();
+        if (!org.springframework.util.StringUtils.hasText(displayInput)
+                && request != null && request.getAttachmentIds() != null && !request.getAttachmentIds().isEmpty()) {
+            displayInput = "请识别附件中的订单信息并生成销售草稿";
+        }
+        String modelInput = attachmentService.enrichPrompt(displayInput,
+                request == null ? null : request.getAttachmentIds(), conversationId, operatorId);
+        AgentRunResult result = streamingService.start(
+                displayInput, modelInput, operatorId, gateway, conversationId);
+        attachmentService.bindToRun(request == null ? null : request.getAttachmentIds(), result.getRunId(),
+                result.getConversationId(), operatorId);
+        return ApiResponse.ok("Agent 流式任务已开始", result);
     }
 
     @PostMapping(value = "/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -111,6 +143,16 @@ public class AgentMessageController {
         return ApiResponse.ok(conversationService.detail(conversationId, currentUserId(request)));
     }
 
+    @PatchMapping("/conversations/{conversationId}/title")
+    public ApiResponse<AgentConversationDetail> renameConversation(
+            @PathVariable Long conversationId,
+            @RequestBody AgentConversationTitleRequest request,
+            HttpServletRequest httpRequest) {
+        Long operatorId = currentUserId(httpRequest);
+        conversationService.rename(conversationId, operatorId, request == null ? null : request.getTitle());
+        return ApiResponse.ok("会话标题已更新", conversationService.detail(conversationId, operatorId));
+    }
+
     @DeleteMapping("/conversations/{conversationId}")
     public ApiResponse<List<String>> deleteConversation(
             @PathVariable Long conversationId,
@@ -136,6 +178,14 @@ public class AgentMessageController {
             @PathVariable Long runId,
             HttpServletRequest httpRequest) {
         return ApiResponse.ok(harness.getRun(runId, currentUserId(httpRequest)));
+    }
+
+    @PostMapping("/runs/{runId}/cancel")
+    public ApiResponse<AgentRunResult> cancelRun(
+            @PathVariable Long runId,
+            HttpServletRequest httpRequest) {
+        return ApiResponse.ok("Agent 任务已取消",
+                streamingService.cancel(runId, currentUserId(httpRequest)));
     }
 
     private Long currentUserId(HttpServletRequest request) {

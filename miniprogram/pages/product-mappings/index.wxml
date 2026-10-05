@@ -1,7 +1,8 @@
 <view class="screen mapping-screen">
-  <view class="page-kicker">PRODUCT MEMORY</view>
+  <view class="page-kicker">商品识别关系</view>
   <view class="page-title">{{productName}}的识别关系</view>
   <view class="page-summary">这些关系帮助小五认出不同厂家货号和买家的习惯叫法。简单查询仍可直接使用，不必每次都经过对话。</view>
+  <view class="demo-notice"><view class="demo-notice-mark">演示</view><view>当前映射关系保存在本机演示数据中。</view></view>
 
   <view class="mapping-overview">
     <view><text>{{activeCount}}</text><text>正在使用</text></view>

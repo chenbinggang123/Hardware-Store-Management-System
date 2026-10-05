@@ -7,6 +7,7 @@ Page({
     order: null,
     suppliers: [],
     supplierName: '',
+    saving: false,
     loading: true,
     loadError: ''
   },
@@ -51,9 +52,13 @@ Page({
   },
 
   stockIn() {
-    api.stockInPurchaseOrder(this.data.id).then(() => {
-      showToast('采购单已入库', 'success')
-      this.loadDetail()
-    })
+    if (this.data.saving) return
+    wx.showModal({ title: '确认采购入库', content: '确认后将增加这张采购单中所有商品的库存，并记录入库日志。不会修改零售价。', confirmText: '确认入库' }).then((result) => {
+      if (!result.confirm) return null
+      this.setData({ saving: true })
+      return api.stockInPurchaseOrder(this.data.id).then(() => { showToast('采购单已入库', 'success'); this.loadDetail() })
+        .catch((error) => showToast((error && (error.message || error.errMsg)) || '入库失败'))
+        .finally(() => this.setData({ saving: false }))
+    }).catch(() => {})
   }
 })

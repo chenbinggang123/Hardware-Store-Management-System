@@ -4,6 +4,8 @@
 .review-file { margin-top: 7rpx; color: #66746E; font-size: 23rpx; }
 .review-file-line { display: flex; align-items: center; justify-content: space-between; gap: 18rpx; }
 .original-link { flex: 0 0 auto; color: #245E9B; font-size: 22rpx; font-weight: 650; }
+.sheet-switch { min-height: 68rpx; margin-top: 16rpx; padding: 0 16rpx; display: flex; align-items: center; justify-content: space-between; color: #34413C; background: #EEF3F0; font-size: 23rpx; }
+.sheet-switch text { color: #245E9B; font-weight: 700; }
 .review-progress { height: 8rpx; margin-top: 21rpx; overflow: hidden; border-radius: 8rpx; background: #E0E6E3; }
 .review-progress-value { height: 100%; background: #245E9B; }
 .review-summary { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 20rpx; border-top: 1rpx solid #E1E6E3; }
@@ -43,6 +45,12 @@
 .row-actions { margin-top: 12rpx; display: grid; grid-template-columns: 1fr 1fr; gap: 12rpx; }
 .row-action { min-height: 66rpx; display: flex; align-items: center; justify-content: center; border-radius: 12rpx; color: #40504A; background: #E9EEEB; font-size: 22rpx; font-weight: 650; }
 .row-action.primary { color: #FFF; background: #245E9B; }
+.row-actions.single { grid-template-columns: 1fr; }
+.candidate-list { margin-top: 12rpx; border-top: 1rpx solid #DDE4E0; }
+.candidate-row { min-height: 82rpx; padding: 10rpx 4rpx; display: flex; align-items: center; justify-content: space-between; gap: 18rpx; border-bottom: 1rpx solid #E4E9E6; }
+.candidate-row view view { color: #26332E; font-size: 23rpx; font-weight: 700; }
+.candidate-row text { color: #718079; font-size: 20rpx; }
+.candidate-row > view:last-child { min-width: 88rpx; min-height: 56rpx; display: flex; align-items: center; justify-content: center; color: #245E9B; background: #E7F0F8; font-size: 21rpx; font-weight: 700; }
 .review-tip { padding: 60rpx 20rpx; color: #718079; text-align: center; font-size: 24rpx; }
 .review-segment { min-height: 76rpx; padding: 0 28rpx; display: flex; align-items: center; justify-content: space-between; gap: 18rpx; color: #718079; font-size: 20rpx; }
 .review-segment view { color: #245E9B; font-weight: 650; }

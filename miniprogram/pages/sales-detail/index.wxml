@@ -5,7 +5,7 @@
     <view class="hero-subtitle">客户 {{customerName}} · 出库 {{order.status}} · 收款 {{order.payStatus}}</view>
     <view class="top-actions">
       <view class="btn btn-primary btn-sm" bindtap="openEdit">编辑销售单</view>
-      <view class="btn btn-outline btn-sm" wx:if="{{order.status !== '已出库'}}" bindtap="stockOut">确认出库</view>
+      <view class="btn btn-outline btn-sm" wx:if="{{order.status !== '已出库'}}" bindtap="stockOut">{{saving ? '处理中…' : '确认销售出库'}}</view>
     </view>
   </view>
 
@@ -46,7 +46,7 @@
       <input class="form-input" type="digit" value="{{paymentAmount}}" bindinput="updatePayment" placeholder="请输入本次收款金额" />
     </view>
     <view class="bottom-actions">
-      <view class="btn btn-primary btn-block" bindtap="registerPayment">登记收款</view>
+      <view class="btn btn-primary btn-block" bindtap="registerPayment">{{saving ? '正在登记…' : '确认登记收款'}}</view>
     </view>
   </view>
 </view>

@@ -1,31 +1,23 @@
 <view class="screen upload-screen">
-  <view class="flow-head"><view class="flow-step-label">第 1 步，共 4 步</view><view class="flow-title">先选择要处理的文件</view><view class="flow-desc">支持询价、报价、厂家价格、盘点和到货文件。上传后只做识别，不会写入业务数据。</view></view>
+  <view class="flow-head"><view class="flow-step-label">第 1 步，共 4 步</view><view class="flow-title">先选择要处理的文件</view><view class="flow-desc">支持 Excel 和 CSV。上传后只读取内容，确认前不会修改商品、价格或库存。</view></view>
   <view class="flow-progress"><view class="flow-progress-value" style="width: 25%;"></view></view>
 
-  <view class="file-drop {{file ? 'selected' : ''}}" bindtap="chooseFile">
+  <view class="file-drop {{file ? 'selected' : ''}}" bindtap="chooseFile" aria-label="选择 Excel 或 CSV 文件">
     <view class="file-mark">{{file ? 'XLS' : '＋'}}</view>
     <view class="file-title">{{file ? file.name : '选择 Excel 或 CSV 文件'}}</view>
     <view class="file-desc">{{file ? file.sizeText + ' · 点击可重新选择' : '从微信会话或手机文件中选择'}}</view>
   </view>
-  <view class="demo-file-link" wx:if="{{!file}}" bindtap="useDemoFile">暂时使用示例文件体验流程</view>
 
   <view class="upload-form">
     <view class="upload-field">
-      <view class="upload-label">这份文件来自哪里</view>
-      <picker range="{{relationTypes}}" value="{{relationTypeIndex}}" bindchange="changeRelationType"><view class="upload-picker">{{relationTypes[relationTypeIndex]}}<text>›</text></view></picker>
-    </view>
-    <view class="upload-field">
-      <view class="upload-label">关联往来单位</view>
-      <picker range="{{relationNameOptions}}" value="{{relationNameIndex}}" bindchange="changeRelationName"><view class="upload-picker">{{relationNameOptions[relationNameIndex]}}<text>›</text></view></picker>
-    </view>
-    <view class="upload-field">
-      <view class="upload-label">准备处理什么</view>
+      <view class="upload-label">这次准备处理什么</view>
       <picker range="{{purposes}}" value="{{purposeIndex}}" bindchange="changePurpose"><view class="upload-picker">{{purposes[purposeIndex]}}<text>›</text></view></picker>
-      <view class="upload-hint">系统会根据文件内容再次判断，你可以在下一步修改。</view>
+      <view class="upload-hint">用途会决定必填字段和最后允许修改的数据。</view>
     </view>
   </view>
 
+  <view class="upload-error" wx:if="{{uploadError}}"><view class="upload-error-title">文件没有上传成功</view><view>{{uploadError}}</view><view>文件仍保留在手机中，可以直接再次尝试。</view></view>
   <view class="safety-line"><view class="safety-mark">安</view><view><view class="safety-title">识别和预览不会改动数据</view><view class="safety-desc">价格、库存或正式单据发生变化前，会单独展示影响并再次确认。</view></view></view>
   <view class="fixed-action-space"></view>
-  <view class="fixed-action"><view class="fixed-primary {{!file || recognizing ? 'disabled' : ''}}" bindtap="startRecognition">{{recognizing ? '正在读取文件…' : '识别文件内容'}}</view></view>
+  <view class="fixed-action"><button class="fixed-primary {{!file || recognizing ? 'disabled' : ''}}" bindtap="startRecognition" disabled="{{!file || recognizing}}">{{recognizing ? '正在上传并读取文件…' : '上传并读取文件'}}</button></view>
 </view>

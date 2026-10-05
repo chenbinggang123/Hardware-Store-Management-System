@@ -1,14 +1,17 @@
-<view class="screen mapping-screen" wx:if="{{task}}">
-  <view class="flow-head"><view class="flow-step-label">第 2 步，共 4 步</view><view class="flow-title">确认每一列代表什么</view><view class="flow-desc">系统已读取“{{task.sheetName}}”，请用真实样例核对字段。</view></view>
+<view class="screen mapping-screen">
+  <view class="loading-state" wx:if="{{loading}}">正在读取字段和样例…</view>
+  <view class="error-state" wx:elif="{{loadError}}"><view class="error-state-title">字段没有加载成功</view><view>{{loadError}}</view><button class="btn btn-secondary" bindtap="retryLoad">重新加载</button></view>
+  <block wx:elif="{{task && sheet}}">
+  <view class="flow-head"><view class="flow-step-label">第 2 步，共 4 步</view><view class="flow-title">确认每一列代表什么</view><view class="flow-desc">系统已读取“{{sheet.sheetName}}”，请用真实样例核对字段。</view></view>
   <view class="flow-progress"><view class="flow-progress-value" style="width: 50%;"></view></view>
 
   <view class="sheet-facts">
     <view><text>文件</text><text>{{task.fileName}}</text></view>
-    <view><text>工作表</text><text>{{task.sheetName}}</text></view>
-    <view><text>数据范围</text><text>A1:F{{task.rowCount + 1}} · 共 {{task.rowCount}} 行</text></view>
+    <view><text>工作表</text><text>{{sheet.sheetName}}</text></view>
+    <view><text>数据范围</text><text>{{sheet.columnCount}} 列 · {{sheet.rowCount}} 行</text></view>
   </view>
 
-  <view class="template-memory"><view class="template-mark">记</view><view><view class="template-title">已应用“{{task.relationName}}”字段模板</view><view class="template-desc">这次修改后会记住，下次同类文件仍会展示确认。</view></view></view>
+  <view class="template-memory"><view class="template-mark">核</view><view><view class="template-title">系统已按表头预选字段</view><view class="template-desc">请逐项核对；这里只生成匹配预览，不会修改业务数据。</view></view></view>
 
   <view class="mapping-title-row"><view><view class="mapping-title">字段映射</view><view class="mapping-subtitle">必填字段已标记，请逐项核对</view></view><view class="mapping-count">{{mappings.length}} 列</view></view>
   <view class="mapping-ledger">
@@ -23,5 +26,6 @@
 
   <view class="mapping-note">如果文件没有表头，可在这里把 A、B、C 列分别指定为商品名称、规格和单位。</view>
   <view class="fixed-action-space"></view>
-  <view class="fixed-action"><view class="fixed-primary" bindtap="continueReview">确认字段并开始匹配</view></view>
+  <view class="fixed-action"><button class="fixed-primary {{saving ? 'disabled' : ''}}" bindtap="continueReview" disabled="{{saving}}">{{saving ? '正在匹配商品…' : '确认字段并开始匹配'}}</button></view>
+  </block>
 </view>

@@ -35,7 +35,9 @@ function normalizeProduct(product) {
 Page({
   data: {
     id: '',
-    product: null
+    product: null,
+    loading: true,
+    loadError: ''
   },
 
   onLoad(options) {
@@ -53,13 +55,15 @@ Page({
 
   loadDetail() {
     if (!this.data.id) {
+      this.setData({ loading: false, loadError: '缺少商品编号' })
       return
     }
+    this.setData({ loading: true, loadError: '' })
     api.getProduct(this.data.id).then((product) => {
       this.setData({
-        product: normalizeProduct(product)
+        product: normalizeProduct(product), loading: false
       })
-    })
+    }).catch((error) => this.setData({ product: null, loading: false, loadError: (error && (error.message || error.errMsg)) || '商品详情加载失败' }))
   },
 
   openEdit() {
@@ -86,10 +90,12 @@ Page({
     if (!product) {
       return
     }
-    api.changeProductStatus(product.id, product.status === 1 ? 0 : 1).then(() => {
-      showToast('状态已更新', 'success')
-      this.loadDetail()
-    })
+    const nextStatus = product.status === 1 ? 0 : 1
+    const actionText = nextStatus === 1 ? '上架' : '下架'
+    wx.showModal({ title: `${actionText}商品`, content: `${actionText}后会改变开单和查询时的可用状态，不会修改库存和价格。`, confirmText: `确认${actionText}` }).then((result) => {
+      if (!result.confirm) return null
+      return api.changeProductStatus(product.id, nextStatus).then(() => { showToast(`商品已${actionText}`, 'success'); this.loadDetail() })
+    }).catch((error) => showToast((error && (error.message || error.errMsg)) || '状态更新失败'))
   },
 
   deleteProduct() {
@@ -99,7 +105,7 @@ Page({
     }
     wx.showModal({
       title: '删除商品',
-      content: `确认删除“${product.name}”吗？`,
+      content: `确认删除“${product.name}”吗？删除后会同步移除对应库存记录，且无法恢复。`,
       confirmColor: '#B94C3A',
       success: (result) => {
         if (!result.confirm) {
@@ -110,8 +116,9 @@ Page({
           setTimeout(() => {
             wx.navigateBack({ delta: 1 })
           }, 400)
-        })
+        }).catch((error) => showToast((error && (error.message || error.errMsg)) || '商品删除失败'))
       }
     })
-  }
+  },
+  retryLoad() { this.loadDetail() }
 })

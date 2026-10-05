@@ -1,12 +1,16 @@
-<view class="review-screen" wx:if="{{task}}">
+<view class="review-screen">
+  <view class="loading-state" wx:if="{{loading && !task}}">正在读取匹配结果…</view>
+  <view class="error-state" wx:elif="{{loadError && !task}}"><view class="error-state-title">匹配结果没有加载成功</view><view>{{loadError}}</view><button class="btn btn-secondary" bindtap="retryLoad">重新加载</button></view>
+  <block wx:elif="{{task}}">
   <view class="review-head">
     <view class="flow-step-label">第 3 步，共 4 步</view>
     <view class="review-title">逐行检查匹配结果</view>
-    <view class="review-file-line"><view class="review-file">{{task.fileName}} · {{task.rowCount}} 行</view><view class="original-link" bindtap="openOriginal">查看原表</view></view>
+    <view class="review-file-line"><view class="review-file">{{task.fileName}} · {{task.rowCount}} 行</view><view class="original-link" bindtap="openOriginal">核对说明</view></view>
+    <picker wx:if="{{sheetNames.length > 1}}" range="{{sheetNames}}" value="{{sheetIndex}}" bindchange="changeSheet"><view class="sheet-switch">当前工作表：{{sheetNames[sheetIndex]}} <text>切换 ›</text></view></picker>
     <view class="review-progress"><view class="review-progress-value" style="width: 76%;"></view></view>
     <view class="review-summary">
-      <view><text>{{task.matched}}</text><text>已匹配</text></view><view class="warning"><text>{{task.pending}}</text><text>待确认</text></view>
-      <view class="warning"><text>{{task.unmatched}}</text><text>未匹配</text></view><view class="danger"><text>{{task.conflict}}</text><text>冲突</text></view>
+      <view><text>{{summary.matchedRows}}</text><text>已匹配</text></view><view class="warning"><text>{{summary.needsReviewRows}}</text><text>待确认</text></view>
+      <view class="warning"><text>{{summary.readyToCreateRows}}</text><text>可新增</text></view><view class="danger"><text>{{summary.invalidRows}}</text><text>数据有误</text></view>
     </view>
   </view>
 
@@ -21,18 +25,27 @@
       <view class="row-note">{{item.note}}</view>
       <view class="row-expand" wx:if="{{expandedId === item.id}}" catchtap="noop">
         <view class="row-detail"><text>价格依据</text><text>{{item.basis}}</text></view>
-        <view class="row-detail"><text>写入动作</text><text>{{item.status === 'UNMATCHED' ? '尚未决定' : item.status === 'SKIPPED' ? '跳过' : '生成报价行'}}</text></view>
-        <view class="row-actions" wx:if="{{item.status !== 'MATCHED' && item.status !== 'SKIPPED'}}">
-          <view class="row-action primary" data-id="{{item.id}}" catchtap="confirmMatch">确认这个匹配</view>
+        <view class="row-detail"><text>处理方式</text><text>{{item.actionType}}</text></view>
+        <view class="candidate-list" wx:if="{{item.status === 'NEEDS_REVIEW' && item.candidates.length}}">
+          <view class="candidate-row" wx:for="{{item.candidates}}" wx:for-item="candidate" wx:key="id" data-id="{{item.id}}" data-product-id="{{candidate.id}}" catchtap="selectCandidate">
+            <view><view>{{candidate.name}}</view><text>{{candidate.specText || '规格未填写'}}</text></view><view>选择</view>
+          </view>
+        </view>
+        <view class="row-actions" wx:if="{{item.status === 'READY_TO_CREATE'}}">
+          <view class="row-action primary" data-id="{{item.id}}" catchtap="confirmCreate">确认新增商品</view>
           <view class="row-action" data-id="{{item.id}}" catchtap="skipRow">本次跳过</view>
+        </view>
+        <view class="row-actions single" wx:elif="{{item.status === 'INVALID' || item.status === 'NEEDS_REVIEW'}}">
+          <view class="row-action" data-id="{{item.id}}" catchtap="skipRow">本次跳过这一行</view>
         </view>
       </view>
     </view>
   </view>
 
-  <view class="review-segment" wx:if="{{visibleRows.length}}"><text>已显示 {{visibleRows.length}} / {{task.rowCount}} 行 · 筛选会保留</text><view bindtap="loadNext">加载下一段</view></view>
+  <view class="review-segment" wx:if="{{visibleRows.length}}"><text>本页显示 {{visibleRows.length}} 行 · 共 {{totalElements}} 行</text><view wx:if="{{hasNextPage}}" bindtap="loadNext">加载下一段</view></view>
 
   <view class="review-tip" wx:if="{{!visibleRows.length}}">这个筛选条件下没有数据行</view>
   <view class="fixed-action-space"></view>
-  <view class="fixed-action"><view class="fixed-primary {{remainingConflict ? 'warning' : ''}}" bindtap="previewChanges">{{remainingConflict ? '先处理 ' + remainingConflict + ' 行冲突' : '预览将要写入的变化'}}</view></view>
+  <view class="fixed-action"><button class="fixed-primary {{remainingConflict ? 'warning' : ''}}" bindtap="previewChanges">{{remainingConflict ? '检查能否继续（还有 ' + remainingConflict + ' 行）' : '预览将要写入的变化'}}</button></view>
+  </block>
 </view>

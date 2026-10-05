@@ -132,13 +132,13 @@ function localFileSize(file, filePath) {
   })
 }
 
-function cloudPathFor(fileName) {
+function cloudPathFor(fileName, category = 'agent') {
   const session = getAuthSession()
   const operatorId = session && session.user && session.user.id ? session.user.id : 'unknown'
   const now = new Date()
   const extension = fileName.includes('.') ? `.${fileName.split('.').pop().toLowerCase()}` : ''
   const datePath = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('/')
-  return `agent/${operatorId}/${datePath}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}${extension}`
+  return `${category}/${operatorId}/${datePath}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}${extension}`
 }
 
 function removeCloudFile(fileID) {
@@ -170,6 +170,32 @@ function uploadAgentFile(file, conversationId) {
         })
       })
       .then((attachment) => ({ ...attachment, cloudFileId: uploadedFileID })))
+    .catch((error) => removeCloudFile(uploadedFileID).then(() => Promise.reject(error)))
+}
+
+function uploadExcelFile(file, purpose) {
+  if (!wx.cloud || !wx.cloud.uploadFile || !wx.cloud.getTempFileURL) {
+    return Promise.reject({ message: '当前微信基础库不支持文件上传' })
+  }
+  const filePath = localFilePath(file)
+  const originalName = localFileName(file)
+  let uploadedFileID = ''
+  return localFileSize(file, filePath)
+    .then((fileSize) => wx.cloud.uploadFile({ cloudPath: cloudPathFor(originalName, 'excel-tasks'), filePath })
+      .then((uploadResult) => {
+        uploadedFileID = uploadResult.fileID
+        return wx.cloud.getTempFileURL({ fileList: [uploadedFileID] })
+      })
+      .then((urlResult) => {
+        const item = urlResult.fileList && urlResult.fileList[0]
+        if (!item || !item.tempFileURL || (item.status && item.status !== 0)) {
+          return Promise.reject({ message: (item && item.errMsg) || '无法获取文件临时读取地址' })
+        }
+        return request('/excel-tasks/cloud', {
+          method: 'POST',
+          data: { cloudFileId: uploadedFileID, downloadUrl: item.tempFileURL, originalName, fileSize, purpose }
+        })
+      }))
     .catch((error) => removeCloudFile(uploadedFileID).then(() => Promise.reject(error)))
 }
 
@@ -469,6 +495,9 @@ module.exports = {
   sendAgentMessage(content, conversationId, attachmentIds) {
     return agentRequest('/agent/messages', { method: 'POST', data: { content, conversationId, attachmentIds: attachmentIds || [] } })
   },
+  startAgentMessageStream(content, conversationId, attachmentIds) {
+    return agentRequest('/agent/messages/stream', { method: 'POST', data: { content, conversationId, attachmentIds: attachmentIds || [] } })
+  },
   uploadAgentAttachment(filePath, conversationId) {
     return uploadAgentFile(filePath, conversationId)
   },
@@ -484,6 +513,9 @@ module.exports = {
   getAgentConversation(conversationId) {
     return agentRequest(`/agent/conversations/${conversationId}`)
   },
+  renameAgentConversation(conversationId, title) {
+    return agentRequest(`/agent/conversations/${conversationId}/title`, { method: 'PATCH', data: { title } })
+  },
   deleteAgentConversation(conversationId) {
     return agentRequest(`/agent/conversations/${conversationId}`, { method: 'DELETE' })
       .then((cloudFileIds) => Promise.all((cloudFileIds || []).map(removeCloudFile)))
@@ -491,8 +523,41 @@ module.exports = {
   getAgentRun(runId) {
     return agentRequest(`/agent/runs/${runId}`)
   },
+  cancelAgentRun(runId) {
+    return agentRequest(`/agent/runs/${runId}/cancel`, { method: 'POST' })
+  },
   resolveAgentApproval(runId, approved) {
     return agentRequest(`/agent/runs/${runId}/approval`, { method: 'POST', data: { approved } })
+  },
+  uploadExcelTask(file, purpose) {
+    return uploadExcelFile(file, purpose)
+  },
+  getExcelTasks(status) {
+    return request('/excel-tasks', { query: status ? { status } : {} })
+  },
+  getExcelTask(taskId) {
+    return request(`/excel-tasks/${taskId}`)
+  },
+  getExcelTaskRows(taskId, sheetId, page = 0, size = 50) {
+    return request(`/excel-tasks/${taskId}/sheets/${sheetId}/rows`, { query: { page, size } })
+  },
+  applyExcelMapping(taskId, sheetId, data) {
+    return request(`/excel-tasks/${taskId}/sheets/${sheetId}/mapping`, { method: 'PUT', data })
+  },
+  getExcelReviewSummary(taskId, sheetId) {
+    return request(`/excel-tasks/${taskId}/sheets/${sheetId}/review-summary`)
+  },
+  getExcelReviewRows(taskId, sheetId, page = 0, size = 50) {
+    return request(`/excel-tasks/${taskId}/sheets/${sheetId}/review-rows`, { query: { page, size } })
+  },
+  reviewExcelRow(taskId, sheetId, resultId, data) {
+    return request(`/excel-tasks/${taskId}/sheets/${sheetId}/review-rows/${resultId}`, { method: 'PUT', data })
+  },
+  validateExcelTask(taskId, expectedVersion) {
+    return request(`/excel-tasks/${taskId}/validate`, { method: 'POST', data: { expectedVersion } })
+  },
+  commitExcelTask(taskId, expectedVersion, idempotencyKey) {
+    return request(`/excel-tasks/${taskId}/commit`, { method: 'POST', data: { expectedVersion, idempotencyKey } })
   },
   getProducts(params = {}) {
     return withFallback(() => request('/products', { data: params }), () => filterProducts(params))

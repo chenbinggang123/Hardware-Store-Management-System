@@ -1,7 +1,7 @@
 <view class="login-screen">
   <view class="login-brand">
     <view class="login-brand-icon">恒</view>
-    <view class="login-brand-name">恒丰五金</view>
+    <view class="login-brand-name">恒迪五金</view>
     <view class="login-brand-desc">商品、单据和库存都在这里</view>
   </view>
 
@@ -21,12 +21,15 @@
       <view class="form-label">密码</view>
       <view class="search-box" style="margin-top: 8rpx;">
         <text class="search-icon">密码</text>
-        <input class="search-input" password placeholder="请输入密码" value="{{password}}" bindinput="onPasswordInput" />
+        <input class="search-input" password="{{!showPassword}}" placeholder="请输入密码" value="{{password}}" bindinput="onPasswordInput" />
+        <view class="password-toggle" bindtap="togglePassword">{{showPassword ? '隐藏' : '显示'}}</view>
       </view>
     </view>
 
+    <view class="login-error" wx:if="{{loginError}}"><text>登录失败</text><view>{{loginError}}</view></view>
+
     <button class="login-btn" loading="{{loading}}" bindtap="handleLogin">
-      {{loading ? '正在登录...' : '进入恒丰五金'}}
+      {{loading ? '正在登录...' : '进入恒迪五金'}}
     </button>
   </view>
 

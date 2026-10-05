@@ -1,3 +1,6 @@
 /* Login overrides — most styles live in app.wxss */
 .login-card .search-icon { min-width: 58rpx; margin-right: 14rpx; color: #52605A; font-size: 22rpx; font-weight: 600; }
 .login-card .search-icon::after { display: none; }
+.password-toggle { min-width: 88rpx; min-height: 72rpx; display: flex; align-items: center; justify-content: center; color: #245E9B; font-size: 26rpx; font-weight: 700; }
+.login-error { margin-top: 22rpx; padding: 18rpx 20rpx; border-left: 6rpx solid #A83F32; color: #73483E; background: #FCE9E4; font-size: 25rpx; line-height: 1.6; }
+.login-error text { display: block; color: #A83F32; font-size: 27rpx; font-weight: 750; }

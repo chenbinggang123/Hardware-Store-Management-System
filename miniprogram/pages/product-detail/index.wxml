@@ -1,6 +1,6 @@
 <view class="screen" wx:if="{{product}}">
   <view class="hero-card">
-    <view class="hero-eyebrow">PRODUCT DETAIL</view>
+    <view class="hero-eyebrow">商品详情</view>
     <view class="hero-title">{{product.name}}</view>
     <view class="hero-subtitle">{{product.specText}} · {{product.unitText}} · 厂商 {{product.sourceFactoryText}}</view>
     <view class="top-actions">
@@ -49,7 +49,7 @@
   </view>
 
   <view class="supply-section">
-    <view class="supply-title"><view><text>供应链关系</text><text>让小五处理复杂表格时认得更准</text></view><view class="supply-badge">AGENT MEMORY</view></view>
+    <view class="supply-title"><view><text>供应链关系</text><text>让小五处理复杂表格时认得更准</text></view><view class="supply-badge">小五识别依据</view></view>
     <view class="supply-row" bindtap="openMappings"><view class="supply-index">01</view><view class="supply-main"><view>厂家货号与买家叫法</view><text>查看、停用商品识别关系</text></view><view class="supply-arrow">→</view></view>
     <view class="supply-row" bindtap="openPriceHistory"><view class="supply-index">02</view><view class="supply-main"><view>价格变化记录</view><text>按来源追溯成本与售价变化</text></view><view class="supply-arrow">→</view></view>
     <view class="supply-row" bindtap="openPriceSync"><view class="supply-index">03</view><view class="supply-main"><view>同步厂家价格</view><text>先预览变化，再确认更新成本</text></view><view class="supply-arrow">→</view></view>
@@ -78,6 +78,7 @@
   </view>
 </view>
 
-<view class="screen" wx:else>
+<view class="screen" wx:elif="{{loading}}">
   <view class="loading-state">商品详情加载中...</view>
 </view>
+<view class="screen" wx:else><view class="empty-state"><text class="empty-icon">!</text><view class="empty-title">商品详情加载失败</view><view class="empty-desc">{{loadError || '请检查网络后重试'}}</view><view class="state-action" bindtap="retryLoad">重新加载商品</view></view></view>

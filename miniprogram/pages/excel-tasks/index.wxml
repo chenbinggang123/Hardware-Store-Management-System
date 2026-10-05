@@ -3,7 +3,6 @@
     <view><view class="task-page-title">文件任务</view><view class="task-page-subtitle">Excel 和 CSV 都在这里处理、复核和追踪</view></view>
     <view class="task-upload-button" bindtap="openUpload">选择文件</view>
   </view>
-
   <view class="task-summary-line">
     <view class="summary-cell warning"><text class="summary-number">{{summary.attention}}</text><text>待处理</text></view>
     <view class="summary-cell"><text class="summary-number">{{summary.processing}}</text><text>处理中</text></view>
@@ -14,14 +13,16 @@
     <view class="task-filter {{filter === item.key ? 'active' : ''}}" wx:for="{{filters}}" wx:key="key" data-filter="{{item.key}}" bindtap="selectFilter">{{item.label}}</view>
   </scroll-view>
 
-  <view class="task-ledger" wx:if="{{visibleTasks.length}}">
+  <view class="loading-state" wx:if="{{loading}}">正在读取文件任务…</view>
+  <view class="error-state" wx:elif="{{loadError}}"><view class="error-state-title">文件任务没有加载成功</view><view>{{loadError}}</view><button class="btn btn-secondary" bindtap="retryLoad">重新加载</button></view>
+  <view class="task-ledger" wx:elif="{{visibleTasks.length}}">
     <view class="task-row tone-{{item.statusTone}}" wx:for="{{visibleTasks}}" wx:key="id" data-id="{{item.id}}" bindtap="openTask">
       <view class="task-row-top">
         <view class="task-purpose">{{item.purpose}}</view>
         <view class="task-status {{item.statusTone}}">{{item.statusText}}</view>
       </view>
       <view class="task-file-name">{{item.fileName}}</view>
-      <view class="task-relation">{{item.relationType}} · {{item.relationName}}</view>
+      <view class="task-relation">{{item.sheetCount}} 个工作表 · {{item.rowCount}} 行</view>
       <view class="task-progress-track"><view class="task-progress-value {{item.statusTone}}" style="width: {{item.progress}}%;"></view></view>
       <view class="task-row-foot"><text>{{item.progressText}}</text><text>{{item.updatedAt}} ›</text></view>
     </view>

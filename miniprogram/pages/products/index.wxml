@@ -60,17 +60,17 @@
         </view>
         <view class="list-meta">零售 ¥{{item.retailPrice}} · 批发 ¥{{item.wholesalePrice}} · 老客户 ¥{{item.oldCustomerPrice}}</view>
         <view class="list-meta">库存 {{item.stock}} · 库位 {{item.locationText}} · 厂商 {{item.sourceFactoryText}}</view>
-        <view class="action-row card-actions">
-          <view class="btn btn-primary btn-sm" bindtap="openDetail" data-id="{{item.id}}">查看详情</view>
-          <view class="btn btn-outline btn-sm" bindtap="openEdit" data-id="{{item.id}}">编辑</view>
-          <view class="btn btn-ghost btn-sm" bindtap="toggleStatus" data-id="{{item.id}}" data-status="{{item.nextStatus}}">{{item.nextStatusText}}</view>
-          <view class="card-more-danger" bindtap="deleteProduct" data-id="{{item.id}}" data-name="{{item.name}}">删除</view>
+        <view class="ledger-actions">
+          <view class="ledger-action primary" bindtap="openDetail" data-id="{{item.id}}">查看商品</view>
+          <view class="ledger-action" bindtap="openEdit" data-id="{{item.id}}">编辑资料</view>
+          <view class="ledger-action" bindtap="manageProduct" data-id="{{item.id}}" data-name="{{item.name}}" data-status="{{item.nextStatus}}" data-status-text="{{item.nextStatusText}}">更多操作</view>
         </view>
       </view>
     </block>
   </view>
 
-  <view class="empty-state" wx:if="{{!loading && !hasProducts}}">
+  <view class="empty-state" wx:if="{{!loading && loadError}}"><text class="empty-icon">!</text><view class="empty-title">商品加载失败</view><view class="empty-desc">{{loadError}}，请检查网络后重试。</view><view class="state-action" bindtap="retryLoad">重新加载商品</view></view>
+  <view class="empty-state" wx:if="{{!loading && !loadError && !hasProducts}}">
     <text class="empty-icon">📦</text>
     <view class="empty-title">暂无商品</view>
     <view class="empty-desc">点击右上角“新增”，添加第一个商品</view>

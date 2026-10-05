@@ -1,12 +1,15 @@
 <view class="screen contacts-screen">
-  <view class="contacts-head"><view class="contacts-title">往来单位</view><view class="contacts-subtitle">统一查看源头厂商与买家，后续文件映射会记住这些关系。</view></view>
+  <view class="contacts-head"><view><view class="contacts-title">往来单位</view><view class="contacts-subtitle">查看源头厂商与买家，文件任务会记住这些关系。</view></view><view class="contact-add" bindtap="openCreate">新增{{type === 'supplier' ? '供应商' : '客户'}}</view></view>
   <view class="contacts-switch"><view class="{{type === 'supplier' ? 'active' : ''}}" data-type="supplier" bindtap="selectType">源头厂商 {{suppliers.length}}</view><view class="{{type === 'customer' ? 'active' : ''}}" data-type="customer" bindtap="selectType">买家 {{customers.length}}</view></view>
+  <view class="search-box contacts-search"><text class="search-icon">查</text><input class="search-input" placeholder="搜索名称、联系人或电话" value="{{keyword}}" bindinput="onKeywordInput" /></view>
   <view class="loading-state" wx:if="{{loading}}">正在读取往来单位…</view>
-  <view class="contacts-ledger" wx:else>
+  <view class="empty-state" wx:elif="{{loadError}}"><view class="empty-icon">!</view><view class="empty-title">往来单位加载失败</view><view class="empty-desc">{{loadError}}，请检查网络后重试。</view><view class="state-action" bindtap="retryLoad">重新加载</view></view>
+  <view class="contacts-ledger" wx:elif="{{visible.length}}">
     <view class="contact-row" wx:for="{{visible}}" wx:key="id" data-id="{{item.id}}" bindtap="openDetail">
       <view class="contact-mark">{{type === 'supplier' ? '厂' : '买'}}</view>
       <view class="contact-copy"><view class="contact-name">{{item.name}}</view><view class="contact-meta">{{item.contact || item.level || '未填写联系人'}} · {{item.phone || '未填写电话'}}</view></view>
       <view class="contact-arrow">›</view>
     </view>
   </view>
+  <view class="empty-state" wx:else><view class="empty-icon">空</view><view class="empty-title" wx:if="{{keyword}}">没有找到符合条件的单位</view><view class="empty-title" wx:else>还没有{{type === 'supplier' ? '供应商' : '客户'}}</view><view class="empty-desc">{{keyword ? '换个名称、联系人或电话号码试试。' : '点击上方新增，保存后会显示在这里。'}}</view><view class="state-action" wx:if="{{!keyword}}" bindtap="openCreate">新增{{type === 'supplier' ? '供应商' : '客户'}}</view></view>
 </view>

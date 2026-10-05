@@ -1,7 +1,8 @@
 <view class="screen compare-screen" wx:if="{{comparison}}">
-  <view class="page-kicker">VERSION DIFFERENCE</view>
+  <view class="page-kicker">版本对比</view>
   <view class="page-title">只看第二版改了什么</view>
   <view class="page-summary">原表内容不覆盖，变化按原始行号列出。你可以先核对，再让小五继续处理最新版。</view>
+  <view class="demo-notice"><view class="demo-notice-mark">演示</view><view>版本和变化内容来自本机演示数据。</view></view>
 
   <view class="version-line">
     <view class="version-block old"><view class="version-label">{{comparison.base.version}} 原版本</view><view>{{comparison.base.fileName}}</view><text>{{comparison.base.uploadedAt}} · {{comparison.base.rows}} 行</text></view>

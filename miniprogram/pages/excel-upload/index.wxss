@@ -10,7 +10,8 @@
 .file-mark { width: 70rpx; height: 70rpx; display: flex; align-items: center; justify-content: center; border-radius: 16rpx; color: #FFF; background: #245E9B; font-size: 20rpx; font-weight: 750; }
 .file-title { max-width: 100%; margin-top: 20rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #17231E; font-size: 29rpx; font-weight: 700; }
 .file-desc { margin-top: 7rpx; color: #718079; font-size: 22rpx; }
-.demo-file-link { padding: 18rpx 0 4rpx; color: #245E9B; font-size: 23rpx; text-align: center; }
+.upload-error { margin-top: 24rpx; padding: 20rpx; color: #7D342A; background: #FCE9E4; border-left: 6rpx solid #B94C3A; font-size: 23rpx; line-height: 1.6; }
+.upload-error-title { margin-bottom: 4rpx; color: #6D2C24; font-size: 26rpx; font-weight: 700; }
 .upload-form { margin-top: 34rpx; border-top: 1rpx solid #D6DEDA; }
 .upload-field { padding: 24rpx 2rpx; border-bottom: 1rpx solid #D6DEDA; }
 .upload-label { margin-bottom: 10rpx; color: #58665F; font-size: 23rpx; }

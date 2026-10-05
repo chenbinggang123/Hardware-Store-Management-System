@@ -5,6 +5,7 @@ import com.example.demo.agent.hook.AgentHookChain;
 import com.example.demo.agent.hook.TraceAgentLifecycleHook;
 import com.example.demo.agent.model.AgentModelGateway;
 import com.example.demo.agent.model.AgentModelResponse;
+import com.example.demo.agent.model.AgentModelStreamListener;
 import com.example.demo.agent.model.AgentToolCall;
 import com.example.demo.agent.policy.AgentPolicyDecision;
 import com.example.demo.agent.policy.AgentPolicyEngine;
@@ -93,38 +94,66 @@ public class AgentHarness {
             Long operatorId,
             AgentModelGateway gateway,
             Long conversationId) {
+        AgentPreparedRun prepared = prepareRun(userInput, modelInput, operatorId, conversationId);
+        return continuePrepared(prepared, gateway, AgentModelStreamListener.NONE, false);
+    }
+
+    public AgentPreparedRun prepareRun(
+            String userInput,
+            String modelInput,
+            Long operatorId,
+            Long conversationId) {
         if (!StringUtils.hasText(userInput)) {
             throw new IllegalArgumentException("Agent 输入不能为空");
         }
         if (!StringUtils.hasText(modelInput)) {
             throw new IllegalArgumentException("Agent 模型输入不能为空");
         }
-        if (gateway == null) {
-            throw new IllegalArgumentException("Agent 模型网关不能为空");
-        }
-
         AgentStartContext startContext = contextManager.prepareStart(conversationId, operatorId, userInput);
         AgentRun run = runStore.create(operatorId, userInput);
         AgentRunContext context = contextManager.start(run, modelInput, startContext);
-        return continueRun(run, context, gateway, false);
+        return new AgentPreparedRun(run, context, resultFactory.create(run));
+    }
+
+    public AgentRunResult continuePrepared(
+            AgentPreparedRun prepared,
+            AgentModelGateway gateway,
+            AgentModelStreamListener streamListener,
+            boolean writeAlreadySucceeded) {
+        if (gateway == null) {
+            throw new IllegalArgumentException("Agent 模型网关不能为空");
+        }
+        return continueRun(
+                prepared.run(),
+                prepared.context(),
+                gateway,
+                streamListener == null ? AgentModelStreamListener.NONE : streamListener,
+                writeAlreadySucceeded);
     }
 
     private AgentRunResult continueRun(
             AgentRun run,
             AgentRunContext context,
             AgentModelGateway gateway,
+            AgentModelStreamListener streamListener,
             boolean writeAlreadySucceeded) {
         Set<String> executedCalls = contextManager.fingerprints(context);
         int totalToolCalls = context.getToolResults().size();
         try {
             int firstStep = Math.max(run.getCurrentStep() == null ? 0 : run.getCurrentStep(), 0) + 1;
             for (int step = firstStep; step <= MAX_MODEL_STEPS; step++) {
+                AgentRunResult cancelled = cancelledResult(run);
+                if (cancelled != null) return cancelled;
                 run.setCurrentStep(step);
                 run = runStore.save(run);
-                AgentModelResponse response = gateway.respond(context, toolExecutor.definitions());
+                AgentModelResponse response = streamListener == AgentModelStreamListener.NONE
+                        ? gateway.respond(context, toolExecutor.definitions())
+                        : gateway.respondStreaming(context, toolExecutor.definitions(), streamListener);
                 if (response == null) {
                     throw new IllegalStateException("模型返回为空");
                 }
+                cancelled = cancelledResult(run);
+                if (cancelled != null) return cancelled;
                 if (response.hasFinalOutput()) {
                     run.setStatus(AgentRunStatus.COMPLETED);
                     run.setOutputText(response.getFinalOutput());
@@ -136,6 +165,8 @@ public class AgentHarness {
                     throw new IllegalStateException("模型既未返回结果，也未请求工具");
                 }
                 for (AgentToolCall call : response.getToolCalls()) {
+                    cancelled = cancelledResult(run);
+                    if (cancelled != null) return cancelled;
                     totalToolCalls++;
                     if (totalToolCalls > MAX_TOOL_CALLS) {
                         throw new IllegalStateException("Agent 工具调用次数超过限制");
@@ -155,6 +186,8 @@ public class AgentHarness {
             }
             throw new IllegalStateException("Agent 模型调用次数超过限制");
         } catch (RuntimeException exception) {
+            AgentRunResult cancelled = cancelledResult(run);
+            if (cancelled != null) return cancelled;
             run.setStatus(writeAlreadySucceeded ? AgentRunStatus.COMPLETED : AgentRunStatus.FAILED);
             run.setErrorCode(exception.getClass().getSimpleName());
             run.setOutputText(writeAlreadySucceeded
@@ -192,10 +225,22 @@ public class AgentHarness {
             if (gateway == null) {
                 return approvalService.completeWithoutGateway(run, result);
             }
-            return continueRun(run, runContext, gateway, true);
+            return continueRun(run, runContext, gateway, AgentModelStreamListener.NONE, true);
         } catch (RuntimeException exception) {
             return approvalService.fail(run, writeSucceeded, exception);
         }
+    }
+
+    private AgentRunResult cancelledResult(AgentRun run) {
+        if (!Thread.currentThread().isInterrupted()) return null;
+        return currentCancelledResult(run);
+    }
+
+    private AgentRunResult currentCancelledResult(AgentRun run) {
+        AgentRun current = runStore.require(run.getId(), "Agent 任务不存在");
+        return current.getStatus() == AgentRunStatus.CANCELLED
+                ? resultFactory.create(current)
+                : null;
     }
 
     public AgentRunResult getRun(Long runId, Long operatorId) {

@@ -12,7 +12,7 @@ from docx.oxml.ns import qn
 ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = ROOT / "docs" / "小程序介绍材料"
 IMG_DIR = OUT_DIR / "页面图片"
-DOCX_PATH = OUT_DIR / "恒丰五金店小程序介绍.docx"
+DOCX_PATH = OUT_DIR / "恒迪五金店小程序介绍.docx"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 IMG_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -374,7 +374,7 @@ def build_doc(images):
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     title.paragraph_format.space_before = Pt(8)
     title.paragraph_format.space_after = Pt(5)
-    r = title.add_run("恒丰五金店小程序介绍")
+    r = title.add_run("恒迪五金店小程序介绍")
     set_font(r, size=27, bold=True, color="000000")
     add_paragraph(doc, "给爸妈看的初步版本说明", size=12, color="59645F", align=WD_ALIGN_PARAGRAPH.CENTER, after=8)
     add_image(doc, images[0], width_cm=7.1, caption="当前首页界面  页面中的金额和数量为演示数据")
@@ -516,7 +516,7 @@ def build_doc(images):
         set_font(r3, size=10, color="7A8580")
     add_paragraph(doc, "你们只要告诉我哪里不符合实际、哪里不好用、还缺什么，我就能继续往下改。小程序最终要按照店里的习惯来做，越简单、越顺手越好。", size=11, bold=True, color="1C3150", before=6, after=0)
 
-    doc.core_properties.title = "恒丰五金店小程序介绍"
+    doc.core_properties.title = "恒迪五金店小程序介绍"
     doc.core_properties.subject = "面向家人的小程序功能图文说明和需求收集"
     doc.core_properties.author = ""
     doc.save(DOCX_PATH)

@@ -1,43 +1,36 @@
 <view class="screen workbench-screen">
   <view class="workbench-head">
-    <view><view class="workbench-greeting">{{currentUser.name || '老板'}}，今天先处理这些</view><view class="workbench-title">供应链工作台</view></view>
-    <view class="workbench-profile" bindtap="openPage" data-path="/pages/settings/index">{{userInitial}}</view>
-  </view>
-  <view class="connection-line"><view class="connection-main"><view class="connection-dot"></view>{{dashboardMeta.status}}</view><text>更新于 {{dashboardMeta.updatedAt}}</text><text>下拉刷新</text></view>
-
-  <view class="todo-head"><view><view class="block-title">今天有 {{summary.attention}} 件事需要处理</view><view class="block-subtitle">先看需要确认和冲突的文件任务</view></view><view class="block-link" bindtap="openTasks">查看全部</view></view>
-  <view class="todo-summary">
-    <view class="todo-cell warning"><text>{{summary.attention}}</text><text>待确认</text></view>
-    <view class="todo-cell"><text>{{summary.processing}}</text><text>处理中</text></view>
-    <view class="todo-cell"><text>{{summary.priceChanges}}</text><text>价格变化</text></view>
-    <view class="todo-cell warning"><text>{{summary.unmatched}}</text><text>未匹配</text></view>
+    <view class="workbench-heading">
+      <view class="workbench-date">{{todayText}} · {{dashboardMeta.status}}</view>
+      <view class="workbench-title">今天先做什么</view>
+      <view class="workbench-subtitle">常用事情直接做，复杂文件交给小五</view>
+    </view>
+    <view class="workbench-profile" bindtap="openPage" data-path="/pages/settings/index" aria-label="打开设置">{{userInitial}}</view>
   </view>
 
-  <view class="file-entry" bindtap="openUpload">
-    <view class="file-entry-mark">XLS</view>
-    <view class="file-entry-copy"><view class="file-entry-title">收到新的 Excel？</view><view class="file-entry-desc">选择文件后自动识别和整理，不会直接写入数据</view></view>
-    <view class="file-entry-action">选择文件</view>
-  </view>
-
-  <view class="block-head"><view><view class="block-title">最近待处理</view><view class="block-subtitle">离开页面后仍可以继续</view></view><view class="block-link" bindtap="openTasks">文件中心</view></view>
-  <view class="home-task-ledger">
-    <view class="home-task-row tone-{{item.statusTone}}" wx:for="{{priorityTasks}}" wx:key="id" data-id="{{item.id}}" bindtap="openTask">
-      <view class="home-task-top"><view class="home-task-purpose">{{item.purpose}}</view><view class="home-task-status {{item.statusTone}}">{{item.statusText}}</view></view>
-      <view class="home-task-name">{{item.fileName}}</view>
-      <view class="home-task-progress"><view style="width: {{item.progress}}%;"></view></view>
-      <view class="home-task-foot"><text>{{item.progressText}}</text><text>继续 ›</text></view>
+  <view class="quick-grid">
+    <view class="quick-action tone-{{item.tone}}" wx:for="{{quickActions}}" wx:key="title" bindtap="openPage" data-path="{{item.path}}">
+      <view class="quick-mark">{{item.mark}}</view><view class="quick-copy"><view>{{item.title}}</view><text>{{item.desc}}</text></view><view class="quick-arrow">›</view>
     </view>
   </view>
 
-  <view class="business-section">
-    <view class="business-direction-head"><view class="direction-mark supply">上</view><view><view class="block-title">源头厂商</view><view class="block-subtitle">价格、采购与到货</view></view></view>
-    <view class="business-ledger"><view class="business-row" wx:for="{{supplyActions}}" wx:key="title" bindtap="openPage" data-path="{{item.path}}"><view class="business-mark">{{item.mark}}</view><view class="business-copy"><view>{{item.title}}</view><text>{{item.desc}}</text></view><view class="business-arrow">›</view></view></view>
-  </view>
-  <view class="business-section">
-    <view class="business-direction-head"><view class="direction-mark buyer">下</view><view><view class="block-title">买家业务</view><view class="block-subtitle">询价、报价与订单</view></view></view>
-    <view class="business-ledger"><view class="business-row" wx:for="{{buyerActions}}" wx:key="title" bindtap="openPage" data-path="{{item.path}}"><view class="business-mark">{{item.mark}}</view><view class="business-copy"><view>{{item.title}}</view><text>{{item.desc}}</text></view><view class="business-arrow">›</view></view></view>
+  <view class="block-head"><view><view class="block-title">经营概况</view><view class="block-subtitle">当前系统数据 · 更新于 {{dashboardMeta.updatedAt}}</view></view><view class="block-link" bindtap="refreshDashboard">刷新数据</view></view>
+  <view class="daily-ledger">
+    <view class="daily-row" bindtap="openPage" data-path="/pages/sales-orders/index"><view class="daily-mark">单</view><text>销售单</text><view class="daily-value">{{businessSummary.orderCount}} 笔</view><view class="daily-arrow">›</view></view>
+    <view class="daily-row" bindtap="openPage" data-path="/pages/sales-orders/index"><view class="daily-mark money">¥</view><text>销售金额</text><view class="daily-value">¥{{businessSummary.salesAmount}}</view><view class="daily-arrow">›</view></view>
+    <view class="daily-row warning" bindtap="openPage" data-path="/pages/inventories/index"><view class="daily-mark">货</view><text>库存预警</text><view class="daily-value">{{inventoryWarning}} 件</view><view class="daily-arrow">›</view></view>
   </view>
 
-  <view class="late-summary" bindtap="openPage" data-path="/pages/inventories/index"><view><view class="late-summary-label">库存预警</view><view class="late-summary-value">{{inventoryWarning}} 件商品需要查看</view></view><view>进入库存 ›</view></view>
-  <view class="agent-line" bindtap="openPage" data-path="/pages/agent/index"><view class="agent-line-mark">小</view><view><view>复杂问题交给小五</view><text>发起文件任务、查询商品或解释异常</text></view><view class="business-arrow">›</view></view>
+  <view class="file-entry" bindtap="openUpload"><view class="file-entry-mark">表</view><view class="file-entry-copy"><view class="file-entry-title">收到新的 Excel？</view><view class="file-entry-desc">先识别和预览，确认后才会修改业务数据</view></view><view class="file-entry-action">选择文件</view></view>
+
+  <view class="block-head"><view><view class="block-title">待办与最近任务</view><view class="block-subtitle">真实文件任务 · 确认后才写入数据</view></view><view class="block-link" bindtap="openTasks">文件中心</view></view>
+  <view class="todo-summary"><view class="todo-cell warning"><text>{{summary.attention}}</text><text>待确认</text></view><view class="todo-cell"><text>{{summary.processing}}</text><text>处理中</text></view><view class="todo-cell warning"><text>{{summary.failed}}</text><text>处理失败</text></view></view>
+  <view class="home-task-ledger" wx:if="{{priorityTasks.length}}">
+    <view class="home-task-row tone-{{item.statusTone}}" wx:for="{{priorityTasks}}" wx:key="id" data-id="{{item.id}}" bindtap="openTask"><view class="home-task-top"><view class="home-task-purpose">{{item.purpose}}</view><view class="home-task-status {{item.statusTone}}">{{item.statusText}}</view></view><view class="home-task-name">{{item.fileName}}</view><view class="home-task-progress"><view style="width: {{item.progress}}%;"></view></view><view class="home-task-foot"><text>{{item.progressText}}</text><text>继续查看 ›</text></view></view>
+  </view>
+  <view class="empty-state compact" wx:else><view class="empty-title">今天没有待处理文件</view><view class="empty-desc">需要时可以从上方选择 Excel，或让小五帮忙。</view></view>
+
+  <view class="block-head"><view><view class="block-title">更多经营工具</view><view class="block-subtitle">客户、供应商、价格和报表</view></view></view>
+  <view class="tool-ledger"><view class="tool-row" wx:for="{{toolActions}}" wx:key="title" bindtap="openPage" data-path="{{item.path}}"><view class="tool-mark">{{item.mark}}</view><view class="tool-copy"><view>{{item.title}}</view><text>{{item.desc}}</text></view><view class="quick-arrow">›</view></view></view>
+  <view class="agent-line" bindtap="openPage" data-path="/pages/agent/index"><view class="agent-line-mark">小</view><view><view>复杂事情，让小五分步骤帮你</view><text>处理表格、批量报价、分析库存和经营数据</text></view><view class="quick-arrow">›</view></view>
 </view>

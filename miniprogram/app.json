@@ -41,7 +41,7 @@
     "pages/system-logs/index"
   ],
   "window": {
-    "navigationBarTitleText": "恒丰五金",
+    "navigationBarTitleText": "恒迪五金",
     "navigationBarBackgroundColor": "#F3F5F2",
     "navigationBarTextStyle": "black",
     "backgroundColor": "#F3F5F2",
@@ -60,16 +60,16 @@
         "selectedIconPath": "assets/tabbar/home-active.png"
       },
       {
-        "pagePath": "pages/excel-tasks/index",
-        "text": "文件",
-        "iconPath": "assets/tabbar/files.png",
-        "selectedIconPath": "assets/tabbar/files-active.png"
-      },
-      {
         "pagePath": "pages/products/index",
         "text": "商品",
         "iconPath": "assets/tabbar/products.png",
         "selectedIconPath": "assets/tabbar/products-active.png"
+      },
+      {
+        "pagePath": "pages/sales-orders/index",
+        "text": "单据",
+        "iconPath": "assets/tabbar/orders.png",
+        "selectedIconPath": "assets/tabbar/orders-active.png"
       },
       {
         "pagePath": "pages/inventories/index",

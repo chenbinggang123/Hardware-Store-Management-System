@@ -1124,11 +1124,73 @@ page { background: #F3F5F2; color: #17231E; }
 .flow-progress-value { height: 100%; background: #245E9B; }
 .fixed-action-space { height: 150rpx; }
 .fixed-action { position: fixed; z-index: 18; left: 0; right: 0; bottom: 0; padding: 16rpx 28rpx calc(16rpx + env(safe-area-inset-bottom)); border-top: 1rpx solid #D6DEDA; background: rgba(255,255,255,.98); }
-.fixed-primary { min-height: 86rpx; display: flex; align-items: center; justify-content: center; border-radius: 15rpx; color: #FFF; background: #245E9B; font-size: 27rpx; font-weight: 750; text-align: center; }
+.fixed-primary { width: 100%; min-height: 86rpx; margin: 0; padding: 0 22rpx; display: flex; align-items: center; justify-content: center; box-sizing: border-box; border: 0; border-radius: 15rpx; color: #FFF; background: #245E9B; font-size: 27rpx; font-weight: 750; line-height: 1.35; text-align: center; }
+.fixed-primary::after { border: 0; }
 .fixed-primary.warning { background: #B87418; }
 .fixed-primary.disabled { opacity: .48; }
+.error-state { margin-top: 24rpx; padding: 30rpx 24rpx; color: #7D342A; background: #FCE9E4; border-left: 7rpx solid #B94C3A; font-size: 24rpx; line-height: 1.65; }
+.error-state-title { margin-bottom: 6rpx; color: #6D2C24; font-size: 29rpx; font-weight: 750; }
+.error-state .btn { margin-top: 20rpx; }
 
 @media (max-width: 350px) {
   .flow-title { font-size: 36rpx; }
   .fixed-action { padding-left: 22rpx; padding-right: 22rpx; }
+}
+
+/* =====================================================
+   恒迪五金 · 2026 family ledger system
+   Final shared layer: large type, open ledgers, clear actions.
+   ===================================================== */
+page { background: #F3F5F2; color: #17231E; font-size: 30rpx; }
+.screen { padding: 22rpx 24rpx calc(48rpx + env(safe-area-inset-bottom)); background: #F3F5F2; }
+.section-title { font-size: 36rpx; }
+.page-description, .section-subtitle, .text-muted { color: #52605A; font-size: 25rpx; }
+.page-kicker { color: #245E9B; font-size: 24rpx; letter-spacing: 1rpx; }
+.page-heading { min-height: 118rpx; padding-bottom: 20rpx; }
+.btn { min-height: 88rpx; font-size: 30rpx; border-radius: 14rpx; }
+.btn-sm { min-height: 76rpx; padding: 14rpx 22rpx; font-size: 27rpx; border-radius: 12rpx; }
+.btn-block { min-height: 92rpx; }
+.search-box { min-height: 92rpx; border-radius: 14rpx; }
+.search-input { height: 90rpx; font-size: 30rpx; }
+.chip { min-height: 68rpx; font-size: 27rpx; border-radius: 12rpx; }
+.card, .data-card, .list-card, .form-card, .table-card { border-color: #CED8D3; box-shadow: none; }
+.list { gap: 0; border-top: 1rpx solid #CED8D3; border-bottom: 1rpx solid #CED8D3; background: #FFFFFF; }
+.list-card { padding: 24rpx 20rpx; border: 0; border-bottom: 1rpx solid #DCE3DF; border-radius: 0; }
+.list-card:last-child { border-bottom: 0; }
+.list-title { font-size: 32rpx; }
+.list-meta { color: #52605A; font-size: 25rpx; }
+.tag { min-height: 46rpx; padding: 7rpx 14rpx; font-size: 24rpx; }
+.stat-label, .metric-label { color: #52605A; font-size: 24rpx; }
+.form-label { font-size: 28rpx; }
+.form-hint, .detail-label, .line-meta, .mini-desc, .banner-desc { color: #52605A; font-size: 24rpx; }
+.form-input, .form-textarea, .form-picker { font-size: 30rpx; border-radius: 12rpx; }
+.fixed-primary { min-height: 92rpx; border-radius: 14rpx; font-size: 30rpx; }
+.empty-state { padding: 54rpx 28rpx; border-radius: 16rpx; box-shadow: none; }
+.empty-title { font-size: 31rpx; }
+.empty-desc, .loading-state { color: #52605A; font-size: 26rpx; }
+.state-action { min-height: 84rpx; margin-top: 24rpx; padding: 0 28rpx; display: flex; align-items: center; justify-content: center; border-radius: 12rpx; color: #FFFFFF; background: #245E9B; font-size: 28rpx; font-weight: 700; }
+.demo-notice { margin: 18rpx 0; padding: 18rpx 20rpx; display: flex; gap: 14rpx; align-items: flex-start; border-left: 6rpx solid #B87418; color: #6F470D; background: #FFF5E4; font-size: 25rpx; line-height: 1.6; }
+.demo-notice-mark { flex: 0 0 auto; font-weight: 800; }
+.ledger-actions { display: flex; gap: 12rpx; margin-top: 18rpx; padding-top: 18rpx; border-top: 1rpx solid #E0E6E3; }
+.ledger-action { min-height: 72rpx; padding: 0 22rpx; display: flex; align-items: center; justify-content: center; border-radius: 12rpx; color: #245E9B; background: #E8F1F8; font-size: 26rpx; font-weight: 700; }
+.ledger-action.primary { color: #FFFFFF; background: #245E9B; }
+.ledger-action.danger { color: #A83F32; background: #FCE9E4; }
+@media (max-width: 340px) {
+  .screen { padding-left: 20rpx; padding-right: 20rpx; }
+  .page-heading { align-items: flex-start; }
+  .page-heading .btn-sm { min-height: 72rpx; padding-left: 16rpx; padding-right: 16rpx; }
+  .stats-strip { gap: 8rpx; }
+  .stat-value { font-size: 32rpx; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn, .module-card, .history-drawer, .run-progress-track view { transition: none; }
+}
+
+/* Minimum readable supporting text for the parent-facing workflow. */
+.flow-step-label, .page-kicker, .page-summary, .task-status, .task-relation, .task-row-foot,
+.review-file, .original-link, .review-filter, .row-number, .row-status, .row-spec, .row-note, .row-detail, .row-action,
+.change-meta, .change-values, .change-legend, .risk-desc, .upload-label, .upload-hint, .file-desc,
+.detail-id, .detail-progress-text, .result-file text, .audit-detail, .audit-time,
+.history-date, .history-type, .history-source, .filter-chip, .selection-note {
+  font-size: 24rpx !important;
 }

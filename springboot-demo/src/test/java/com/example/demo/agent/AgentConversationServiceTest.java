@@ -63,6 +63,31 @@ class AgentConversationServiceTest {
     }
 
     @Test
+    void renamesConversationOwnedByCurrentOperator() {
+        AgentConversation conversation = new AgentConversation();
+        conversation.setId(9L);
+        conversation.setOperatorId(7L);
+        conversation.setTitle("旧标题");
+        when(conversationRepository.findByIdAndOperatorId(9L, 7L)).thenReturn(Optional.of(conversation));
+        when(conversationRepository.save(any(AgentConversation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AgentConversation renamed = service.rename(9L, 7L, "  十月门店盘点   讨论  ");
+
+        assertEquals("十月门店盘点 讨论", renamed.getTitle());
+        verify(conversationRepository).save(conversation);
+    }
+
+    @Test
+    void rejectsBlankConversationTitle() {
+        AgentConversation conversation = new AgentConversation();
+        conversation.setId(9L);
+        conversation.setOperatorId(7L);
+        when(conversationRepository.findByIdAndOperatorId(9L, 7L)).thenReturn(Optional.of(conversation));
+
+        assertThrows(IllegalArgumentException.class, () -> service.rename(9L, 7L, "   "));
+    }
+
+    @Test
     void contextKeepsOnlyLatestTenRunsInOriginalOrder() {
         List<AgentConversationRun> links = new ArrayList<>();
         List<AgentRun> runs = new ArrayList<>();

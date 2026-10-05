@@ -23,7 +23,7 @@
   </view>
 
   <view class="bottom-actions">
-    <view class="btn btn-primary btn-block" bindtap="submit">确认调整</view>
+    <view class="btn btn-primary btn-block" bindtap="submit">{{saving ? '正在更新库存…' : '确认更新库存'}}</view>
   </view>
 </view>
 

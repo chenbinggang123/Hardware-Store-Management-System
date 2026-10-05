@@ -1,4 +1,7 @@
-<view class="screen confirm-screen" wx:if="{{task}}">
+<view class="screen confirm-screen">
+  <view class="loading-state" wx:if="{{loading}}">正在核对最终影响…</view>
+  <view class="error-state" wx:elif="{{loadError}}"><view class="error-state-title">写入预览没有加载成功</view><view>{{loadError}}</view><button class="btn btn-secondary" bindtap="retryLoad">重新加载</button></view>
+  <block wx:elif="{{task}}">
   <view class="flow-head"><view class="flow-step-label">第 4 步，共 4 步</view><view class="flow-title">确认这次会写入什么</view><view class="flow-desc">请核对新增、修改、跳过和异常。执行后仍会保留原文件、原行号和操作记录。</view></view>
   <view class="flow-progress"><view class="flow-progress-value" style="width: 100%;"></view></view>
 
@@ -12,9 +15,7 @@
   <view class="confirm-section">
     <view class="confirm-section-title">变化预览</view>
     <view class="change-ledger">
-      <view class="change-row"><view><view class="change-name">冲击电钻 680W</view><view class="change-meta">报价价格 · 城建安装公司</view></view><view class="change-values"><text>¥268.00</text><text>¥245.00</text></view></view>
-      <view class="change-row"><view><view class="change-name">羊角锤 16oz</view><view class="change-meta">生成报价行 · 使用批发价</view></view><view class="change-values"><text>未报价</text><text>¥24.50</text></view></view>
-      <view class="change-row"><view><view class="change-name">PPR 直管 DN20</view><view class="change-meta">新建临时报价项</view></view><view class="change-values"><text>无记录</text><text>将新增</text></view></view>
+      <view class="change-row" wx:for="{{previewRows}}" wx:key="id"><view><view class="change-name">{{item.name}}</view><view class="change-meta">原表第 {{item.sourceRow}} 行 · {{item.actionType}}</view></view><view class="change-values vertical"><text>{{item.beforeText}}</text><text>{{item.afterText}}</text></view></view>
     </view>
     <view class="change-legend"><text>左侧为修改前</text><text>右侧为修改后</text></view>
   </view>
@@ -22,13 +23,14 @@
   <view class="confirm-section">
     <view class="confirm-section-title">写入后会发生</view>
     <view class="impact-list">
-      <view><text class="impact-index">1</text><text>保存 {{task.modifications}} 条报价或业务记录</text></view>
+      <view><text class="impact-index">1</text><text>{{impact.will}}</text></view>
       <view><text class="impact-index">2</text><text>保留原文件和每一行的来源位置</text></view>
-      <view><text class="impact-index">3</text><text>生成可下载的处理结果 Excel</text></view>
+      <view><text class="impact-index">3</text><text>{{impact.willNot}}</text></view>
     </view>
   </view>
 
-  <view class="risk-confirm"><view class="risk-mark">确</view><view><view class="risk-title">这是正式业务写入</view><view class="risk-desc">操作人、确认时间和处理结果会进入操作日志。</view></view></view>
+  <view class="risk-confirm"><view class="risk-mark">核</view><view><view class="risk-title">这是正式写入前的最后确认</view><view class="risk-desc">返回修改不会写入任何数据；确认后只处理上方已经审核通过的行。</view></view></view>
   <view class="fixed-action-space"></view>
-  <view class="fixed-action"><view class="fixed-primary {{writing ? 'disabled' : ''}}" bindtap="confirmWrite">{{writing ? '正在写入，请不要重复点击…' : '确认写入 ' + (task.additions + task.modifications) + ' 条记录'}}</view></view>
+  <view class="fixed-action split-action"><button class="fixed-secondary" bindtap="backToReview" disabled="{{writing}}">返回修改</button><button class="fixed-primary {{writing ? 'disabled' : ''}}" bindtap="confirmWrite" disabled="{{writing}}">{{writing ? '正在写入，请稍候…' : impact.action + ' ' + (task.additions + task.modifications) + ' 行'}}</button></view>
+  </block>
 </view>

@@ -14,7 +14,7 @@ App({
   },
 
   globalData: {
-    brandName: '恒丰五金',
+    brandName: '恒迪五金',
     currentUser: null,
     currentOperatorId: null,
     authToken: ''

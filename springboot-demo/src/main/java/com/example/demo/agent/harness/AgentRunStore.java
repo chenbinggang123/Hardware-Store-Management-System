@@ -48,4 +48,35 @@ public class AgentRunStore {
                 AgentRunStatus.RUNNING,
                 now) == 1;
     }
+
+    public void updateRunningOutput(Long runId, String output) {
+        repository.updateRunningOutput(runId, output, AgentRunStatus.RUNNING);
+    }
+
+    public AgentRun cancelActive(Long runId, Long operatorId) {
+        AgentRun existing = require(runId, "Agent 任务不存在");
+        if (!operatorId.equals(existing.getOperatorId())) {
+            throw new IllegalArgumentException("无权取消其他操作人的 Agent 任务");
+        }
+        if (existing.getStatus() == AgentRunStatus.CANCELLED) {
+            return existing;
+        }
+        if (existing.getStatus() != AgentRunStatus.RUNNING
+                && existing.getStatus() != AgentRunStatus.WAITING_APPROVAL) {
+            throw new IllegalArgumentException("Agent 任务已结束，无法取消");
+        }
+        int updated = repository.cancelActive(
+                runId,
+                operatorId,
+                AgentRunStatus.RUNNING,
+                AgentRunStatus.WAITING_APPROVAL,
+                AgentRunStatus.CANCELLED,
+                LocalDateTime.now(),
+                "用户已取消本次任务");
+        AgentRun current = require(runId, "Agent 任务不存在");
+        if (updated == 0 && current.getStatus() != AgentRunStatus.CANCELLED) {
+            throw new IllegalArgumentException("Agent 任务已结束，无法取消");
+        }
+        return current;
+    }
 }

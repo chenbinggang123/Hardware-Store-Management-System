@@ -1,5 +1,27 @@
 # Agent 与文件任务变更记录
 
+## [0.6.0-dev] - 2026-10-05
+
+### Added（移动会话工作台）
+- Agent 小程序页重构为移动端对话工作台，支持会话抽屉、新建、切换、重命名、删除和当前标题展示。
+- 增加空状态任务入口、运行中状态、审批卡、失败重试和底部输入区的完整交互状态。
+- 新增 `PATCH /api/agent/conversations/{conversationId}/title`，重命名会校验当前操作人的会话所有权。
+
+### Added（增量输出）
+- 新增 `POST /api/agent/messages/stream`，创建 Run 后立即返回，由受控线程池在后台执行模型循环。
+- OpenAI-compatible 模型网关支持解析 SSE 文本分片与跨事件工具调用分片。
+- 模型文本增量写入 Run；小程序在现有 CloudBase 容器调用方式下短轮询增量结果，并支持离开页面后重新恢复。
+
+### Added（任务取消）
+- 新增 `POST /api/agent/runs/{runId}/cancel`，支持取消运行中或等待确认的任务。
+- 取消操作校验任务所有权、原子更新状态、清理待确认数据并中断本机后台 Future。
+- 取消时递增乐观锁版本，防止并发中的后台线程把 `CANCELLED` 覆盖成其他终态。
+- 小程序 API 层提供 `cancelAgentRun(runId)`；视觉入口由前端工作继续接入。
+
+### Evaluation
+- 新增异步增量持久化、SSE 文本分片、SSE 工具调用拼接、取消中断和越权取消测试。
+- JavaScript 语法检查与后端全量测试通过。
+
 ## [0.5.0-dev] - 2026-10-01
 
 ### Changed（Harness 第一阶段解耦）
