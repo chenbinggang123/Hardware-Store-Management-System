@@ -10,4 +10,6 @@ public interface ExcelTaskOutputRepository extends JpaRepository<ExcelTaskOutput
     Optional<ExcelTaskOutput> findByOperatorIdAndIdempotencyKey(Long operatorId, String idempotencyKey);
     Optional<ExcelTaskOutput> findByIdAndTaskIdAndOperatorId(Long id, Long taskId, Long operatorId);
     List<ExcelTaskOutput> findByTaskIdAndOperatorIdOrderByCreateTimeDesc(Long taskId, Long operatorId);
+    List<ExcelTaskOutput> findByTaskId(Long taskId);
+    void deleteByTaskId(Long taskId);
 }

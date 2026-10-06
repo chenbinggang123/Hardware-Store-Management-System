@@ -12,4 +12,5 @@ public interface ExcelTaskRowRepository extends JpaRepository<ExcelTaskRow, Long
     Page<ExcelTaskRow> findByTaskIdAndSheetIdOrderByRowNumberAsc(Long taskId, Long sheetId, Pageable pageable);
     List<ExcelTaskRow> findByTaskIdAndSheetIdOrderByRowNumberAsc(Long taskId, Long sheetId);
     Optional<ExcelTaskRow> findByIdAndTaskIdAndSheetId(Long id, Long taskId, Long sheetId);
+    void deleteByTaskId(Long taskId);
 }

@@ -8,6 +8,7 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.StringUtils;
 
 import java.io.ByteArrayInputStream;
@@ -25,14 +26,48 @@ import java.util.Map;
 public class ExcelTaskParser {
     static final int MAX_ROWS = 2_000;
     static final int MAX_COLUMNS = 80;
+    private final PdfProcurementParser pdfParser;
+    private final WordTableParser wordParser;
+    private final OcrTableParser ocrTableParser;
+
+    @Autowired
+    public ExcelTaskParser(PdfProcurementParser pdfParser, WordTableParser wordParser,
+                           OcrTableParser ocrTableParser) {
+        this.pdfParser = pdfParser;
+        this.wordParser = wordParser;
+        this.ocrTableParser = ocrTableParser;
+    }
+
+    public ExcelTaskParser() {
+        this(new PdfProcurementParser(), new WordTableParser(), null);
+    }
 
     public ParsedWorkbook parse(String mimeType, byte[] content) {
+        return parse("upload", mimeType, content);
+    }
+
+    public ParsedWorkbook parse(String fileName, String mimeType, byte[] content) {
+        return parseFile(fileName, mimeType, content).workbook();
+    }
+
+    public ParsedFile parseFile(String fileName, String mimeType, byte[] content) {
         try {
-            return "text/csv".equals(mimeType) ? parseCsv(content) : parseWorkbook(content);
+            if (mimeType != null && mimeType.startsWith("image/")) {
+                if (ocrTableParser == null) throw new IllegalStateException("图片表格 OCR 解析器不可用");
+                return ocrTableParser.parseDetailed(fileName, mimeType, content);
+            }
+            if ("application/pdf".equals(mimeType)) return nativeFile(pdfParser.parse(content));
+            if ("application/vnd.openxmlformats-officedocument.wordprocessingml.document".equals(mimeType)
+                    || "application/msword".equals(mimeType)) return nativeFile(wordParser.parse(mimeType, content));
+            return nativeFile("text/csv".equals(mimeType) ? parseCsv(content) : parseWorkbook(content));
         } catch (Exception exception) {
             String message = StringUtils.hasText(exception.getMessage()) ? exception.getMessage() : exception.getClass().getSimpleName();
             throw new IllegalArgumentException("表格解析失败：" + message, exception);
         }
+    }
+
+    private ParsedFile nativeFile(ParsedWorkbook workbook) {
+        return new ParsedFile(workbook, null);
     }
 
     private ParsedWorkbook parseWorkbook(byte[] content) throws Exception {

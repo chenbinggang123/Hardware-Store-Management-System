@@ -15,7 +15,7 @@ Page({
   data: {
     id: '', task: null, sheet: null, sheetIndex: 0, sheetNames: [], filters, filter: 'ALL',
     rows: [], visibleRows: [], expandedId: null, remainingConflict: 0, summary: {},
-    page: 0, totalPages: 0, totalElements: 0, hasNextPage: false, loading: true, reviewingId: null, loadError: ''
+    page: 0, totalPages: 0, totalElements: 0, hasNextPage: false, loading: true, reviewingId: null, rewinding: false, loadError: ''
   },
 
   onLoad(options) {
@@ -34,8 +34,17 @@ Page({
       const sheets = detail.sheets || []
       return Promise.all(sheets.map((sheet) => api.getExcelReviewSummary(task.id, sheet.id))).then((summaries) => {
         const summary = mergeReviewSummaries(summaries)
-        const sheetIndex = Math.min(Number(preferredSheetIndex === undefined ? this.data.sheetIndex : preferredSheetIndex) || 0, Math.max(sheets.length - 1, 0))
-        this.setData({ task: { ...task, ...summary }, summaries, summary, sheetNames: sheets.map((item) => item.sheetName), sheetIndex })
+        const isSkipped = (index) => ((summaries[index] && summaries[index].mappings) || []).some((item) => item.targetField === 'IGNORE_SHEET')
+        let sheetIndex = Math.min(Number(preferredSheetIndex === undefined ? this.data.sheetIndex : preferredSheetIndex) || 0, Math.max(sheets.length - 1, 0))
+        if (isSkipped(sheetIndex)) {
+          const firstBusinessSheet = sheets.findIndex((item, index) => !isSkipped(index))
+          if (firstBusinessSheet >= 0) sheetIndex = firstBusinessSheet
+        }
+        this.setData({
+          task: { ...task, ...summary }, summaries, summary,
+          sheetNames: sheets.map((item, index) => isSkipped(index) ? `${item.sheetName}（已跳过）` : item.sheetName),
+          sheetIndex
+        })
         return this.loadSheetPage(sheetIndex, 0)
       })
     }).catch((error) => this.setData({ loadError: errorMessage(error, '匹配结果没有加载成功') }))
@@ -122,6 +131,23 @@ Page({
       }
       openPage('/pages/excel-confirm/index', { id: this.data.id })
     }).catch((error) => showToast(errorMessage(error, '校验失败，请稍后重试')))
+  },
+
+  backToMapping() {
+    if (this.data.rewinding || !this.data.task) return
+    wx.showModal({
+      title: '返回字段映射？',
+      content: '可以重新调整列含义。再次生成匹配结果时，这张工作表已经做过的逐行复核会被重新计算。',
+      confirmText: '返回上一步',
+      success: (result) => {
+        if (!result.confirm) return
+        this.setData({ rewinding: true })
+        api.rewindExcelTaskToMapping(this.data.id, this.data.task.version).then(() => {
+          openPage('/pages/excel-mapping/index', { id: this.data.id, sheetId: this.data.sheet.id }, { replace: true })
+        }).catch((error) => showToast(errorMessage(error, '暂时无法返回字段映射，请刷新后重试')))
+          .finally(() => this.setData({ rewinding: false }))
+      }
+    })
   },
 
   retryLoad() { this.loadTask(this.data.sheetIndex) }

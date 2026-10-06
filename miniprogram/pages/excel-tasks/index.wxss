@@ -37,3 +37,5 @@
 .task-row-foot { margin-top: 10rpx; display: flex; justify-content: space-between; gap: 20rpx; color: #66746E; font-size: 21rpx; }
 .task-row-foot text:first-child { flex: 1; min-width: 0; }
 .task-row-foot text:last-child { flex: 0 0 auto; color: #52605A; }
+.task-row-actions { display: flex; align-items: center; gap: 10rpx; flex: 0 0 auto; }
+.task-delete { min-width: 88rpx; min-height: 88rpx; padding: 0 12rpx; display: flex; align-items: center; justify-content: center; box-sizing: border-box; border-radius: 10rpx; color: #A83F32; background: #FCE9E4; font-size: 24rpx; font-weight: 700; }

@@ -3,6 +3,7 @@ package com.example.demo.agent;
 import com.example.demo.agent.service.attachment.AttachmentContentParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
@@ -41,6 +42,27 @@ class AttachmentContentParserTest {
 
         assertThat(result.status()).isEqualTo("PARSED");
         assertThat(result.text()).contains("红色,加急", "电钻");
+    }
+
+    @Test
+    void extractsParagraphsAndTablesFromDocx() throws Exception {
+        byte[] content;
+        try (var document = new XWPFDocument(); var output = new ByteArrayOutputStream()) {
+            document.createParagraph().createRun().setText("宏达装修队采购清单");
+            var table = document.createTable(2, 2);
+            table.getRow(0).getCell(0).setText("商品");
+            table.getRow(0).getCell(1).setText("数量");
+            table.getRow(1).getCell(0).setText("空气开关");
+            table.getRow(1).getCell(1).setText("10");
+            document.write(output);
+            content = output.toByteArray();
+        }
+
+        var result = parser.parse("采购清单.docx",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document", content);
+
+        assertThat(result.status()).isEqualTo("PARSED");
+        assertThat(result.text()).contains("宏达装修队采购清单", "[表格 1]", "空气开关", "10");
     }
 
     @Test

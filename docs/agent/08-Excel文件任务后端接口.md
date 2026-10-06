@@ -6,7 +6,7 @@
 
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
-| POST | `/excel-tasks` | multipart 上传 XLS、XLSX 或 CSV，并创建任务 |
+| POST | `/excel-tasks` | multipart 上传 DOC、DOCX、XLS、XLSX、CSV 或文字型 PDF，并创建任务 |
 | POST | `/excel-tasks/cloud` | 从 CloudBase 文件 ID 或受信下载地址创建任务 |
 | GET | `/excel-tasks` | 查询当前用户任务，可用 `status` 筛选 |
 | GET | `/excel-tasks/{taskId}` | 查询任务和工作表结构 |
@@ -17,6 +17,9 @@
 | PUT | `/excel-tasks/{taskId}/sheets/{sheetId}/review-rows/{resultId}` | 人工选择商品、批准新增商品或排除数据行 |
 | POST | `/excel-tasks/{taskId}/validate` | 提交前整单校验，返回全部阻塞原因 |
 | POST | `/excel-tasks/{taskId}/commit` | 使用任务版本和幂等键提交正式变更 |
+| POST | `/excel-tasks/{taskId}/generate-workbook` | 将已解析任务生成规范、可编辑的 XLSX |
+| GET | `/excel-tasks/{taskId}/outputs` | 查询任务生成的 XLSX/PDF 文件及状态 |
+| GET | `/excel-tasks/{taskId}/outputs/{outputId}/download` | 鉴权下载已生成文件 |
 
 multipart 上传可传 `purpose`：
 
@@ -26,6 +29,34 @@ multipart 上传可传 `purpose`：
 - `INVENTORY_COUNT`：库存盘点
 - `PURCHASE_RECEIPT`：采购到货
 - `UNCLASSIFIED`：尚未确定用途
+
+DOC、DOCX 和 PDF 当前只允许用于 `BUYER_QUOTE`。Word 表格、文字型 PDF、CSV 和 Excel 会先统一保存成内部的工作表、表头与数据行；后续映射、商品匹配、复核和输出不再依赖原文件格式。普通 Word 正文可以作为 Agent 上下文读取，但只有表格内容会进入结构化 Excel 文件任务。扫描 PDF 暂未接入 OCR 表格识别。
+
+## 统一生成可编辑 Excel
+
+文件任务解析成功后，无需先完成商品匹配，即可生成一份规范 XLSX：
+
+```http
+POST /api/excel-tasks/{taskId}/generate-workbook
+Content-Type: application/json
+
+{
+  "expectedVersion": 3,
+  "idempotencyKey": "task-42-normalized-xlsx-v3"
+}
+```
+
+生成规则：
+
+- 每个逻辑工作表对应一个 XLSX Sheet，保留表头、数据行和原始顺序；
+- 自动冻结表头、增加筛选并调整列宽；
+- 数量、价格和金额等字段尽量写为数字单元格；
+- 以 `= + - @` 开头的外部文本会转义，避免公式注入；
+- 输出类型为 `NORMALIZED_XLSX`，异步生成，状态通过 `outputs` 查询；
+- 文件有效期为 7 天，并按任务所有人校验下载权限；
+- `expectedVersion` 防止基于旧任务内容导出，`idempotencyKey` 防止重复生成。
+
+这条接口是 DOC/PDF/CSV → Excel 的统一出口；原生 XLS/XLSX 也可通过它生成清洗后的标准副本。
 
 ## 当前状态
 
@@ -140,4 +171,4 @@ PARSING -> READY_FOR_MAPPING -> READY_FOR_REVIEW -> COMMITTED
 
 ## 后续能力
 
-下一阶段可补充行内标准值修正、映射模板复用、买家报价单生成、厂家价格版本对比和 Excel 结果导出。
+下一阶段可补充行内标准值修正、映射模板复用、扫描件 OCR，以及把人工复核后的规范值导出为新的标准 Excel。

@@ -547,11 +547,23 @@ module.exports = {
   getExcelTask(taskId) {
     return request(`/excel-tasks/${taskId}`)
   },
+  getExcelTaskOcrResult(taskId) {
+    return request(`/excel-tasks/${taskId}/ocr-result`)
+  },
+  deleteExcelTask(taskId) {
+    return request(`/excel-tasks/${taskId}`, { method: 'DELETE' })
+  },
+  rewindExcelTaskToMapping(taskId, expectedVersion) {
+    return request(`/excel-tasks/${taskId}/rewind-to-mapping`, { method: 'POST', data: { expectedVersion } })
+  },
   getExcelTaskRows(taskId, sheetId, page = 0, size = 50) {
     return request(`/excel-tasks/${taskId}/sheets/${sheetId}/rows`, { query: { page, size } })
   },
   applyExcelMapping(taskId, sheetId, data) {
     return request(`/excel-tasks/${taskId}/sheets/${sheetId}/mapping`, { method: 'PUT', data })
+  },
+  skipExcelTaskSheet(taskId, sheetId, expectedVersion) {
+    return request(`/excel-tasks/${taskId}/sheets/${sheetId}/skip`, { method: 'POST', data: { expectedVersion } })
   },
   getExcelReviewSummary(taskId, sheetId) {
     return request(`/excel-tasks/${taskId}/sheets/${sheetId}/review-summary`)
@@ -570,6 +582,9 @@ module.exports = {
   },
   generateExcelQuote(taskId, data) {
     return request(`/excel-tasks/${taskId}/generate-quote`, { method: 'POST', data })
+  },
+  generateExcelWorkbook(taskId, data) {
+    return request(`/excel-tasks/${taskId}/generate-workbook`, { method: 'POST', data })
   },
   getExcelOutputs(taskId) {
     return request(`/excel-tasks/${taskId}/outputs`)

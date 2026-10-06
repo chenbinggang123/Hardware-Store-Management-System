@@ -10,6 +10,7 @@ import java.util.List;
 public interface ExcelTaskMappingRepository extends JpaRepository<ExcelTaskMapping, Long> {
     List<ExcelTaskMapping> findByTaskIdAndSheetIdOrderBySourceColumnIndexAsc(Long taskId, Long sheetId);
     void deleteByTaskIdAndSheetId(Long taskId, Long sheetId);
+    void deleteByTaskId(Long taskId);
     @Query("select count(distinct mapping.sheetId) from ExcelTaskMapping mapping where mapping.taskId = :taskId")
     long countMappedSheets(@Param("taskId") Long taskId);
 }

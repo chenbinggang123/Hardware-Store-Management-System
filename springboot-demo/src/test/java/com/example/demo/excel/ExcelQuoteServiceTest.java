@@ -18,6 +18,8 @@ import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -80,6 +82,16 @@ class ExcelQuoteServiceTest {
                     workbook.getSheet("报价明细").getRow(1).getCell(1).getStringCellValue());
             assertEquals(25.0, workbook.getSheet("报价明细").getRow(1).getCell(7).getNumericCellValue());
         }
+
+        bytes.set(null);
+        var pdfResult = service.generate(10L,
+                new ExcelQuoteRequest(6L, "RETAIL_PRICE", null, true, "quote-key-pdf-001", "PDF"), 2L);
+        assertEquals("READY", pdfResult.status());
+        assertEquals("application/pdf", pdfResult.mimeType());
+        assertNotNull(bytes.get());
+        assertEquals("%PDF", new String(bytes.get(), 0, 4, java.nio.charset.StandardCharsets.US_ASCII));
+        Files.createDirectories(Path.of("target", "pdf-preview"));
+        Files.write(Path.of("target", "pdf-preview", "buyer-quote.pdf"), bytes.get());
     }
 
     private ExcelTask task(Long id, Long operatorId, Long version) {

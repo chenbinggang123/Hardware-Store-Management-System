@@ -31,6 +31,7 @@ import java.util.UUID;
 public class AgentAttachmentService {
     private static final Set<String> IMAGE_EXTENSIONS = Set.of("jpg", "jpeg", "png", "webp");
     private static final Set<String> SHEET_EXTENSIONS = Set.of("xls", "xlsx", "csv");
+    private static final Set<String> DOCUMENT_EXTENSIONS = Set.of("pdf", "doc", "docx");
     private static final int MAX_ATTACHMENTS_PER_MESSAGE = 3;
     private static final int MAX_MODEL_CHARS = 50_000;
 
@@ -194,13 +195,19 @@ public class AgentAttachmentService {
 
     private String validateExtension(String originalName) {
         String extension = extension(originalName);
-        if (!IMAGE_EXTENSIONS.contains(extension) && !SHEET_EXTENSIONS.contains(extension)) {
-            throw new IllegalArgumentException("当前仅支持 JPG、PNG、WEBP、XLS、XLSX 和 CSV 文件");
+        if (!IMAGE_EXTENSIONS.contains(extension) && !SHEET_EXTENSIONS.contains(extension)
+                && !DOCUMENT_EXTENSIONS.contains(extension)) {
+            throw new IllegalArgumentException("当前仅支持 JPG、PNG、WEBP、DOC、DOCX、PDF、XLS、XLSX 和 CSV 文件");
         }
         return extension;
     }
 
     private String detectedMime(String extension, byte[] bytes) {
+        if (bytes.length >= 5 && bytes[0] == '%' && bytes[1] == 'P' && bytes[2] == 'D'
+                && bytes[3] == 'F' && bytes[4] == '-') {
+            if (!"pdf".equals(extension)) breakMismatch();
+            return "application/pdf";
+        }
         if (bytes.length >= 8 && bytes[0] == (byte) 0x89 && bytes[1] == 'P' && bytes[2] == 'N' && bytes[3] == 'G') {
             if (!"png".equals(extension)) breakMismatch();
             return "image/png";
@@ -215,12 +222,14 @@ public class AgentAttachmentService {
             return "image/webp";
         }
         if (bytes.length >= 4 && bytes[0] == 'P' && bytes[1] == 'K') {
-            if (!"xlsx".equals(extension)) breakMismatch();
-            return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            if ("xlsx".equals(extension)) return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            if ("docx".equals(extension)) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+            breakMismatch();
         }
         if (bytes.length >= 4 && bytes[0] == (byte) 0xd0 && bytes[1] == (byte) 0xcf && bytes[2] == 0x11 && bytes[3] == (byte) 0xe0) {
-            if (!"xls".equals(extension)) breakMismatch();
-            return "application/vnd.ms-excel";
+            if ("xls".equals(extension)) return "application/vnd.ms-excel";
+            if ("doc".equals(extension)) return "application/msword";
+            breakMismatch();
         }
         if ("csv".equals(extension) && java.util.stream.IntStream.range(0, Math.min(bytes.length, 4096))
                 .noneMatch(index -> bytes[index] == 0)) return "text/csv";

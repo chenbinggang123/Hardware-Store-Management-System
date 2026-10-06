@@ -8,6 +8,14 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.hwpf.HWPFDocument;
+import org.apache.poi.hwpf.extractor.WordExtractor;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFTable;
+import org.apache.poi.xwpf.usermodel.XWPFTableRow;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
@@ -53,6 +61,15 @@ public class AttachmentContentParser {
             }
             if ("text/csv".equals(mimeType)) {
                 return AttachmentParseResult.parsed(parseCsv(content));
+            }
+            if ("application/pdf".equals(mimeType)) {
+                return AttachmentParseResult.parsed(parsePdf(content));
+            }
+            if ("application/vnd.openxmlformats-officedocument.wordprocessingml.document".equals(mimeType)) {
+                return AttachmentParseResult.parsed(parseDocx(content));
+            }
+            if ("application/msword".equals(mimeType)) {
+                return AttachmentParseResult.parsed(parseDoc(content));
             }
             if (mimeType.startsWith("image/")) {
                 return parseImage(fileName, mimeType, content);
@@ -108,6 +125,49 @@ public class AttachmentContentParser {
         }
         if (rows.size() > MAX_ROWS) append(output, "[内容已截断：最多读取 " + MAX_ROWS + " 行]\n");
         return output.toString();
+    }
+
+    private String parsePdf(byte[] content) throws Exception {
+        try (PDDocument document = Loader.loadPDF(content)) {
+            if (document.getNumberOfPages() == 0) throw new IllegalArgumentException("PDF 没有可读取的页面");
+            PDFTextStripper stripper = new PDFTextStripper();
+            stripper.setSortByPosition(true);
+            String text = stripper.getText(document);
+            if (!StringUtils.hasText(text)) {
+                throw new IllegalArgumentException("PDF 中没有可读取文字；扫描件请先使用 OCR");
+            }
+            return "[PDF 文件，共 " + document.getNumberOfPages() + " 页]\n" + limit(text.trim());
+        }
+    }
+
+    private String parseDocx(byte[] content) throws Exception {
+        StringBuilder output = new StringBuilder("[Word DOCX 文件]\n");
+        try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(content))) {
+            document.getParagraphs().stream().map(item -> item.getText().trim()).filter(StringUtils::hasText)
+                    .forEach(text -> append(output, text + "\n"));
+            int tableIndex = 0;
+            for (XWPFTable table : document.getTables()) {
+                append(output, "[表格 " + (++tableIndex) + "]\n");
+                int rowIndex = 0;
+                for (XWPFTableRow row : table.getRows()) {
+                    if (++rowIndex > MAX_ROWS) { append(output, "[表格内容已截断]\n"); break; }
+                    List<String> cells = row.getTableCells().stream().limit(MAX_COLUMNS)
+                            .map(cell -> cell.getText().replaceAll("\\s+", " ").trim()).toList();
+                    append(output, "第" + rowIndex + "行\t" + String.join("\t", cells) + "\n");
+                }
+            }
+        }
+        if (output.length() <= "[Word DOCX 文件]\n".length()) throw new IllegalArgumentException("Word 文档中没有可读取内容");
+        return limit(output.toString());
+    }
+
+    private String parseDoc(byte[] content) throws Exception {
+        try (HWPFDocument document = new HWPFDocument(new ByteArrayInputStream(content));
+             WordExtractor extractor = new WordExtractor(document)) {
+            String text = extractor.getText();
+            if (!StringUtils.hasText(text)) throw new IllegalArgumentException("Word 文档中没有可读取内容");
+            return "[Word DOC 文件]\n" + limit(text.trim());
+        }
     }
 
     private List<List<String>> csvRows(String source) {

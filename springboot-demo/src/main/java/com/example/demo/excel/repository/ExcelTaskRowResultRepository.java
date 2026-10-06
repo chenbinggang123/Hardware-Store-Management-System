@@ -11,6 +11,7 @@ import java.util.Optional;
 public interface ExcelTaskRowResultRepository extends JpaRepository<ExcelTaskRowResult, Long> {
     Page<ExcelTaskRowResult> findByTaskIdAndSheetIdOrderByRowNumberAsc(Long taskId, Long sheetId, Pageable pageable);
     void deleteByTaskIdAndSheetId(Long taskId, Long sheetId);
+    void deleteByTaskId(Long taskId);
     long countByTaskIdAndSheetIdAndMatchStatus(Long taskId, Long sheetId, String matchStatus);
     Optional<ExcelTaskRowResult> findByIdAndTaskIdAndSheetId(Long id, Long taskId, Long sheetId);
     List<ExcelTaskRowResult> findByTaskIdOrderBySheetIdAscRowNumberAsc(Long taskId);

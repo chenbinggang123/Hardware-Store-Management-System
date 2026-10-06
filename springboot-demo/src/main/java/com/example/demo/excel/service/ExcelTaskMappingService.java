@@ -44,7 +44,7 @@ import java.util.Set;
 public class ExcelTaskMappingService {
     private static final Set<String> TARGET_FIELDS = Set.of(
             "PRODUCT_NAME", "BARCODE", "SPEC", "UNIT", "QUANTITY", "UNIT_PRICE", "AMOUNT",
-            "REMARK", "SUPPLIER_SKU", "CUSTOMER_SKU", "IGNORE");
+            "REMARK", "SUPPLIER_SKU", "CUSTOMER_SKU", "CUSTOMER_NAME", "IGNORE");
 
     private final ExcelTaskRepository taskRepository;
     private final ExcelTaskSheetRepository sheetRepository;
@@ -87,6 +87,8 @@ public class ExcelTaskMappingService {
         List<ValidatedMapping> mappings = validateMappings(request.mappings(), columns, task.getPurpose());
         mappingRepository.deleteByTaskIdAndSheetId(taskId, sheetId);
         resultRepository.deleteByTaskIdAndSheetId(taskId, sheetId);
+        mappingRepository.flush();
+        resultRepository.flush();
 
         LocalDateTime now = LocalDateTime.now();
         List<ExcelTaskMapping> storedMappings = mappings.stream().map(mapping -> {
@@ -113,6 +115,42 @@ public class ExcelTaskMappingService {
                 ? "READY_FOR_REVIEW" : "READY_FOR_MAPPING");
         task.setErrorMessage(null);
         task.setUpdateTime(now);
+        taskRepository.saveAndFlush(task);
+        return summary(task, sheetId);
+    }
+
+    public ExcelReviewSummary skipSheet(Long taskId, Long sheetId, Long expectedVersion, Long operatorId) {
+        ExcelTask task = requireTask(taskId, operatorId);
+        ExcelTaskSheet sheet = requireSheet(taskId, sheetId);
+        if (!Set.of("READY_FOR_MAPPING", "READY_FOR_REVIEW").contains(task.getStatus())) {
+            throw new IllegalArgumentException("当前任务状态不能跳过工作表");
+        }
+        if (expectedVersion == null) throw new IllegalArgumentException("expectedVersion 不能为空");
+        if (!expectedVersion.equals(task.getVersion())) throw new ResponseStatusException(
+                HttpStatus.CONFLICT, "文件任务已被其他操作更新，请刷新后重试");
+
+        mappingRepository.deleteByTaskIdAndSheetId(taskId, sheetId);
+        resultRepository.deleteByTaskIdAndSheetId(taskId, sheetId);
+        mappingRepository.flush();
+        resultRepository.flush();
+
+        ExcelTaskMapping skipped = new ExcelTaskMapping();
+        skipped.setTaskId(taskId);
+        skipped.setSheetId(sheetId);
+        skipped.setSourceColumnIndex(0);
+        skipped.setSourceColumnName("整张表已跳过");
+        skipped.setTargetField("IGNORE_SHEET");
+        skipped.setCreateTime(LocalDateTime.now());
+        mappingRepository.save(skipped);
+
+        List<ExcelTaskRow> rows = rowRepository.findByTaskIdAndSheetIdOrderByRowNumberAsc(taskId, sheetId);
+        rows.forEach(row -> row.setReviewStatus("EXCLUDED"));
+        rowRepository.saveAll(rows);
+
+        task.setStatus(mappingRepository.countMappedSheets(taskId) >= task.getSheetCount()
+                ? "READY_FOR_REVIEW" : "READY_FOR_MAPPING");
+        task.setErrorMessage(null);
+        task.setUpdateTime(LocalDateTime.now());
         taskRepository.saveAndFlush(task);
         return summary(task, sheetId);
     }

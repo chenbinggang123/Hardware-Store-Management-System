@@ -17,6 +17,8 @@
     <view class="quote-field"><view><view class="quote-label">使用哪种价格</view><view class="quote-hint">每一行都从商品当前价格中读取</view></view><picker range="{{priceModes}}" range-key="label" value="{{priceModeIndex}}" bindchange="changePriceMode"><view class="quote-picker">{{priceModes[priceModeIndex].label}} ›</view></picker></view>
     <view class="quote-field" wx:if="{{priceModes[priceModeIndex].code === 'CUSTOMER_TYPE_PRICE'}}"><view><view class="quote-label">报价客户</view><view class="quote-hint">根据客户类型选择零售价、批发价或老客户价</view></view><picker range="{{customerNames}}" value="{{customerIndex < 0 ? 0 : customerIndex}}" bindchange="changeCustomer"><view class="quote-picker">{{customerIndex < 0 ? '请选择客户' : customerNames[customerIndex]}} ›</view></picker></view>
     <view class="quote-field"><view><view class="quote-label">保留未匹配行</view><view class="quote-hint">保留在“未匹配与异常”工作表，方便继续核对</view></view><switch checked="{{includeUnmatchedRows}}" color="#245E9B" bindchange="changeIncludeUnmatched" /></view>
+    <view class="quote-field"><view><view class="quote-label">可编辑 Excel</view><view class="quote-hint">方便继续改数量和价格</view></view><switch checked="{{outputXlsx}}" color="#245E9B" bindchange="changeOutputXlsx" /></view>
+    <view class="quote-field"><view><view class="quote-label">横向 PDF</view><view class="quote-hint">三组并排，可直接发给客户</view></view><switch checked="{{outputPdf}}" color="#245E9B" bindchange="changeOutputPdf" /></view>
   </view>
 
   <view class="confirm-section">

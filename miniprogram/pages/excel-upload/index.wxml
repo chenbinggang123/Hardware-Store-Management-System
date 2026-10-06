@@ -1,11 +1,15 @@
 <view class="screen upload-screen">
-  <view class="flow-head"><view class="flow-step-label">第 1 步，共 4 步</view><view class="flow-title">先选择要处理的文件</view><view class="flow-desc">支持 Excel 和 CSV。上传后只读取内容，确认前不会修改商品、价格或库存。</view></view>
+  <view class="flow-head"><view class="flow-step-label">第 1 步，共 4 步</view><view class="flow-title">先选择要处理的表格</view><view class="flow-desc">优先上传原始 Excel；也支持 Word、CSV、文字型 PDF，以及拍照或截图得到的价格表。确认前不会修改商品、价格或库存。</view></view>
   <view class="flow-progress"><view class="flow-progress-value" style="width: 25%;"></view></view>
 
-  <view class="file-drop {{file ? 'selected' : ''}}" bindtap="chooseFile" aria-label="选择 Excel 或 CSV 文件">
-    <view class="file-mark">{{file ? 'XLS' : '＋'}}</view>
-    <view class="file-title">{{file ? file.name : '选择 Excel 或 CSV 文件'}}</view>
-    <view class="file-desc">{{file ? file.sizeText + ' · 点击可重新选择' : '从微信会话或手机文件中选择'}}</view>
+  <view class="file-drop {{file ? 'selected' : ''}}" bindtap="chooseFile" aria-label="选择表格文件">
+    <view class="file-mark">{{file ? (file.kind === 'image' ? '图片' : '文件') : '＋'}}</view>
+    <view class="file-title">{{file ? file.name : '选择 Word、Excel、CSV、PDF 或图片'}}</view>
+    <view class="file-desc">{{file ? file.sizeText + ' · 点击可重新选择文件' : '从微信会话或手机文件中选择'}}</view>
+  </view>
+  <view class="image-choice" catchtap="chooseImage">
+    <view class="image-choice-title">拍照或从相册选择价格表</view>
+    <view class="image-choice-desc">请尽量包含完整表头和表格四边，拍摄屏幕时保持正对</view>
   </view>
 
   <view class="upload-form">

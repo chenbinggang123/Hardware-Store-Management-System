@@ -46,6 +46,6 @@
 
   <view class="review-tip" wx:if="{{!visibleRows.length}}">这个筛选条件下没有数据行</view>
   <view class="fixed-action-space"></view>
-  <view class="fixed-action"><button class="fixed-primary {{remainingConflict ? 'warning' : ''}}" bindtap="previewChanges">{{remainingConflict ? '检查能否继续（还有 ' + remainingConflict + ' 行）' : '预览将要写入的变化'}}</button></view>
+  <view class="fixed-action split-action"><button class="fixed-secondary" bindtap="backToMapping" disabled="{{rewinding}}">{{rewinding ? '正在返回…' : '上一步'}}</button><button class="fixed-primary {{remainingConflict ? 'warning' : ''}}" bindtap="previewChanges" disabled="{{rewinding}}">{{remainingConflict ? '检查能否继续（还有 ' + remainingConflict + ' 行）' : '预览将要写入的变化'}}</button></view>
   </block>
 </view>

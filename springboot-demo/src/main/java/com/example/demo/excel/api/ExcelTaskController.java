@@ -6,6 +6,7 @@ import com.example.demo.excel.dto.ExcelTaskCloudRequest;
 import com.example.demo.excel.dto.ExcelTaskDetail;
 import com.example.demo.excel.dto.ExcelTaskRowPage;
 import com.example.demo.excel.dto.ExcelTaskSummary;
+import com.example.demo.excel.dto.ExcelTaskOcrView;
 import com.example.demo.excel.dto.ExcelMappingRequest;
 import com.example.demo.excel.dto.ExcelReviewRowPage;
 import com.example.demo.excel.dto.ExcelReviewSummary;
@@ -13,14 +14,17 @@ import com.example.demo.excel.dto.ExcelRowReviewRequest;
 import com.example.demo.excel.dto.ExcelTaskCommitRequest;
 import com.example.demo.excel.dto.ExcelTaskCommitResult;
 import com.example.demo.excel.dto.ExcelTaskValidateRequest;
+import com.example.demo.excel.dto.ExcelTaskRewindRequest;
 import com.example.demo.excel.dto.ExcelTaskValidation;
 import com.example.demo.excel.service.ExcelTaskCommitService;
 import com.example.demo.excel.service.ExcelTaskMappingService;
 import com.example.demo.excel.service.ExcelTaskService;
+import com.example.demo.excel.service.ExcelTaskLifecycleService;
 import com.example.demo.security.AuthSession;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -40,12 +44,15 @@ public class ExcelTaskController {
     private final ExcelTaskService service;
     private final ExcelTaskMappingService mappingService;
     private final ExcelTaskCommitService commitService;
+    private final ExcelTaskLifecycleService lifecycleService;
 
     public ExcelTaskController(ExcelTaskService service, ExcelTaskMappingService mappingService,
-                               ExcelTaskCommitService commitService) {
+                               ExcelTaskCommitService commitService,
+                               ExcelTaskLifecycleService lifecycleService) {
         this.service = service;
         this.mappingService = mappingService;
         this.commitService = commitService;
+        this.lifecycleService = lifecycleService;
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -75,6 +82,11 @@ public class ExcelTaskController {
         return ApiResponse.ok(service.get(taskId, currentUserId(request)));
     }
 
+    @GetMapping("/{taskId}/ocr-result")
+    public ApiResponse<ExcelTaskOcrView> ocrResult(@PathVariable Long taskId, HttpServletRequest request) {
+        return ApiResponse.ok(service.ocrResult(taskId, currentUserId(request)));
+    }
+
     @GetMapping("/{taskId}/sheets/{sheetId}/rows")
     public ApiResponse<ExcelTaskRowPage> rows(@PathVariable Long taskId,
                                              @PathVariable Long sheetId,
@@ -91,6 +103,15 @@ public class ExcelTaskController {
                                                         HttpServletRequest request) {
         return ApiResponse.ok("字段映射已保存，变更预览已生成",
                 mappingService.apply(taskId, sheetId, mapping, currentUserId(request)));
+    }
+
+    @PostMapping("/{taskId}/sheets/{sheetId}/skip")
+    public ApiResponse<ExcelReviewSummary> skipSheet(@PathVariable Long taskId,
+                                                     @PathVariable Long sheetId,
+                                                     @RequestBody ExcelTaskValidateRequest skip,
+                                                     HttpServletRequest request) {
+        return ApiResponse.ok("工作表已跳过", mappingService.skipSheet(taskId, sheetId,
+                skip == null ? null : skip.expectedVersion(), currentUserId(request)));
     }
 
     @GetMapping("/{taskId}/sheets/{sheetId}/review-summary")
@@ -133,6 +154,21 @@ public class ExcelTaskController {
                                                      HttpServletRequest request) {
         return ApiResponse.ok("文件任务提交完成",
                 commitService.commit(taskId, commit, currentUserId(request)));
+    }
+
+    @PostMapping("/{taskId}/rewind-to-mapping")
+    public ApiResponse<Void> rewindToMapping(@PathVariable Long taskId,
+                                             @RequestBody ExcelTaskRewindRequest rewind,
+                                             HttpServletRequest request) {
+        lifecycleService.rewindToMapping(taskId, rewind == null ? null : rewind.expectedVersion(),
+                currentUserId(request));
+        return ApiResponse.ok("已返回字段映射", null);
+    }
+
+    @DeleteMapping("/{taskId}")
+    public ApiResponse<Void> delete(@PathVariable Long taskId, HttpServletRequest request) {
+        lifecycleService.delete(taskId, currentUserId(request));
+        return ApiResponse.ok("文件任务已删除", null);
     }
 
     private Long currentUserId(HttpServletRequest request) {

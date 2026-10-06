@@ -11,21 +11,24 @@
     <view><text>数据范围</text><text>{{sheet.columnCount}} 列 · {{sheet.rowCount}} 行</text></view>
   </view>
 
-  <view class="template-memory"><view class="template-mark">核</view><view><view class="template-title">系统已按表头预选字段</view><view class="template-desc">请逐项核对；这里只生成匹配预览，不会修改业务数据。</view></view></view>
+  <view class="template-memory {{!canMatchProducts ? 'warning' : ''}}"><view class="template-mark">{{canMatchProducts ? '核' : '问'}}</view><view><view class="template-title">{{!canMatchProducts ? '这张表里没有找到商品信息' : (needsAttentionCount ? '有 ' + needsAttentionCount + ' 列需要你看看' : '系统已识别 ' + recognizedCount + ' 列')}}</view><view class="template-desc">{{!canMatchProducts ? '如果这是说明、目录或无效内容，请直接跳过；否则在下方指定商品名称或条码。' : (needsAttentionCount ? '不确定的列已经放在下面，其他列先收起来。' : '如果文件内容没问题，可以直接进入下一步。')}}</view></view></view>
 
-  <view class="mapping-title-row"><view><view class="mapping-title">字段映射</view><view class="mapping-subtitle">必填字段已标记，请逐项核对</view></view><view class="mapping-count">{{mappings.length}} 列</view></view>
-  <view class="mapping-ledger">
-    <view class="mapping-row" wx:for="{{mappings}}" wx:key="source">
+  <view class="skip-sheet-card urgent" wx:if="{{!canMatchProducts}}"><view><view class="skip-sheet-title">这张表只是说明或无效内容？</view><view class="skip-sheet-desc">整张跳过后，不再强制选择商品名称或条码，也不会影响其他工作表。</view></view><view class="skip-sheet-action" bindtap="skipSheet">{{skipping ? '跳过中…' : '跳过这张表'}}</view></view>
+
+  <view class="mapping-title-row"><view><view class="mapping-title">{{showAllFields || !canMatchProducts ? '全部识别结果' : '需要确认的内容'}}</view><view class="mapping-subtitle">左边是 Excel 表头，右边是系统理解的含义</view></view><view class="mapping-toggle" bindtap="toggleAllFields">{{!canMatchProducts ? '请修改右侧含义' : (showAllFields ? '只看待确认' : '查看全部 ' + mappings.length + ' 列')}}</view></view>
+  <view class="mapping-ok" wx:if="{{!showAllFields && !visibleMappings.length}}"><view class="mapping-ok-mark">✓</view><view><view>没有需要手工修改的字段</view><text>系统识别结果已收起，需要时可点“查看全部”。</text></view></view>
+  <view class="mapping-ledger" wx:if="{{visibleMappings.length}}">
+    <view class="mapping-row" wx:for="{{visibleMappings}}" wx:key="sourceColumnIndex">
       <view class="mapping-source"><view class="source-name">{{item.source}}<text wx:if="{{item.required}}">必填</text></view><view class="source-samples">样例：{{item.samples}}</view></view>
       <view class="mapping-arrow">›</view>
-      <picker class="mapping-picker-wrap" range="{{targetOptions}}" data-index="{{index}}" bindchange="changeTarget">
-        <view class="mapping-target"><view>{{item.target}}</view><text>{{item.confidence}}%</text></view>
+      <picker class="mapping-picker-wrap" range="{{targetOptions}}" value="{{item.targetIndex}}" data-source-index="{{item.sourceColumnIndex}}" bindchange="changeTarget">
+        <view class="mapping-target"><view>{{item.target}}</view><text>点这里修改</text></view>
       </picker>
     </view>
   </view>
 
-  <view class="mapping-note">如果文件没有表头，可在这里把 A、B、C 列分别指定为商品名称、规格和单位。</view>
+  <view class="mapping-note">找不到合适的含义时可选“忽略此列”。客户名称现在可以单独选择，不会再当作商品名称。</view>
   <view class="fixed-action-space"></view>
-  <view class="fixed-action"><button class="fixed-primary {{saving ? 'disabled' : ''}}" bindtap="continueReview" disabled="{{saving}}">{{saving ? '正在匹配商品…' : '确认字段并开始匹配'}}</button></view>
+  <view class="fixed-action"><button class="fixed-primary {{saving || skipping ? 'disabled' : ''}}" bindtap="continueReview" disabled="{{saving || skipping}}">{{saving ? '正在匹配商品…' : (!canMatchProducts ? '请先指定商品信息或跳过' : '识别正确，进入下一步')}}</button></view>
   </block>
 </view>

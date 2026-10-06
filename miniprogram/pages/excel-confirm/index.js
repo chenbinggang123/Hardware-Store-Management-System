@@ -25,7 +25,8 @@ Page({
       { code: 'RETAIL_PRICE', label: '零售价' }, { code: 'WHOLESALE_PRICE', label: '批发价' },
       { code: 'OLD_CUSTOMER_PRICE', label: '老客户价' }, { code: 'CUSTOMER_TYPE_PRICE', label: '按客户类型' }
     ],
-    priceModeIndex: 0, customers: [], customerNames: [], customerIndex: -1, includeUnmatchedRows: true
+    priceModeIndex: 0, customers: [], customerNames: [], customerIndex: -1, includeUnmatchedRows: true,
+    outputXlsx: true, outputPdf: true
   },
 
   onLoad(options) {
@@ -58,7 +59,21 @@ Page({
             quoteReady: isQuote && quoteBlockers.length === 0
           })
           if (isQuote) {
-            api.getCustomers().then((customers) => this.setData({ customers: customers || [], customerNames: (customers || []).map((item) => item.name || `客户 ${item.id}`) })).catch(() => {})
+            api.getCustomers().then((customers) => {
+              const items = customers || []
+              const names = previewRows.map((item) => item.normalized && item.normalized.CUSTOMER_NAME)
+                .filter(Boolean).map((item) => String(item).trim())
+              const uniqueNames = Array.from(new Set(names))
+              const customerIndex = uniqueNames.length === 1
+                ? items.findIndex((item) => String(item.name || '').trim().toLowerCase() === uniqueNames[0].toLowerCase())
+                : -1
+              this.setData({
+                customers: items,
+                customerNames: items.map((item) => item.name || `客户 ${item.id}`),
+                customerIndex,
+                priceModeIndex: customerIndex >= 0 ? 3 : this.data.priceModeIndex
+              })
+            }).catch(() => {})
           }
         })
       })
@@ -101,14 +116,19 @@ Page({
       success: (result) => {
         if (!result.confirm) return
         this.setData({ writing: true })
-        api.generateExcelQuote(this.data.id, {
+        const base = {
           expectedVersion: this.data.task.version,
           pricingMode: mode.code,
           customerId: customer ? customer.id : null,
-          includeUnmatchedRows: this.data.includeUnmatchedRows,
-          idempotencyKey: `quote-${this.data.id}-${this.data.task.version}-${Date.now()}`
-        }).then(() => {
-          showToast('报价文件正在生成', 'success')
+          includeUnmatchedRows: this.data.includeUnmatchedRows
+        }
+        const stamp = Date.now()
+        const requests = []
+        if (this.data.outputXlsx) requests.push(api.generateExcelQuote(this.data.id, { ...base, outputFormat: 'XLSX', idempotencyKey: `quote-xlsx-${this.data.id}-${this.data.task.version}-${stamp}` }))
+        if (this.data.outputPdf) requests.push(api.generateExcelQuote(this.data.id, { ...base, outputFormat: 'PDF', idempotencyKey: `quote-pdf-${this.data.id}-${this.data.task.version}-${stamp}` }))
+        if (!requests.length) { this.setData({ writing: false }); return showToast('请至少选择一种文件格式') }
+        Promise.all(requests).then(() => {
+          showToast(requests.length > 1 ? '两种报价文件正在生成' : '报价文件正在生成', 'success')
           openPage('/pages/excel-task-detail/index', { id: this.data.id }, { replace: true })
         }).catch((error) => showToast(errorMessage(error, '报价文件没有生成成功')))
           .finally(() => this.setData({ writing: false }))
@@ -119,6 +139,8 @@ Page({
   changePriceMode(event) { this.setData({ priceModeIndex: Number(event.detail.value) }) },
   changeCustomer(event) { this.setData({ customerIndex: Number(event.detail.value) }) },
   changeIncludeUnmatched(event) { this.setData({ includeUnmatchedRows: event.detail.value }) },
+  changeOutputXlsx(event) { this.setData({ outputXlsx: event.detail.value }) },
+  changeOutputPdf(event) { this.setData({ outputPdf: event.detail.value }) },
 
   backToReview() { openPage('/pages/excel-review/index', { id: this.data.id }, { replace: true }) },
   retryLoad() { this.loadPreview() }

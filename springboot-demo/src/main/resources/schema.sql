@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS agent_conversation (
     create_time DATETIME NOT NULL,
     update_time DATETIME NOT NULL,
     KEY idx_agent_conversation_operator_update (operator_id, update_time)
-);
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS agent_run (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -115,7 +115,7 @@ CREATE TABLE IF NOT EXISTS agent_run (
     expires_at DATETIME NOT NULL,
     version BIGINT NOT NULL DEFAULT 0,
     KEY idx_agent_run_operator_status (operator_id, status)
-);
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS agent_conversation_run (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -144,7 +144,7 @@ CREATE TABLE IF NOT EXISTS agent_attachment (
     KEY idx_agent_attachment_conversation (conversation_id, create_time),
     KEY idx_agent_attachment_run (run_id),
     KEY idx_agent_attachment_operator (operator_id)
-);
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS agent_tool_call (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -157,7 +157,56 @@ CREATE TABLE IF NOT EXISTS agent_tool_call (
     duration_ms BIGINT NOT NULL DEFAULT 0,
     create_time DATETIME NOT NULL,
     KEY idx_agent_tool_call_run_id (run_id)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- 兼容旧库的 MySQL utf8（最多 3 字节）。Agent 输入、输出与工具结果可能包含 Emoji，必须升级为 utf8mb4。
+SET @convert_agent_conversation_utf8mb4 = (
+    SELECT IF(COUNT(*) > 0,
+              'ALTER TABLE agent_conversation CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci',
+              'SELECT 1')
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'agent_conversation'
+      AND character_set_name IS NOT NULL AND character_set_name <> 'utf8mb4'
 );
+PREPARE convert_agent_conversation_utf8mb4_stmt FROM @convert_agent_conversation_utf8mb4;
+EXECUTE convert_agent_conversation_utf8mb4_stmt;
+DEALLOCATE PREPARE convert_agent_conversation_utf8mb4_stmt;
+
+SET @convert_agent_run_utf8mb4 = (
+    SELECT IF(COUNT(*) > 0,
+              'ALTER TABLE agent_run CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci',
+              'SELECT 1')
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'agent_run'
+      AND character_set_name IS NOT NULL AND character_set_name <> 'utf8mb4'
+);
+PREPARE convert_agent_run_utf8mb4_stmt FROM @convert_agent_run_utf8mb4;
+EXECUTE convert_agent_run_utf8mb4_stmt;
+DEALLOCATE PREPARE convert_agent_run_utf8mb4_stmt;
+
+SET @convert_agent_attachment_utf8mb4 = (
+    SELECT IF(COUNT(*) > 0,
+              'ALTER TABLE agent_attachment CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci',
+              'SELECT 1')
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'agent_attachment'
+      AND character_set_name IS NOT NULL AND character_set_name <> 'utf8mb4'
+);
+PREPARE convert_agent_attachment_utf8mb4_stmt FROM @convert_agent_attachment_utf8mb4;
+EXECUTE convert_agent_attachment_utf8mb4_stmt;
+DEALLOCATE PREPARE convert_agent_attachment_utf8mb4_stmt;
+
+SET @convert_agent_tool_call_utf8mb4 = (
+    SELECT IF(COUNT(*) > 0,
+              'ALTER TABLE agent_tool_call CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci',
+              'SELECT 1')
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'agent_tool_call'
+      AND character_set_name IS NOT NULL AND character_set_name <> 'utf8mb4'
+);
+PREPARE convert_agent_tool_call_utf8mb4_stmt FROM @convert_agent_tool_call_utf8mb4;
+EXECUTE convert_agent_tool_call_utf8mb4_stmt;
+DEALLOCATE PREPARE convert_agent_tool_call_utf8mb4_stmt;
 
 CREATE TABLE IF NOT EXISTS excel_task (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -169,6 +218,12 @@ CREATE TABLE IF NOT EXISTS excel_task (
     original_name VARCHAR(255) NOT NULL,
     object_key VARCHAR(500) NOT NULL,
     mime_type VARCHAR(100) NOT NULL,
+    source_format VARCHAR(32),
+    parse_method VARCHAR(32),
+    ocr_provider VARCHAR(64),
+    ocr_model_version VARCHAR(100),
+    ocr_request_id VARCHAR(160),
+    ocr_result_json LONGTEXT,
     file_size BIGINT NOT NULL,
     sha256 VARCHAR(64) NOT NULL,
     sheet_count INT NOT NULL DEFAULT 0,
@@ -203,6 +258,72 @@ SET @add_excel_task_effective_date = (
 PREPARE add_excel_task_effective_date_stmt FROM @add_excel_task_effective_date;
 EXECUTE add_excel_task_effective_date_stmt;
 DEALLOCATE PREPARE add_excel_task_effective_date_stmt;
+
+SET @add_excel_task_source_format = (
+    SELECT IF(COUNT(*) = 0,
+              'ALTER TABLE excel_task ADD COLUMN source_format VARCHAR(32) NULL AFTER mime_type',
+              'SELECT 1')
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'excel_task' AND column_name = 'source_format'
+);
+PREPARE add_excel_task_source_format_stmt FROM @add_excel_task_source_format;
+EXECUTE add_excel_task_source_format_stmt;
+DEALLOCATE PREPARE add_excel_task_source_format_stmt;
+
+SET @add_excel_task_parse_method = (
+    SELECT IF(COUNT(*) = 0,
+              'ALTER TABLE excel_task ADD COLUMN parse_method VARCHAR(32) NULL AFTER source_format',
+              'SELECT 1')
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'excel_task' AND column_name = 'parse_method'
+);
+PREPARE add_excel_task_parse_method_stmt FROM @add_excel_task_parse_method;
+EXECUTE add_excel_task_parse_method_stmt;
+DEALLOCATE PREPARE add_excel_task_parse_method_stmt;
+
+SET @add_excel_task_ocr_provider = (
+    SELECT IF(COUNT(*) = 0,
+              'ALTER TABLE excel_task ADD COLUMN ocr_provider VARCHAR(64) NULL AFTER parse_method',
+              'SELECT 1')
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'excel_task' AND column_name = 'ocr_provider'
+);
+PREPARE add_excel_task_ocr_provider_stmt FROM @add_excel_task_ocr_provider;
+EXECUTE add_excel_task_ocr_provider_stmt;
+DEALLOCATE PREPARE add_excel_task_ocr_provider_stmt;
+
+SET @add_excel_task_ocr_model_version = (
+    SELECT IF(COUNT(*) = 0,
+              'ALTER TABLE excel_task ADD COLUMN ocr_model_version VARCHAR(100) NULL AFTER ocr_provider',
+              'SELECT 1')
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'excel_task' AND column_name = 'ocr_model_version'
+);
+PREPARE add_excel_task_ocr_model_version_stmt FROM @add_excel_task_ocr_model_version;
+EXECUTE add_excel_task_ocr_model_version_stmt;
+DEALLOCATE PREPARE add_excel_task_ocr_model_version_stmt;
+
+SET @add_excel_task_ocr_request_id = (
+    SELECT IF(COUNT(*) = 0,
+              'ALTER TABLE excel_task ADD COLUMN ocr_request_id VARCHAR(160) NULL AFTER ocr_model_version',
+              'SELECT 1')
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'excel_task' AND column_name = 'ocr_request_id'
+);
+PREPARE add_excel_task_ocr_request_id_stmt FROM @add_excel_task_ocr_request_id;
+EXECUTE add_excel_task_ocr_request_id_stmt;
+DEALLOCATE PREPARE add_excel_task_ocr_request_id_stmt;
+
+SET @add_excel_task_ocr_result_json = (
+    SELECT IF(COUNT(*) = 0,
+              'ALTER TABLE excel_task ADD COLUMN ocr_result_json LONGTEXT NULL AFTER ocr_request_id',
+              'SELECT 1')
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'excel_task' AND column_name = 'ocr_result_json'
+);
+PREPARE add_excel_task_ocr_result_json_stmt FROM @add_excel_task_ocr_result_json;
+EXECUTE add_excel_task_ocr_result_json_stmt;
+DEALLOCATE PREPARE add_excel_task_ocr_result_json_stmt;
 
 CREATE TABLE IF NOT EXISTS excel_task_sheet (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,

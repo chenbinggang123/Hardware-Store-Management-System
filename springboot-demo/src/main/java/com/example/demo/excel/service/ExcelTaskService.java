@@ -8,11 +8,13 @@ import com.example.demo.excel.dto.ExcelTaskRowPage;
 import com.example.demo.excel.dto.ExcelTaskRowView;
 import com.example.demo.excel.dto.ExcelTaskSheetView;
 import com.example.demo.excel.dto.ExcelTaskSummary;
+import com.example.demo.excel.dto.ExcelTaskOcrView;
 import com.example.demo.excel.entity.ExcelTask;
 import com.example.demo.excel.entity.ExcelTaskRow;
 import com.example.demo.excel.entity.ExcelTaskSheet;
 import com.example.demo.excel.parser.ExcelTaskParser;
 import com.example.demo.excel.parser.ParsedWorkbook;
+import com.example.demo.excel.parser.ParsedFile;
 import com.example.demo.excel.repository.ExcelTaskRepository;
 import com.example.demo.excel.repository.ExcelTaskRowRepository;
 import com.example.demo.excel.repository.ExcelTaskSheetRepository;
@@ -44,7 +46,8 @@ import java.util.UUID;
 public class ExcelTaskService {
     private static final Set<String> PURPOSES = Set.of("BUYER_QUOTE", "SUPPLIER_PRICE", "PRODUCT_IMPORT",
             "INVENTORY_COUNT", "PURCHASE_RECEIPT", "UNCLASSIFIED");
-    private static final Set<String> EXTENSIONS = Set.of("xls", "xlsx", "csv");
+    private static final Set<String> EXTENSIONS = Set.of("xls", "xlsx", "csv", "pdf", "doc", "docx",
+            "jpg", "jpeg", "png", "webp");
 
     private final ExcelTaskRepository taskRepository;
     private final ExcelTaskSheetRepository sheetRepository;
@@ -92,6 +95,8 @@ public class ExcelTaskService {
         if (file.getSize() > maxSize) throw tooLarge();
         String originalName = cleanName(file.getOriginalFilename());
         String extension = validateExtension(originalName);
+        String normalizedPurpose = normalizePurpose(purpose);
+        validateDocumentPurpose(extension, normalizedPurpose);
         byte[] content;
         try {
             content = file.getBytes();
@@ -101,7 +106,7 @@ public class ExcelTaskService {
         String mimeType = detectedMime(extension, content);
         String objectKey = "excel-tasks/" + operatorId + "/" + LocalDate.now() + "/" + UUID.randomUUID() + "." + extension;
         storage.put(objectKey, content, mimeType);
-        return create(operatorId, purpose, supplierId, priceEffectiveDate,
+        return create(operatorId, normalizedPurpose, supplierId, priceEffectiveDate,
                 objectKey, originalName, mimeType, content);
     }
 
@@ -112,6 +117,7 @@ public class ExcelTaskService {
         if (request.getFileSize() != null && request.getFileSize() > maxSize) throw tooLarge();
         String originalName = cleanName(request.getOriginalName());
         String extension = validateExtension(originalName);
+        validateDocumentPurpose(extension, context.purpose());
         byte[] content = cloudFileDownloader.download(request.getCloudFileId(), request.getDownloadUrl(), maxSize);
         String mimeType = detectedMime(extension, content);
         return create(operatorId, context.purpose(), context.supplierId(), context.effectiveDate(),
@@ -131,6 +137,8 @@ public class ExcelTaskService {
         task.setOriginalName(originalName);
         task.setObjectKey(objectKey);
         task.setMimeType(mimeType);
+        task.setSourceFormat(sourceFormat(mimeType));
+        task.setParseMethod(parseMethod(mimeType));
         task.setFileSize((long) content.length);
         task.setSha256(sha256(content));
         task.setSheetCount(0);
@@ -139,7 +147,14 @@ public class ExcelTaskService {
         task.setUpdateTime(now);
         task = taskRepository.save(task);
         try {
-            ParsedWorkbook workbook = parser.parse(mimeType, content);
+            ParsedFile parsed = parser.parseFile(originalName, mimeType, content);
+            ParsedWorkbook workbook = parsed.workbook();
+            if (parsed.ocrResult() != null) {
+                task.setOcrProvider(parsed.ocrResult().provider());
+                task.setOcrModelVersion(parsed.ocrResult().modelVersion());
+                task.setOcrRequestId(parsed.ocrResult().requestId());
+                task.setOcrResultJson(writeObject(parsed.ocrResult()));
+            }
             int dataRows = 0;
             for (ParsedWorkbook.ParsedSheet parsedSheet : workbook.sheets()) {
                 ExcelTaskSheet sheet = new ExcelTaskSheet();
@@ -190,6 +205,21 @@ public class ExcelTaskService {
     }
 
     @Transactional(readOnly = true)
+    public ExcelTaskOcrView ocrResult(Long taskId, Long operatorId) {
+        ExcelTask task = requireTask(taskId, operatorId);
+        if (!"OCR_TABLE".equals(task.getParseMethod()) || !StringUtils.hasText(task.getOcrResultJson())) {
+            throw new IllegalArgumentException("该文件任务没有可读取的表格 OCR 结果");
+        }
+        try {
+            var result = objectMapper.readValue(task.getOcrResultJson(), com.example.demo.excel.ocr.TableOcrResult.class);
+            return new ExcelTaskOcrView(task.getId(), result.provider(), result.modelVersion(), result.requestId(),
+                    result.detectedAngle(), result.imageWidth(), result.imageHeight(), result.tables(), result.warnings());
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("OCR 结果读取失败", exception);
+        }
+    }
+
+    @Transactional(readOnly = true)
     public ExcelTaskRowPage rows(Long taskId, Long sheetId, int page, int size, Long operatorId) {
         requireTask(taskId, operatorId);
         sheetRepository.findByIdAndTaskId(sheetId, taskId)
@@ -218,7 +248,9 @@ public class ExcelTaskService {
                 .toList();
         return new ExcelTaskDetail(task.getId(), task.getOriginalName(), task.getPurpose(), task.getStatus(),
                 task.getSupplierId(), task.getPriceEffectiveDate(),
-                task.getMimeType(), task.getFileSize(), task.getSha256(), task.getSheetCount(), task.getRowCount(),
+                task.getMimeType(), task.getSourceFormat(), task.getParseMethod(),
+                task.getOcrProvider(), task.getOcrModelVersion(), task.getOcrRequestId(),
+                task.getFileSize(), task.getSha256(), task.getSheetCount(), task.getRowCount(),
                 task.getErrorMessage(), task.getCreateTime(), task.getUpdateTime(), task.getVersion(), sheets);
     }
 
@@ -234,6 +266,28 @@ public class ExcelTaskService {
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("表格数据序列化失败", exception);
         }
+    }
+
+    private String writeObject(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("OCR 结果序列化失败", exception);
+        }
+    }
+
+    private String sourceFormat(String mimeType) {
+        if (mimeType != null && mimeType.startsWith("image/")) return "IMAGE";
+        if ("application/pdf".equals(mimeType)) return "PDF";
+        if ("text/csv".equals(mimeType)) return "CSV";
+        if (mimeType != null && mimeType.contains("word")) return "DOC";
+        return "EXCEL";
+    }
+
+    private String parseMethod(String mimeType) {
+        if (mimeType != null && mimeType.startsWith("image/")) return "OCR_TABLE";
+        if ("application/pdf".equals(mimeType)) return "PDF_TEXT_LAYOUT";
+        return "NATIVE_TABLE";
     }
 
     private List<String> read(String json) {
@@ -275,19 +329,50 @@ public class ExcelTaskService {
     private String validateExtension(String name) {
         int dot = name.lastIndexOf('.');
         String extension = dot < 0 ? "" : name.substring(dot + 1).toLowerCase(Locale.ROOT);
-        if (!EXTENSIONS.contains(extension)) throw new IllegalArgumentException("文件任务仅支持 XLS、XLSX 和 CSV");
+        if (!EXTENSIONS.contains(extension)) {
+            throw new IllegalArgumentException("文件任务仅支持 JPG、PNG、WEBP、DOC、DOCX、XLS、XLSX、CSV 和 PDF");
+        }
         return extension;
     }
 
+    private void validateDocumentPurpose(String extension, String purpose) {
+        if (Set.of("pdf", "doc", "docx").contains(extension) && !"BUYER_QUOTE".equals(purpose)) {
+            throw new IllegalArgumentException("Word/PDF 清单目前用于买家询价，请把文件用途选为“买家询价”");
+        }
+    }
+
     private String detectedMime(String extension, byte[] bytes) {
+        if (bytes.length >= 5 && bytes[0] == '%' && bytes[1] == 'P' && bytes[2] == 'D'
+                && bytes[3] == 'F' && bytes[4] == '-') {
+            if (!"pdf".equals(extension)) throw mismatch();
+            return "application/pdf";
+        }
+        if (bytes.length >= 8 && bytes[0] == (byte) 0x89 && bytes[1] == 'P'
+                && bytes[2] == 'N' && bytes[3] == 'G') {
+            if (!"png".equals(extension)) throw mismatch();
+            return "image/png";
+        }
+        if (bytes.length >= 3 && bytes[0] == (byte) 0xff && bytes[1] == (byte) 0xd8
+                && bytes[2] == (byte) 0xff) {
+            if (!Set.of("jpg", "jpeg").contains(extension)) throw mismatch();
+            return "image/jpeg";
+        }
+        if (bytes.length >= 12
+                && new String(bytes, 0, 4, java.nio.charset.StandardCharsets.US_ASCII).equals("RIFF")
+                && new String(bytes, 8, 4, java.nio.charset.StandardCharsets.US_ASCII).equals("WEBP")) {
+            if (!"webp".equals(extension)) throw mismatch();
+            return "image/webp";
+        }
         if (bytes.length >= 4 && bytes[0] == 'P' && bytes[1] == 'K') {
-            if (!"xlsx".equals(extension)) throw mismatch();
-            return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            if ("xlsx".equals(extension)) return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            if ("docx".equals(extension)) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+            throw mismatch();
         }
         if (bytes.length >= 4 && bytes[0] == (byte) 0xd0 && bytes[1] == (byte) 0xcf
                 && bytes[2] == 0x11 && bytes[3] == (byte) 0xe0) {
-            if (!"xls".equals(extension)) throw mismatch();
-            return "application/vnd.ms-excel";
+            if ("xls".equals(extension)) return "application/vnd.ms-excel";
+            if ("doc".equals(extension)) return "application/msword";
+            throw mismatch();
         }
         if ("csv".equals(extension) && java.util.stream.IntStream.range(0, Math.min(bytes.length, 4096))
                 .noneMatch(index -> bytes[index] == 0)) return "text/csv";

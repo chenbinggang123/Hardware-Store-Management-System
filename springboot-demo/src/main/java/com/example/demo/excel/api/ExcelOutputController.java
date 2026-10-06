@@ -5,8 +5,10 @@ import com.example.demo.common.ApiResponse;
 import com.example.demo.config.AuthInterceptor;
 import com.example.demo.excel.dto.ExcelOutputView;
 import com.example.demo.excel.dto.ExcelQuoteRequest;
+import com.example.demo.excel.dto.ExcelWorkbookExportRequest;
 import com.example.demo.excel.entity.ExcelTaskOutput;
 import com.example.demo.excel.service.ExcelQuoteService;
+import com.example.demo.excel.service.ExcelWorkbookExportService;
 import com.example.demo.security.AuthSession;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ContentDisposition;
@@ -28,10 +30,13 @@ import java.util.List;
 @RequestMapping("/excel-tasks/{taskId}")
 public class ExcelOutputController {
     private final ExcelQuoteService service;
+    private final ExcelWorkbookExportService workbookExportService;
     private final AttachmentStorage storage;
 
-    public ExcelOutputController(ExcelQuoteService service, AttachmentStorage storage) {
+    public ExcelOutputController(ExcelQuoteService service, ExcelWorkbookExportService workbookExportService,
+                                 AttachmentStorage storage) {
         this.service = service;
+        this.workbookExportService = workbookExportService;
         this.storage = storage;
     }
 
@@ -41,6 +46,15 @@ public class ExcelOutputController {
             HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.ACCEPTED)
                 .body(ApiResponse.ok("报价文件正在生成", service.generate(taskId, quote, currentUserId(request))));
+    }
+
+    @PostMapping("/generate-workbook")
+    public ResponseEntity<ApiResponse<ExcelOutputView>> generateWorkbook(
+            @PathVariable Long taskId, @RequestBody ExcelWorkbookExportRequest export,
+            HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.ACCEPTED)
+                .body(ApiResponse.ok("可编辑 Excel 正在生成",
+                        workbookExportService.generate(taskId, export, currentUserId(request))));
     }
 
     @GetMapping("/outputs")

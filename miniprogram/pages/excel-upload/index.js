@@ -37,11 +37,31 @@ Page({
 
   chooseFile() {
     if (this.data.recognizing) return
-    wx.chooseMessageFile({ count: 1, type: 'file', extension: ['xls', 'xlsx', 'csv'] }).then((result) => {
+    wx.chooseMessageFile({ count: 1, type: 'file', extension: ['doc', 'docx', 'xls', 'xlsx', 'csv', 'pdf', 'jpg', 'jpeg', 'png', 'webp'] }).then((result) => {
       const file = result.tempFiles && result.tempFiles[0]
       if (!file) return
-      this.setData({ file: { name: file.name, size: Number(file.size || 0), sizeText: this.formatSize(file.size), path: file.path || file.tempFilePath }, uploadError: '' })
+      this.selectFile(file.name, file.size, file.path || file.tempFilePath, 'file')
     }).catch(() => {})
+  },
+
+  chooseImage() {
+    if (this.data.recognizing) return
+    wx.chooseMedia({ count: 1, mediaType: ['image'], sourceType: ['album', 'camera'], sizeType: ['original', 'compressed'] })
+      .then((result) => {
+        const file = result.tempFiles && result.tempFiles[0]
+        if (!file || !file.tempFilePath) return
+        const matched = String(file.tempFilePath).match(/\.([a-zA-Z0-9]+)(?:\?|$)/)
+        const extension = matched && ['jpg', 'jpeg', 'png', 'webp'].includes(matched[1].toLowerCase())
+          ? matched[1].toLowerCase() : 'jpg'
+        this.selectFile(`价格表-${Date.now()}.${extension}`, file.size, file.tempFilePath, 'image')
+      }).catch(() => {})
+  },
+
+  selectFile(name, size, path, kind) {
+    this.setData({
+      file: { name, size: Number(size || 0), sizeText: this.formatSize(size), path, kind },
+      uploadError: ''
+    })
   },
 
   formatSize(size) {
@@ -54,7 +74,7 @@ Page({
   changeEffectiveDate(event) { this.setData({ effectiveDate: event.detail.value, uploadError: '' }) },
 
   startRecognition() {
-    if (!this.data.file) return showToast('请先选择 Excel 或 CSV 文件')
+    if (!this.data.file) return showToast('请先选择表格文件或价格表图片')
     if (this.data.recognizing) return
     const purpose = PURPOSE_OPTIONS[this.data.purposeIndex]
     if (purpose.code === 'SUPPLIER_PRICE' && this.data.supplierIndex < 0) return showToast('请选择这份价格表的供应商')
@@ -69,7 +89,7 @@ Page({
         this.setData({ uploadError: task.errorMessage || '文件读取失败，请检查表格后重试' })
         return
       }
-      showToast('文件读取完成', 'success')
+      showToast(this.data.file.kind === 'image' ? '图片表格识别完成' : '文件读取完成', 'success')
       openPage(taskRoute(task), { id: task.id }, { replace: true })
     }).catch((error) => {
       this.setData({ uploadError: errorMessage(error, '文件上传失败，请检查网络后重试') })

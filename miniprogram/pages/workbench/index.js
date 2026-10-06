@@ -33,7 +33,7 @@ Page({
     currentUser: {}, userInitial: '管', dashboardMeta: { status: '正在同步', updatedAt: '--:--' },
     summary: { attention: 0, processing: 0, failed: 0 }, priorityTasks: [],
     inventoryWarning: 0, quickActions, toolActions, todayText: dateLabel(),
-    businessSummary: { orderCount: 0, salesAmount: '0.00' }
+    businessSummary: { orderCount: 0, salesAmount: '0.00' }, deletingTaskId: ''
   },
 
   onShow() {
@@ -70,5 +70,24 @@ Page({
     const task = this.data.priorityTasks.find((item) => String(item.id) === String(event.currentTarget.dataset.id))
     if (!task) return
     openPage(taskRoute(task), { id: task.id })
+  },
+  deleteTask(event) {
+    const task = this.data.priorityTasks.find((item) => String(item.id) === String(event.currentTarget.dataset.id))
+    if (!task || !task.canDelete || this.data.deletingTaskId) return
+    wx.showModal({
+      title: '删除这个文件任务？',
+      content: `将删除“${task.fileName}”及其字段映射、复核结果和生成文件。商品、库存、订单等业务数据不会受影响。`,
+      confirmText: '删除任务',
+      confirmColor: '#B94C3A',
+      success: (result) => {
+        if (!result.confirm) return
+        this.setData({ deletingTaskId: task.id })
+        api.deleteExcelTask(task.id).then(() => {
+          wx.showToast({ title: '任务已删除', icon: 'success' })
+          return this.loadDashboard()
+        }).catch((error) => wx.showToast({ title: (error && error.message) || '删除失败，请重试', icon: 'none' }))
+          .finally(() => this.setData({ deletingTaskId: '' }))
+      }
+    })
   }
 })

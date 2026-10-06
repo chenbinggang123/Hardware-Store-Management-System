@@ -9,6 +9,8 @@ import com.example.demo.excel.dto.ExcelTaskCommitRequest;
 import com.example.demo.excel.service.ExcelTaskCommitService;
 import com.example.demo.excel.service.ExcelTaskMappingService;
 import com.example.demo.excel.service.ExcelTaskService;
+import com.example.demo.excel.ocr.TableOcrProvider;
+import com.example.demo.excel.ocr.TableOcrResult;
 import com.example.demo.entity.Product;
 import com.example.demo.repository.ProductRepository;
 import com.example.demo.repository.InventoryRepository;
@@ -31,6 +33,8 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -59,6 +63,31 @@ class ExcelTaskIntegrationTest {
 
     @MockBean
     private AttachmentStorage storage;
+
+    @MockBean
+    private TableOcrProvider tableOcrProvider;
+
+    @Test
+    void imageUploadPersistsStructuredOcrAndCreatesNormalFileTask() {
+        when(tableOcrProvider.recognize(any())).thenReturn(new TableOcrResult(
+                "test-table-ocr", "v1", "ocr-request-1", BigDecimal.ZERO, 1080, 1920,
+                List.of(new TableOcrResult.Table(0, "价格表", List.of(
+                        ocrCell(0, 0, "名称"), ocrCell(0, 1, "规格"), ocrCell(0, 2, "价格"),
+                        ocrCell(1, 0, "五节扣"), ocrCell(1, 1, "冷"), ocrCell(1, 2, "6")
+                ))), List.of(), "{\"provider\":\"test-table-ocr\"}"));
+        byte[] jpeg = new byte[]{(byte) 0xff, (byte) 0xd8, (byte) 0xff, 0x00};
+
+        var task = service.upload(new MockMultipartFile("file", "供应商价格.jpg", "image/jpeg", jpeg),
+                "BUYER_QUOTE", 99L);
+
+        assertThat(task.status()).isEqualTo("READY_FOR_MAPPING");
+        assertThat(task.sourceFormat()).isEqualTo("IMAGE");
+        assertThat(task.parseMethod()).isEqualTo("OCR_TABLE");
+        assertThat(task.ocrProvider()).isEqualTo("test-table-ocr");
+        assertThat(task.ocrRequestId()).isEqualTo("ocr-request-1");
+        assertThat(task.sheets().get(0).columns()).containsExactly("名称", "规格", "价格");
+        assertThat(service.ocrResult(task.id(), 99L).tables().get(0).cells()).hasSize(6);
+    }
 
     @Test
     void uploadCreatesPreviewableTaskWithoutWritingBusinessData() throws Exception {
@@ -169,6 +198,41 @@ class ExcelTaskIntegrationTest {
                         new ExcelColumnMappingRequest(0, "PRODUCT_NAME"))), 99L))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("刷新后重试");
+    }
+
+    @Test
+    void skipsInstructionSheetWithoutForcingProductField() throws Exception {
+        byte[] content = workbook(new String[]{"测试说明"}, new String[]{"本页不是商品数据"});
+        var task = service.upload(new MockMultipartFile("file", "含说明页.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", content),
+                "BUYER_QUOTE", 99L);
+        Long sheetId = task.sheets().get(0).id();
+
+        var skipped = mappingService.skipSheet(task.id(), sheetId, task.version(), 99L);
+
+        assertThat(skipped.status()).isEqualTo("READY_FOR_REVIEW");
+        assertThat(skipped.mappings()).singleElement()
+                .satisfies(mapping -> assertThat(mapping.targetField()).isEqualTo("IGNORE_SHEET"));
+        assertThat(mappingService.rows(task.id(), sheetId, 0, 20, 99L).items()).isEmpty();
+    }
+
+    @Test
+    void keepsCustomerNameSeparateFromProductName() throws Exception {
+        String productName = "客户字段测试商品-" + UUID.randomUUID();
+        productRepository.saveAndFlush(product(productName, "K-" + UUID.randomUUID(), "标准", BigDecimal.ONE));
+        byte[] content = workbook(new String[]{"客户名称", "商品名称"}, new String[]{"宏达装修队", productName});
+        var task = service.upload(new MockMultipartFile("file", "客户询价.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", content),
+                "BUYER_QUOTE", 99L);
+        Long sheetId = task.sheets().get(0).id();
+
+        mappingService.apply(task.id(), sheetId, new ExcelMappingRequest(task.version(), List.of(
+                new ExcelColumnMappingRequest(0, "CUSTOMER_NAME"),
+                new ExcelColumnMappingRequest(1, "PRODUCT_NAME"))), 99L);
+
+        var row = mappingService.rows(task.id(), sheetId, 0, 20, 99L).items().get(0);
+        assertThat(row.normalized()).containsEntry("CUSTOMER_NAME", "宏达装修队")
+                .containsEntry("PRODUCT_NAME", productName);
     }
 
     @Test
@@ -332,5 +396,10 @@ class ExcelTaskIntegrationTest {
             workbook.write(output);
             return output.toByteArray();
         }
+    }
+
+    private TableOcrResult.Cell ocrCell(int row, int column, String text) {
+        return new TableOcrResult.Cell(row, row, column, column, text,
+                new BigDecimal("0.98"), List.of());
     }
 }

@@ -9,6 +9,7 @@ const PURPOSE_OPTIONS = [
 
 const TARGET_OPTIONS = [
   { label: '商品名称', code: 'PRODUCT_NAME' },
+  { label: '客户名称', code: 'CUSTOMER_NAME' },
   { label: '规格', code: 'SPEC' },
   { label: '单位', code: 'UNIT' },
   { label: '数量', code: 'QUANTITY' },
@@ -80,7 +81,8 @@ function normalizeTask(item) {
     additions: Number(item.additions || 0),
     modifications: Number(item.modifications || 0),
     skipped: Number(item.skipped || 0),
-    failures: Number(item.failures || 0)
+    failures: Number(item.failures || 0),
+    canDelete: !['COMMITTED', 'COMPLETED', 'PARSING'].includes(item.status)
   }
 }
 
@@ -105,6 +107,7 @@ function taskSummary(tasks) {
 
 function guessTarget(name) {
   const value = String(name || '').replace(/\s/g, '').toLowerCase()
+  if (/客户名称|客户名|询价客户|报价客户|客户单位|客户公司/.test(value)) return 'CUSTOMER_NAME'
   if (/条码|barcode|ean|upc/.test(value)) return 'BARCODE'
   if (/品名|商品名称|产品名称|货品名称|名称/.test(value)) return 'PRODUCT_NAME'
   if (/规格|型号|尺寸/.test(value)) return 'SPEC'
@@ -133,13 +136,15 @@ function requiredTarget(code, purpose) {
 function buildMappings(sheet, rowItems, existingMappings, purpose) {
   const existing = new Map((existingMappings || []).map((item) => [Number(item.sourceColumnIndex), item.targetField]))
   return (sheet.columns || []).map((source, sourceColumnIndex) => {
-    const code = existing.get(sourceColumnIndex) || guessTarget(source)
+    const storedCode = existing.get(sourceColumnIndex)
+    const code = storedCode === 'IGNORE_SHEET' ? 'IGNORE' : (storedCode || guessTarget(source))
     const samples = (rowItems || []).slice(0, 3).map((row) => (row.cells || [])[sourceColumnIndex]).filter(Boolean).join('｜') || '暂无样例'
     return {
       sourceColumnIndex,
       source,
       targetCode: code,
       target: targetLabel(code),
+      targetIndex: Math.max(0, TARGET_OPTIONS.findIndex((item) => item.code === code)),
       confidence: existing.has(sourceColumnIndex) ? 100 : (code === 'IGNORE' ? 0 : 88),
       samples,
       required: requiredTarget(code, purpose)

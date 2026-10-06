@@ -54,3 +54,5 @@
 .review-tip { padding: 60rpx 20rpx; color: #718079; text-align: center; font-size: 24rpx; }
 .review-segment { min-height: 76rpx; padding: 0 28rpx; display: flex; align-items: center; justify-content: space-between; gap: 18rpx; color: #718079; font-size: 20rpx; }
 .review-segment view { color: #245E9B; font-weight: 650; }
+.split-action { display: grid; grid-template-columns: .62fr 1.55fr; gap: 14rpx; }
+.fixed-secondary { min-height: 92rpx; margin: 0; padding: 0 16rpx; display: flex; align-items: center; justify-content: center; border: 1rpx solid #AEBAB4; border-radius: 14rpx; color: #40504A; background: #FFF; font-size: 28rpx; font-weight: 700; }

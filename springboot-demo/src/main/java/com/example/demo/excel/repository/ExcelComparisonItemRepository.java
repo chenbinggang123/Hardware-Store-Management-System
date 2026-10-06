@@ -9,4 +9,5 @@ public interface ExcelComparisonItemRepository extends JpaRepository<ExcelCompar
     Page<ExcelComparisonItem> findByComparisonIdOrderByIdAsc(Long comparisonId, Pageable pageable);
     Page<ExcelComparisonItem> findByComparisonIdAndChangeTypeOrderByIdAsc(
             Long comparisonId, String changeType, Pageable pageable);
+    void deleteByComparisonId(Long comparisonId);
 }

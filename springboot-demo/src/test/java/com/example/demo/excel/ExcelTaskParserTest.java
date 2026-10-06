@@ -2,6 +2,7 @@ package com.example.demo.excel;
 
 import com.example.demo.excel.parser.ExcelTaskParser;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
@@ -50,6 +51,28 @@ class ExcelTaskParserTest {
 
         assertThat(result.sheets().get(0).columns()).containsExactly("商品", "备注", "数量");
         assertThat(result.sheets().get(0).rows().get(0).cells()).containsExactly("电钻", "红色,加急", "2");
+    }
+
+    @Test
+    void readsTablesFromDocxAsWorkbookSheets() throws Exception {
+        byte[] content;
+        try (var document = new XWPFDocument(); var output = new ByteArrayOutputStream()) {
+            var table = document.createTable(2, 3);
+            table.getRow(0).getCell(0).setText("商品名称");
+            table.getRow(0).getCell(1).setText("单位");
+            table.getRow(0).getCell(2).setText("数量");
+            table.getRow(1).getCell(0).setText("模具导柱");
+            table.getRow(1).getCell(1).setText("支");
+            table.getRow(1).getCell(2).setText("4");
+            document.write(output);
+            content = output.toByteArray();
+        }
+
+        var result = parser.parse("application/vnd.openxmlformats-officedocument.wordprocessingml.document", content);
+
+        assertThat(result.sheets()).hasSize(1);
+        assertThat(result.sheets().get(0).columns()).containsExactly("商品名称", "单位", "数量");
+        assertThat(result.sheets().get(0).rows().get(0).cells()).containsExactly("模具导柱", "支", "4");
     }
 
     @Test

@@ -40,6 +40,8 @@
 .home-task-foot { margin-top: 8rpx; display: flex; justify-content: space-between; gap: 18rpx; color: #718079; font-size: 19rpx; }
 .home-task-foot text:first-child { flex: 1; min-width: 0; }
 .home-task-foot text:last-child { color: #245E9B; white-space: nowrap; }
+.home-task-actions { display: flex; align-items: center; gap: 10rpx; flex: 0 0 auto; }
+.home-task-delete { min-width: 88rpx; min-height: 88rpx; padding: 0 12rpx; display: flex; align-items: center; justify-content: center; box-sizing: border-box; color: #A83F32; background: #FCE9E4; border-radius: 10rpx; font-weight: 700; }
 .business-section { margin-top: 36rpx; }
 .business-direction-head { margin: 0 2rpx 13rpx; display: flex; align-items: center; gap: 13rpx; }
 .direction-mark { width: 48rpx; height: 48rpx; display: flex; align-items: center; justify-content: center; border-radius: 13rpx; color: #6F480D; background: #FFE8BD; font-size: 20rpx; font-weight: 750; }

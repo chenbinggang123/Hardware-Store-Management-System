@@ -3,3 +3,4 @@ python-multipart==0.0.20
 uvicorn[standard]==0.34.2
 paddleocr==3.0.0
 paddlepaddle==3.0.0
+pillow==11.2.1

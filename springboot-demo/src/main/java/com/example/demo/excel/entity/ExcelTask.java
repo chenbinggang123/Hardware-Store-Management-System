@@ -1,6 +1,7 @@
 package com.example.demo.excel.entity;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.Column;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -26,6 +27,13 @@ public class ExcelTask {
     private String originalName;
     private String objectKey;
     private String mimeType;
+    private String sourceFormat;
+    private String parseMethod;
+    private String ocrProvider;
+    private String ocrModelVersion;
+    private String ocrRequestId;
+    @Column(name = "ocr_result_json", columnDefinition = "LONGTEXT")
+    private String ocrResultJson;
     private Long fileSize;
     private String sha256;
     private Integer sheetCount;

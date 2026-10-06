@@ -8,4 +8,5 @@ import java.util.Optional;
 public interface ExcelTaskCommitRepository extends JpaRepository<ExcelTaskCommit, Long> {
     Optional<ExcelTaskCommit> findByOperatorIdAndIdempotencyKey(Long operatorId, String idempotencyKey);
     Optional<ExcelTaskCommit> findByTaskId(Long taskId);
+    void deleteByTaskId(Long taskId);
 }

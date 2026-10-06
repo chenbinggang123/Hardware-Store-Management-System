@@ -24,7 +24,7 @@
       <view class="task-file-name">{{item.fileName}}</view>
       <view class="task-relation">{{item.sheetCount}} 个工作表 · {{item.rowCount}} 行</view>
       <view class="task-progress-track"><view class="task-progress-value {{item.statusTone}}" style="width: {{item.progress}}%;"></view></view>
-      <view class="task-row-foot"><text>{{item.progressText}}</text><text>{{item.updatedAt}} ›</text></view>
+      <view class="task-row-foot"><text>{{item.progressText}}</text><view class="task-row-actions"><text>{{item.updatedAt}} ›</text><view wx:if="{{item.canDelete}}" class="task-delete" data-id="{{item.id}}" catchtap="deleteTask">{{deletingTaskId === item.id ? '删除中' : '删除'}}</view></view></view>
     </view>
   </view>
 
