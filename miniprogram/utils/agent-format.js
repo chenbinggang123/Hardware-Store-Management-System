@@ -12,13 +12,66 @@ function plainBlocks(value) {
   const text = cleanMarkdown(value)
     .replace(/\|\s*:?-{3,}:?\s*(?=\||$)/g, '')
     .replace(/\s+-\s+(?=[^：:\n]{1,18}[：:])/g, '\n')
-    .replace(/\s*\|\s*/g, ' · ')
+    // Only trim spaces around table separators. Using \s here also consumes
+    // newlines and collapses every OCR order row into one unreadable paragraph.
+    .replace(/[ \t]*\|[ \t]*/g, ' · ')
 
   return text.split(/\n+/).map((line) => line.trim()).filter(Boolean).map((line) => {
     const field = line.match(/^-?\s*([^：:]{1,18})[：:]\s*(.+)$/)
     if (field) return { type: 'field', label: field[1].trim(), value: field[2].trim() }
     return { type: 'text', text: line.replace(/^[-•]\s*/, '') }
   })
+}
+
+function tableCells(line) {
+  const source = String(line || '').trim()
+  if (!source.includes('|')) return []
+  return source.replace(/^\|/, '').replace(/\|$/, '').split('|').map((cell) => cleanMarkdown(cell))
+}
+
+function isSeparatorCells(cells) {
+  return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell.replace(/\s/g, '')))
+}
+
+function sourceOrderTableBlocks(value) {
+  const lines = String(value || '').replace(/\r/g, '').split('\n')
+  for (let headerLine = 0; headerLine < lines.length; headerLine += 1) {
+    const headers = tableCells(lines[headerLine])
+    const normalized = headers.map((header) => header.replace(/\s/g, ''))
+    const lineIndex = normalized.findIndex((header) => header === '行号')
+    const nameIndex = normalized.findIndex((header) => header === '商品名称' || header === '商品')
+    const unitIndex = normalized.findIndex((header) => header === '单位')
+    const quantityIndex = normalized.findIndex((header) => header === '数量')
+    const priceIndex = normalized.findIndex((header) => header === '单价')
+    const amountIndex = normalized.findIndex((header) => header === '行金额' || header === '金额')
+    if ([lineIndex, nameIndex, unitIndex, quantityIndex, priceIndex, amountIndex].some((index) => index < 0)) continue
+
+    const rows = []
+    let cursor = headerLine + 1
+    while (cursor < lines.length) {
+      const cells = tableCells(lines[cursor])
+      if (!cells.length) break
+      if (isSeparatorCells(cells)) {
+        cursor += 1
+        continue
+      }
+      const lineNo = cells[lineIndex]
+      if (!/^\d+$/.test(lineNo || '')) break
+      rows.push({
+        type: 'field',
+        label: `第${lineNo}行`,
+        value: `${cells[nameIndex] || '未识别商品'} · ${cells[unitIndex] || '单位待核对'} · ${cells[quantityIndex] || '?'} × ¥${cells[priceIndex] || '?'} = ¥${cells[amountIndex] || '?'}`
+      })
+      cursor += 1
+    }
+    if (!rows.length) continue
+    return [
+      ...plainBlocks(lines.slice(0, headerLine).join('\n')),
+      ...rows,
+      ...plainBlocks(lines.slice(cursor).join('\n'))
+    ]
+  }
+  return null
 }
 
 function productTableBlocks(value) {
@@ -53,7 +106,7 @@ function productTableBlocks(value) {
 function formatAgentContent(value) {
   const content = cleanMarkdown(value)
   if (!content) return []
-  return productTableBlocks(content) || plainBlocks(content)
+  return sourceOrderTableBlocks(content) || productTableBlocks(content) || plainBlocks(content)
 }
 
 module.exports = { formatAgentContent }

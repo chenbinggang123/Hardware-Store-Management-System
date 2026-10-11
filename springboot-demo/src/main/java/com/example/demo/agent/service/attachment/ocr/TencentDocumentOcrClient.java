@@ -18,6 +18,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.io.ByteArrayInputStream;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
@@ -124,8 +126,11 @@ public class TencentDocumentOcrClient implements DocumentOcrClient {
             StringBuilder output = new StringBuilder("[腾讯云表格识别 V3：OCR原文，等待用户审核]\n");
             contexts.stream().sorted(Comparator.comparingInt(this::topY)).forEach(cell ->
                     output.append("[上下文] ").append(clean(cell.path("Text").asText())).append('\n'));
+            List<String> reviewSummaries = new ArrayList<>();
             int tableIndex = 0;
             for (JsonNode table : structuredTables) {
+                String reviewSummary = buildLineItemReviewSummary(table);
+                if (StringUtils.hasText(reviewSummary)) reviewSummaries.add(reviewSummary);
                 output.append("[表格 ").append(++tableIndex).append("]\n");
                 Map<Integer, List<JsonNode>> rows = new TreeMap<>();
                 for (JsonNode cell : table.path("Cells")) {
@@ -143,6 +148,9 @@ public class TencentDocumentOcrClient implements DocumentOcrClient {
                     }
                     output.append(String.join("\t", values)).append('\n');
                 });
+            }
+            if (!reviewSummaries.isEmpty()) {
+                output.insert(0, String.join("\n", reviewSummaries) + "\n\n");
             }
             return new DocumentOcrResult("tencent-table-v3", text(payload, "RequestId"), output.toString().trim(),
                     reviewWarnings());
@@ -221,6 +229,149 @@ public class TencentDocumentOcrClient implements DocumentOcrClient {
         }
     }
 
+    private String buildLineItemReviewSummary(JsonNode table) {
+        JsonNode cellsNode = table.path("Cells");
+        if (!cellsNode.isArray()) return "";
+        List<JsonNode> cells = new ArrayList<>();
+        cellsNode.forEach(cells::add);
+
+        JsonNode productHeader = findHeader(cells, "项目");
+        JsonNode unitHeader = findHeader(cells, "单位");
+        JsonNode quantityHeader = findHeader(cells, "数量");
+        JsonNode priceHeader = findHeader(cells, "单价");
+        JsonNode amountHeader = findHeader(cells, "金额");
+        if (productHeader == null || unitHeader == null || quantityHeader == null
+                || priceHeader == null || amountHeader == null) return "";
+
+        int headerRow = productHeader.path("RowTl").asInt();
+        int productEnd = unitHeader.path("ColTl").asInt();
+        int unitColumn = unitHeader.path("ColTl").asInt();
+        int quantityColumn = quantityHeader.path("ColTl").asInt();
+        int priceColumn = priceHeader.path("ColTl").asInt();
+        int amountStart = amountHeader.path("ColTl").asInt();
+        JsonNode signatureHeader = findHeader(cells, "客户签名");
+        int amountEnd = signatureHeader == null
+                ? amountHeader.path("ColBr").asInt(amountStart + 1)
+                : signatureHeader.path("ColTl").asInt();
+
+        Map<Integer, List<JsonNode>> rows = new TreeMap<>();
+        for (JsonNode cell : cells) {
+            int row = cell.path("RowTl").asInt(-1);
+            if (row > headerRow) rows.computeIfAbsent(row, ignored -> new ArrayList<>()).add(cell);
+        }
+
+        StringBuilder output = new StringBuilder("[结构化审核参考：保留OCR原文，金额由数量×单价验算]\n");
+        output.append("行号\t商品原文\t单位原文\t数量原文\t单价原文\t验算金额\t金额栏OCR原文\n");
+        BigDecimal calculatedTotal = BigDecimal.ZERO;
+        int itemIndex = 0;
+        String printedTotalRaw = null;
+        for (Map.Entry<Integer, List<JsonNode>> entry : rows.entrySet()) {
+            List<JsonNode> rowCells = entry.getValue();
+            String wholeRow = joinTexts(rowCells, Integer.MIN_VALUE, Integer.MAX_VALUE);
+            if (wholeRow.contains("合计")) {
+                printedTotalRaw = lastNumber(wholeRow);
+                continue;
+            }
+            String product = joinOverlappingTexts(rowCells, Integer.MIN_VALUE, productEnd);
+            if (!StringUtils.hasText(product)) continue;
+            String unit = textAtColumn(rowCells, unitColumn);
+            String quantityRaw = textAtColumn(rowCells, quantityColumn);
+            String priceRaw = textAtColumn(rowCells, priceColumn);
+            String amountRaw = joinTexts(rowCells, amountStart, amountEnd);
+            BigDecimal quantity = ocrNumber(quantityRaw);
+            BigDecimal price = ocrNumber(priceRaw);
+            BigDecimal calculated = quantity == null || price == null ? null
+                    : quantity.multiply(price).setScale(2, RoundingMode.HALF_UP);
+            if (calculated != null) calculatedTotal = calculatedTotal.add(calculated);
+
+            output.append(++itemIndex).append('\t')
+                    .append(product).append('\t')
+                    .append(unit).append('\t')
+                    .append(quantityRaw).append('\t')
+                    .append(priceRaw).append('\t')
+                    .append(calculated == null ? "待核对" : calculated.toPlainString()).append('\t')
+                    .append(amountReview(amountRaw, calculated)).append('\n');
+        }
+        if (itemIndex == 0) return "";
+        output.append("明细验算合计\t").append(calculatedTotal.setScale(2, RoundingMode.HALF_UP).toPlainString()).append('\n');
+        if (StringUtils.hasText(printedTotalRaw)) {
+            output.append("票面合计OCR原文\t").append(printedTotalRaw)
+                    .append("（金额格含元角分，不可直接当作整数元；小数位置由用户确认）\n");
+        }
+        return output.toString().trim();
+    }
+
+    private JsonNode findHeader(List<JsonNode> cells, String expected) {
+        return cells.stream()
+                .filter(cell -> cell.path("RowTl").asInt(-1) >= 0)
+                .filter(cell -> compact(cell.path("Text").asText()).equals(expected))
+                .findFirst().orElse(null);
+    }
+
+    private String textAtColumn(List<JsonNode> cells, int column) {
+        return cells.stream()
+                .filter(cell -> cell.path("ColTl").asInt(-1) == column)
+                .map(cell -> clean(cell.path("Text").asText()))
+                .filter(StringUtils::hasText)
+                .findFirst().orElse("");
+    }
+
+    private String joinOverlappingTexts(List<JsonNode> cells, int startInclusive, int endExclusive) {
+        return cells.stream()
+                .filter(cell -> cell.path("ColTl").asInt(-1) < endExclusive
+                        && cell.path("ColBr").asInt(-1) > startInclusive)
+                .sorted(Comparator.comparingInt(cell -> cell.path("ColTl").asInt()))
+                .map(cell -> clean(cell.path("Text").asText()))
+                .filter(StringUtils::hasText)
+                .reduce((left, right) -> left + " " + right).orElse("");
+    }
+
+    private String joinTexts(List<JsonNode> cells, int startInclusive, int endExclusive) {
+        return cells.stream()
+                .filter(cell -> cell.path("ColTl").asInt(-1) >= startInclusive
+                        && cell.path("ColTl").asInt(-1) < endExclusive)
+                .sorted(Comparator.comparingInt(cell -> cell.path("ColTl").asInt()))
+                .map(cell -> clean(cell.path("Text").asText()))
+                .filter(StringUtils::hasText)
+                .reduce((left, right) -> left + right).orElse("");
+    }
+
+    private BigDecimal ocrNumber(String value) {
+        if (!StringUtils.hasText(value)) return null;
+        String normalized = value.trim().replace('、', '.').replace('，', '.').replace(',', '.');
+        normalized = normalized.replaceAll("[^0-9.+-]", "");
+        if (!normalized.matches("[-+]?\\d+(?:\\.\\d+)?")) return null;
+        try {
+            return new BigDecimal(normalized);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private String amountReview(String raw, BigDecimal calculated) {
+        if (!StringUtils.hasText(raw)) return "未识别";
+        BigDecimal rawNumber = ocrNumber(raw);
+        if (calculated != null && rawNumber != null && rawNumber.compareTo(calculated) != 0) {
+            if (rawNumber.movePointLeft(1).compareTo(calculated) == 0) {
+                return raw + "（元角分栏；应读作 " + calculated.toPlainString() + " 元）";
+            }
+            return raw + "（与验算金额不一致，待核对）";
+        }
+        return raw;
+    }
+
+    private String lastNumber(String value) {
+        if (!StringUtils.hasText(value)) return null;
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("[0-9]+(?:[、.,][0-9]+)?").matcher(value);
+        String result = null;
+        while (matcher.find()) result = matcher.group();
+        return result;
+    }
+
+    private String compact(String value) {
+        return value == null ? "" : value.replaceAll("\\s+", "").trim();
+    }
+
     private JsonNode payload(String response) throws Exception {
         if (!StringUtils.hasText(response)) throw new IllegalStateException("腾讯云 OCR 返回空响应");
         JsonNode root = objectMapper.readTree(response);
@@ -236,7 +387,8 @@ public class TencentDocumentOcrClient implements DocumentOcrClient {
     private List<String> reviewWarnings() {
         return List.of(
                 "OCR结果仅生成待审核草稿，商品名称和单位必须保留原文，不得按常识擅自改写",
-                "数量、单价、行金额和合计需要显示给用户核对；验算差异只能提示，不能静默覆盖OCR原值");
+                "数量、单价、行金额和合计需要显示给用户核对；验算金额是审核参考，不能静默覆盖OCR原值",
+                "金额格按十万千百十元角分排列；例如OCR原文504若与28×1.8吻合，应展示为50.40元而不是504元");
     }
 
     private int topY(JsonNode cell) {

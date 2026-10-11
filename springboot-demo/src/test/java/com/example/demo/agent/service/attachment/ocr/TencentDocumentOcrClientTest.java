@@ -44,6 +44,36 @@ class TencentDocumentOcrClientTest {
     }
 
     @Test
+    void treatsMergedAmountDigitsAsYuanJiaoFenAndProvidesArithmeticReviewValue() {
+        String response = """
+                {"Response":{"RequestId":"amount-grid","TableDetections":[{"Cells":[
+                  {"RowTl":1,"ColTl":1,"ColBr":2,"Text":"项目"},
+                  {"RowTl":1,"ColTl":2,"ColBr":3,"Text":"单位"},
+                  {"RowTl":1,"ColTl":3,"ColBr":4,"Text":"数量"},
+                  {"RowTl":1,"ColTl":4,"ColBr":5,"Text":"单价"},
+                  {"RowTl":1,"ColTl":5,"ColBr":13,"Text":"金额"},
+                  {"RowTl":1,"ColTl":13,"ColBr":14,"Text":"客户签名"},
+                  {"RowTl":2,"ColTl":10,"ColBr":11,"Text":"元"},
+                  {"RowTl":2,"ColTl":11,"ColBr":12,"Text":"角分"},
+                  {"RowTl":3,"ColTl":0,"ColBr":2,"Text":"气管10"},
+                  {"RowTl":3,"ColTl":2,"ColBr":3,"Text":"￥"},
+                  {"RowTl":3,"ColTl":3,"ColBr":4,"Text":"28"},
+                  {"RowTl":3,"ColTl":4,"ColBr":5,"Text":"1、8"},
+                  {"RowTl":3,"ColTl":9,"ColBr":10,"Text":"504"},
+                  {"RowTl":4,"ColTl":0,"ColBr":13,"Text":"合计 ￥:2451"}
+                ]}]}}
+                """;
+
+        DocumentOcrResult result = client.parseTableResponse(response);
+
+        assertThat(result.text()).contains("结构化审核参考", "气管10", "1、8", "50.40");
+        assertThat(result.text()).contains("504（元角分栏；应读作 50.40 元）");
+        assertThat(result.text()).contains("明细验算合计\t50.40");
+        assertThat(result.text()).contains("票面合计OCR原文\t2451");
+        assertThat(result.warnings()).anyMatch(value -> value.contains("504") && value.contains("50.40"));
+    }
+
+    @Test
     void returnsEmptyTableTextSoCallerCanFallbackToGeneralOcr() {
         DocumentOcrResult result = client.parseTableResponse("""
                 {"Response":{"RequestId":"no-table","TableDetections":[
