@@ -126,6 +126,78 @@ public class FactoryLedgerService {
     }
 
     public Map<String, Object> addTransaction(Long ledgerId, FactoryLedgerTransactionRequest request, Long operatorId) {
+        return addTransaction(ledgerId, request, operatorId, "MINIPROGRAM");
+    }
+
+    public Map<String, Object> addAgentTransaction(Long ledgerId, FactoryLedgerTransactionRequest request, Long operatorId) {
+        return addTransaction(ledgerId, request, operatorId, "AGENT");
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> previewTransaction(Long ledgerId, FactoryLedgerTransactionRequest request) {
+        PreparedTransaction prepared = prepareTransaction(ledgerId, request);
+        List<FactoryLedgerTransaction> currentTransactions = transactionRepository
+                .findByLedgerIdOrderByTransactionDateDescCreateTimeDesc(ledgerId);
+        YearMonth month = YearMonth.from(prepared.date());
+        Map<String, Object> currentSummary = calculateSummary(prepared.ledger(), currentTransactions, month);
+        long balanceBeforeCents = number(currentSummary.get("balanceCents"));
+        long balanceAfterCents = balanceBeforeCents + transactionDelta(request.getType(), prepared.amountCents());
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("ledgerId", ledgerId);
+        result.put("ledgerNo", prepared.ledger().getLedgerNo());
+        result.put("factoryName", prepared.ledger().getFactoryName());
+        result.put("type", request.getType());
+        result.put("typeLabel", transactionTypeLabel(request.getType()));
+        result.put("date", prepared.date());
+        result.put("receiptNo", prepared.receiptNo());
+        result.put("items", prepared.items());
+        result.put("amountCents", prepared.amountCents());
+        result.put("amount", yuan(prepared.amountCents()));
+        result.put("balanceBeforeCents", balanceBeforeCents);
+        result.put("balanceBefore", yuan(balanceBeforeCents));
+        result.put("balanceAfterCents", balanceAfterCents);
+        result.put("balanceAfter", yuan(balanceAfterCents));
+        result.put("remark", trim(request.getRemark()));
+        result.put("effect", transactionTypeLabel(request.getType()) + " ¥" + yuan(prepared.amountCents())
+                + "，账本余额将从 ¥" + yuan(balanceBeforeCents) + " 变为 ¥" + yuan(balanceAfterCents));
+        return result;
+    }
+
+    private Map<String, Object> addTransaction(
+            Long ledgerId,
+            FactoryLedgerTransactionRequest request,
+            Long operatorId,
+            String source) {
+        PreparedTransaction prepared = prepareTransaction(ledgerId, request);
+        FactoryLedger ledger = prepared.ledger();
+        List<FactoryLedgerItem> items = prepared.items();
+        long amountCents = prepared.amountCents();
+        String receiptNo = prepared.receiptNo();
+
+        LocalDateTime now = LocalDateTime.now();
+        FactoryLedgerTransaction transaction = new FactoryLedgerTransaction();
+        transaction.setTransactionNo(readableNumber("LS"));
+        transaction.setLedgerId(ledgerId);
+        transaction.setType(request.getType());
+        transaction.setTransactionDate(prepared.date());
+        transaction.setReceiptNo(receiptNo);
+        transaction.setAmountCents(amountCents);
+        transaction.setItems(items);
+        transaction.setRemark(trim(request.getRemark()));
+        transaction.setSource(source);
+        transaction.setOperatorId(operatorId);
+        transaction.setCreateTime(now);
+        FactoryLedgerTransaction saved = transactionRepository.save(transaction);
+
+        ledger.setUpdateTime(now);
+        ledgerRepository.save(ledger);
+        upsertSettlement(ledgerId, YearMonth.from(saved.getTransactionDate()).toString(), "PENDING_SUMMARY", operatorId);
+        audit(operatorId, request.getType(), transactionTypeLabel(request.getType()) + "：" + ledger.getFactoryName() + " ¥" + yuan(amountCents));
+        return transactionView(saved);
+    }
+
+    private PreparedTransaction prepareTransaction(Long ledgerId, FactoryLedgerTransactionRequest request) {
         FactoryLedger ledger = requireLedger(ledgerId);
         if (request == null || !TRANSACTION_TYPES.contains(request.getType())) {
             throw new IllegalArgumentException("请选择拿货、退货或收款");
@@ -147,27 +219,12 @@ public class FactoryLedgerService {
         if (amountCents <= 0) {
             throw new IllegalArgumentException("PAYMENT".equals(request.getType()) ? "请填写收款金额" : "请至少填写一件有效商品");
         }
-
-        LocalDateTime now = LocalDateTime.now();
-        FactoryLedgerTransaction transaction = new FactoryLedgerTransaction();
-        transaction.setTransactionNo(readableNumber("LS"));
-        transaction.setLedgerId(ledgerId);
-        transaction.setType(request.getType());
-        transaction.setTransactionDate(request.getDate() == null ? LocalDate.now() : request.getDate());
-        transaction.setReceiptNo(receiptNo);
-        transaction.setAmountCents(amountCents);
-        transaction.setItems(items);
-        transaction.setRemark(trim(request.getRemark()));
-        transaction.setSource("MINIPROGRAM");
-        transaction.setOperatorId(operatorId);
-        transaction.setCreateTime(now);
-        FactoryLedgerTransaction saved = transactionRepository.save(transaction);
-
-        ledger.setUpdateTime(now);
-        ledgerRepository.save(ledger);
-        upsertSettlement(ledgerId, YearMonth.from(saved.getTransactionDate()).toString(), "PENDING_SUMMARY", operatorId);
-        audit(operatorId, request.getType(), transactionTypeLabel(request.getType()) + "：" + ledger.getFactoryName() + " ¥" + yuan(amountCents));
-        return transactionView(saved);
+        return new PreparedTransaction(
+                ledger,
+                items,
+                amountCents,
+                receiptNo,
+                request.getDate() == null ? LocalDate.now() : request.getDate());
     }
 
     public Map<String, Object> setSettlementStatus(Long ledgerId, String monthText, String status, Long operatorId) {
@@ -328,7 +385,11 @@ public class FactoryLedgerService {
     }
 
     private long transactionDelta(FactoryLedgerTransaction transaction) {
-        return "PURCHASE".equals(transaction.getType()) ? transaction.getAmountCents() : -transaction.getAmountCents();
+        return transactionDelta(transaction.getType(), transaction.getAmountCents());
+    }
+
+    private long transactionDelta(String type, long amountCents) {
+        return "PURCHASE".equals(type) ? amountCents : -amountCents;
     }
 
     private String transactionContent(FactoryLedgerTransaction transaction) {
@@ -380,5 +441,13 @@ public class FactoryLedgerService {
         log.setDetail(detail);
         log.setCreateTime(LocalDateTime.now());
         operationLogRepository.save(log);
+    }
+
+    private record PreparedTransaction(
+            FactoryLedger ledger,
+            List<FactoryLedgerItem> items,
+            long amountCents,
+            String receiptNo,
+            LocalDate date) {
     }
 }

@@ -72,4 +72,12 @@ class AttachmentContentParserTest {
         assertThat(result.status()).isEqualTo("WAITING_OCR");
         assertThat(result.error()).contains("PaddleOCR");
     }
+
+    @Test
+    void videoWaitsForConfiguredOcrServiceWithoutStartingFfmpeg() {
+        var result = parser.parse("厂商订单.mp4", "video/mp4", new byte[]{0, 0, 0, 20});
+
+        assertThat(result.status()).isEqualTo("WAITING_OCR");
+        assertThat(result.error()).contains("视频已保存", "OCR");
+    }
 }

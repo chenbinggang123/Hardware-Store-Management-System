@@ -10,6 +10,7 @@ import com.example.demo.repository.FactoryLedgerTransactionRepository;
 import com.example.demo.repository.OperationLogRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -22,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class FactoryLedgerServiceTest {
@@ -89,6 +91,28 @@ class FactoryLedgerServiceTest {
 
         assertEquals("CONFIRMED", result.get("status"));
         assertEquals("已确认", result.get("statusLabel"));
+    }
+
+    @Test
+    void previewsBalanceWithoutWritingAndMarksConfirmedAgentEntry() {
+        when(transactionRepository.findByLedgerIdOrderByTransactionDateDescCreateTimeDesc(1L)).thenReturn(List.of());
+        when(settlementRepository.findByLedgerIdAndSettlementMonth(1L, "2026-10"))
+                .thenReturn(Optional.empty());
+        FactoryLedgerTransactionRequest request = new FactoryLedgerTransactionRequest();
+        request.setType("PAYMENT");
+        request.setDate(LocalDate.of(2026, 10, 11));
+        request.setPaymentAmount(new BigDecimal("50.00"));
+
+        Map<String, Object> preview = service.previewTransaction(1L, request);
+
+        assertEquals("128.50", preview.get("balanceBefore"));
+        assertEquals("78.50", preview.get("balanceAfter"));
+
+        service.addAgentTransaction(1L, request, 7L);
+        ArgumentCaptor<FactoryLedgerTransaction> transactionCaptor = ArgumentCaptor.forClass(FactoryLedgerTransaction.class);
+        verify(transactionRepository).save(transactionCaptor.capture());
+        assertEquals("AGENT", transactionCaptor.getValue().getSource());
+        assertEquals(7L, transactionCaptor.getValue().getOperatorId());
     }
 
     private FactoryLedger ledger() {

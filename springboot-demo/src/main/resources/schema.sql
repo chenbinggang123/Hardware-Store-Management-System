@@ -117,6 +117,31 @@ CREATE TABLE IF NOT EXISTS factory_ledger_settlement (
     KEY idx_factory_settlement_status (settlement_month, status)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS source_purchase_document (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    purchase_order_id BIGINT,
+    attachment_id BIGINT NOT NULL,
+    supplier_id BIGINT,
+    supplier_name VARCHAR(100) NOT NULL,
+    source_order_no VARCHAR(100),
+    order_date DATE NOT NULL,
+    buyer_name VARCHAR(100),
+    handler_name VARCHAR(100),
+    declared_total_amount DECIMAL(12, 2),
+    calculated_total_amount DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+    receive_stock TINYINT NOT NULL DEFAULT 0,
+    remark VARCHAR(500),
+    operator_id BIGINT NOT NULL,
+    idempotency_key VARCHAR(160) NOT NULL,
+    create_time DATETIME NOT NULL,
+    items_json LONGTEXT NOT NULL,
+    UNIQUE KEY uk_source_purchase_idempotency (idempotency_key),
+    UNIQUE KEY uk_source_purchase_supplier_order (supplier_name, source_order_no),
+    KEY idx_source_purchase_time (order_date, create_time),
+    KEY idx_source_purchase_attachment (attachment_id),
+    KEY idx_source_purchase_order (purchase_order_id)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS sales_order_draft (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     customer_id BIGINT NOT NULL,

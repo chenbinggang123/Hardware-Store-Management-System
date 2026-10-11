@@ -2,6 +2,7 @@ package com.example.demo.agent.service.attachment;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
@@ -28,9 +29,13 @@ import org.springframework.web.client.RestClient;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Component
 public class AttachmentContentParser {
@@ -41,17 +46,28 @@ public class AttachmentContentParser {
     private final String ocrUrl;
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
+    private final String ffmpegPath;
+    private final int videoTimeoutSeconds;
 
+    @Autowired
     public AttachmentContentParser(
             @Value("${agent.attachment.ocr-url:}") String ocrUrl,
             @Value("${agent.attachment.ocr-timeout-seconds:45}") int timeoutSeconds,
+            @Value("${agent.attachment.ffmpeg-path:ffmpeg}") String ffmpegPath,
+            @Value("${agent.attachment.video-timeout-seconds:60}") int videoTimeoutSeconds,
             ObjectMapper objectMapper) {
         this.ocrUrl = ocrUrl;
         this.objectMapper = objectMapper;
+        this.ffmpegPath = ffmpegPath;
+        this.videoTimeoutSeconds = Math.max(videoTimeoutSeconds, 10);
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(Duration.ofSeconds(Math.min(timeoutSeconds, 10)));
         requestFactory.setReadTimeout(Duration.ofSeconds(timeoutSeconds));
         this.restClient = RestClient.builder().requestFactory(requestFactory).build();
+    }
+
+    public AttachmentContentParser(String ocrUrl, int timeoutSeconds, ObjectMapper objectMapper) {
+        this(ocrUrl, timeoutSeconds, "ffmpeg", 60, objectMapper);
     }
 
     public AttachmentParseResult parse(String fileName, String mimeType, byte[] content) {
@@ -73,6 +89,9 @@ public class AttachmentContentParser {
             }
             if (mimeType.startsWith("image/")) {
                 return parseImage(fileName, mimeType, content);
+            }
+            if ("video/mp4".equals(mimeType)) {
+                return parseVideo(fileName, content);
             }
             return AttachmentParseResult.failed("暂不支持该文件类型");
         } catch (Exception exception) {
@@ -216,6 +235,63 @@ public class AttachmentContentParser {
             throw new IllegalStateException("OCR 服务未返回可识别文字");
         }
         return AttachmentParseResult.parsed(limit(text.asText()));
+    }
+
+    private AttachmentParseResult parseVideo(String fileName, byte[] content) throws Exception {
+        if (!StringUtils.hasText(ocrUrl)) {
+            return AttachmentParseResult.waiting("视频已保存；配置 OCR 服务后即可抽帧识别");
+        }
+        Path directory = Files.createTempDirectory("agent-video-");
+        try {
+            Path input = directory.resolve("input.mp4");
+            Path pattern = directory.resolve("frame-%02d.jpg");
+            Files.write(input, content);
+            Process process = new ProcessBuilder(
+                    ffmpegPath,
+                    "-hide_banner",
+                    "-loglevel", "error",
+                    "-i", input.toString(),
+                    "-vf", "fps=1/5,scale=1600:-2:force_original_aspect_ratio=decrease",
+                    "-frames:v", "6",
+                    "-q:v", "3",
+                    pattern.toString())
+                    .redirectErrorStream(true)
+                    .start();
+            boolean completed = process.waitFor(videoTimeoutSeconds, TimeUnit.SECONDS);
+            if (!completed) {
+                process.destroyForcibly();
+                throw new IllegalStateException("视频抽帧超时");
+            }
+            String processOutput = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+            if (process.exitValue() != 0) {
+                throw new IllegalStateException("视频抽帧失败" + (processOutput.isEmpty() ? "" : "：" + processOutput));
+            }
+            List<Path> frames;
+            try (var stream = Files.list(directory)) {
+                frames = stream.filter(path -> path.getFileName().toString().startsWith("frame-"))
+                        .sorted().limit(6).toList();
+            }
+            if (frames.isEmpty()) throw new IllegalStateException("视频中没有可识别画面");
+            StringBuilder output = new StringBuilder("[视频抽帧识别：" + fileName + "，共 " + frames.size() + " 帧]\n");
+            int index = 0;
+            for (Path frame : frames) {
+                AttachmentParseResult parsed = parseImage(frame.getFileName().toString(), "image/jpeg", Files.readAllBytes(frame));
+                if (!"PARSED".equals(parsed.status())) {
+                    throw new IllegalStateException(parsed.error());
+                }
+                append(output, "\n[代表帧 " + (++index) + "]\n" + parsed.text() + "\n");
+            }
+            return AttachmentParseResult.parsed(limit(output.toString()));
+        } finally {
+            try (var stream = Files.walk(directory)) {
+                stream.sorted(Comparator.reverseOrder()).forEach(path -> {
+                    try {
+                        Files.deleteIfExists(path);
+                    } catch (Exception ignored) {
+                    }
+                });
+            }
+        }
     }
 
     private boolean isSpreadsheet(String mimeType) {

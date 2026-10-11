@@ -6,6 +6,9 @@ COPY src ./src
 RUN mvn -B -DskipTests package
 
 FROM eclipse-temurin:17-jre
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=builder /workspace/target/springboot-demo-0.0.1-SNAPSHOT.jar app.jar
 ENV SERVER_PORT=80
