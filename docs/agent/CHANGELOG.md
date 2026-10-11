@@ -1,5 +1,28 @@
 # Agent 与文件任务变更记录
 
+## [0.9.0-dev] - 2026-10-12
+
+### Added（对话生成 Excel 文件）
+- 新增 Agent 工具 `generate_excel_workbook`（`R1_DRAFT`）：小五可按用户意图把识别结果、查询结果或口述内容生成任意结构的可编辑 XLSX；数量、单价、金额列由后端用 BigDecimal 验算并自动求和，差异标黄并写入“核对说明”，单据信息、附件识别原文和生成说明分别写入独立工作表。
+- 确认卡新增 `EXCEL_WORKBOOK` 预览：文件名、工作表与行数、表头、前 5 行样例、金额待核对数、来源附件与保存方式。
+- 新增 `/api/agent/outputs` 列表、详情、下载与删除接口（含 `POST /delete` 兼容入口）和 `/api/agent/runs/{runId}/outputs`；`AgentRunResult` 与会话历史新增 `files`。
+- 小程序对话中显示文件卡，可直接打开、转发或删除；新增“小五生成的文件”页集中管理；会话抽屉与结果区增加入口。
+- 对话生成的文件永久保存，由用户自行删除；删除同时清理存储对象并记录审计。
+- 系统提示词与附件提示增加生成 Excel 的规则：先展示表格再调用工具、文本列用 TEXT 保留原文、数量单价金额标注角色、生成文件不代表写入业务数据。
+
+### Added（图片文件任务 OCR）
+- 新增 `TencentTableOcrProvider` 与 `ConfiguredTableOcrProvider`：图片文件任务可直接使用腾讯云 SDK 的表格识别 V3，`TABLE_OCR_MODE` 默认 `auto`，配置 `TABLE_OCR_URL` 时仍优先 HTTP 适配器；网格外文字保留为上下文警告，不再进入表头。
+
+### Changed
+- `excel_task_output` 泛化为统一输出记录：`task_id` 允许为空，新增 `source_type`、`source_id`、`run_id`、`conversation_id` 与索引；`ExcelOutputView` 新增 `sourceType`、`runId`。
+- 可编辑 Excel 导出与对话生成文件共用 `WorkbookRenderSupport`（表头样式、公式注入转义、工作表名去重、冻结与列宽）。
+
+### Database
+- `schema.sql` 自动补列补索引；已有 MySQL 环境可执行 `migrations/20261012_agent_workbook_output.sql`。
+
+### Evaluation
+- 新增 `AgentWorkbookServiceTest`、`AgentOutputServiceTest`、`GenerateExcelWorkbookToolTest`、`AgentOutputControllerTest`、`AgentRunResultFilesTest` 共 19 项；后端全量回归通过。
+
 ## [0.8.0-dev] - 2026-10-06
 
 ### Added（采购 PDF 报价闭环）

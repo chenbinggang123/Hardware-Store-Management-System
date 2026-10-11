@@ -54,6 +54,42 @@ class ExcelTaskParserTest {
     }
 
     @Test
+    void detectsHeaderBelowTitleAndSupplierNotes() throws Exception {
+        byte[] content;
+        try (var workbook = new XSSFWorkbook(); var output = new ByteArrayOutputStream()) {
+            var sheet = workbook.createSheet("报价单");
+            sheet.createRow(0).createCell(0).setCellValue("锐恒五金工具供货报价单");
+            var notes = sheet.createRow(1);
+            notes.createCell(0).setCellValue("供货方");
+            notes.createCell(1).setCellValue("锐恒五金");
+            notes.createCell(2).setCellValue("供货地址");
+            notes.createCell(3).setCellValue("工业园");
+            notes.createCell(4).setCellValue("说明");
+            var header = sheet.createRow(3);
+            header.createCell(0).setCellValue("商品名称");
+            header.createCell(1).setCellValue("规格");
+            header.createCell(2).setCellValue("单位");
+            header.createCell(3).setCellValue("单价");
+            var row = sheet.createRow(4);
+            row.createCell(0).setCellValue("五节扣");
+            row.createCell(1).setCellValue("冷");
+            row.createCell(2).setCellValue("个");
+            row.createCell(3).setCellValue(6);
+            workbook.write(output);
+            content = output.toByteArray();
+        }
+
+        var result = parser.parse("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", content);
+        var parsed = result.sheets().get(0);
+
+        assertThat(parsed.headerRowNumber()).isEqualTo(4);
+        assertThat(parsed.dataStartRowNumber()).isEqualTo(5);
+        assertThat(parsed.columns()).containsExactly("商品名称", "规格", "单位", "单价");
+        assertThat(parsed.rows()).hasSize(1);
+        assertThat(parsed.rows().get(0).cells()).containsExactly("五节扣", "冷", "个", "6");
+    }
+
+    @Test
     void readsTablesFromDocxAsWorkbookSheets() throws Exception {
         byte[] content;
         try (var document = new XWPFDocument(); var output = new ByteArrayOutputStream()) {

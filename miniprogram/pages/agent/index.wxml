@@ -20,6 +20,7 @@
       <view class="history-close" role="button" aria-label="关闭会话列表" bindtap="closeHistory">×</view>
     </view>
     <view class="history-new" role="button" aria-label="开始新对话" bindtap="startNew"><text class="history-new-icon">＋</text><text>新对话</text></view>
+    <view class="history-files" role="button" aria-label="查看小五生成的文件" bindtap="openMyFiles"><text>小五生成的文件</text><text class="history-files-arrow">›</text></view>
     <view class="history-section-label">最近会话</view>
     <scroll-view class="history-list" scroll-y>
       <view class="history-loading" wx:if="{{loadingHistory}}">正在读取历史…</view>
@@ -46,8 +47,19 @@
 
   <view class="welcome" wx:if="{{!messages.length && !run}}">
     <view class="welcome-mark">小</view>
-    <view class="welcome-title">小五可以帮你做什么？</view>
-    <view class="welcome-subtitle">复杂任务我来分步骤完成；查商品、看库存仍可直接进入对应页面。</view>
+    <view class="welcome-title">今天要处理什么？</view>
+    <view class="welcome-subtitle">业务文件走完整核对流程；日常查询和开单直接告诉小五。</view>
+    <view class="file-workflow" role="button" aria-label="进入业务文件处理" data-kind="file" bindtap="startTask">
+      <view class="file-workflow-mark">文</view>
+      <view class="file-workflow-copy">
+        <view class="file-workflow-label">完整文件流程</view>
+        <view class="file-workflow-title">{{fileWorkflow.title}}</view>
+        <view class="file-workflow-desc">{{fileWorkflow.desc}}</view>
+        <view class="file-workflow-steps">{{fileWorkflow.steps}}</view>
+      </view>
+      <view class="file-workflow-action">开始处理 ›</view>
+    </view>
+    <view class="welcome-divider"><text>或直接交代一件事</text></view>
     <view class="task-entry-list">
       <view class="task-entry tone-{{item.tone}}" role="button" wx:for="{{taskEntries}}" wx:key="title" data-kind="{{item.kind}}" data-prompt="{{item.prompt}}" bindtap="startTask">
         <view class="task-entry-mark">{{item.mark}}</view><view class="task-entry-copy"><view>{{item.title}}</view><text>{{item.desc}}</text></view><view class="task-entry-arrow">›</view>
@@ -85,13 +97,27 @@
               </block>
             </block>
             <view class="answer-paragraph" wx:else>{{item.content}}<text class="stream-cursor" wx:if="{{item.streaming}}"></text></view>
+            <view class="file-card-list" wx:if="{{item.files && item.files.length}}">
+              <view class="file-card {{file.failed ? 'failed' : ''}}" wx:for="{{item.files}}" wx:for-item="file" wx:key="id">
+                <view class="file-card-mark">{{file.mark}}</view>
+                <view class="file-card-copy">
+                  <view class="file-card-name">{{file.name}}</view>
+                  <view class="file-card-meta">{{file.statusText}}<text wx:if="{{file.sizeText}}"> · {{file.sizeText}}</text><text wx:if="{{file.detailText}}"> · {{file.detailText}}</text> · 永久保存</view>
+                  <view class="file-card-error" wx:if="{{file.errorMessage}}">{{file.errorMessage}}</view>
+                </view>
+                <view class="file-card-actions">
+                  <view class="file-card-action" wx:if="{{file.ready}}" role="button" aria-label="打开文件" data-id="{{file.id}}" catchtap="openGeneratedFile">{{openingFileId === file.id ? '打开中…' : '打开'}}</view>
+                  <view class="file-card-action danger" role="button" aria-label="删除文件" data-id="{{file.id}}" catchtap="deleteGeneratedFile">{{deletingFileId === file.id ? '删除中…' : '删除'}}</view>
+                </view>
+              </view>
+            </view>
             <view class="message-retry" wx:if="{{item.role === 'error'}}" bindtap="retryLastMessage">重新输入并重试</view>
           </view>
         </view>
         <view class="message" wx:else>
           <view class="message-attachments" wx:if="{{item.attachments && item.attachments.length}}">
             <view class="attachment-card sent" wx:for="{{item.attachments}}" wx:for-item="file" wx:key="id">
-              <view class="attachment-icon">{{file.typeText === '图片' ? '图' : '表'}}</view>
+              <view class="attachment-icon">{{file.typeMark}}</view>
               <view class="attachment-copy"><view class="attachment-name">{{file.originalName}}</view><view class="attachment-meta">{{file.typeText}} · {{file.sizeText}}</view></view>
             </view>
           </view>
@@ -118,6 +144,19 @@
         <view class="approval-description">{{run.pendingAction.description}}</view>
       </view>
       <view class="risk-badge">{{run.pendingAction.risk === 'R2_WRITE' ? '正式写入' : '草稿操作'}}</view>
+    </view>
+    <view class="workbook-preview" wx:if="{{run.pendingAction.preview.kind === 'EXCEL_WORKBOOK'}}">
+      <view class="operation-row"><text>文件名</text><text class="operation-value">{{run.pendingAction.preview.fileName}}</text></view>
+      <view class="operation-row"><text>内容</text><text class="operation-value">{{run.pendingAction.preview.sheetCount}} 个工作表 · {{run.pendingAction.preview.rowCount}} 行数据</text></view>
+      <view class="operation-row" wx:if="{{run.pendingAction.preview.sourceAttachment}}"><text>来源附件</text><text class="operation-value">{{run.pendingAction.preview.sourceAttachment.name}}</text></view>
+      <view class="operation-row"><text>保存方式</text><text class="operation-value">{{run.pendingAction.preview.retention}}</text></view>
+      <view class="workbook-sheet" wx:for="{{run.pendingAction.preview.sheets}}" wx:key="name">
+        <view class="workbook-sheet-head"><text class="workbook-sheet-name">{{item.name}}</text><text class="workbook-sheet-meta">{{item.rowCount}} 行 · {{item.columnCount}} 列<text class="workbook-mismatch" wx:if="{{item.mismatchCount}}"> · {{item.mismatchCount}} 处金额待核对</text></text></view>
+        <view class="workbook-columns">表头：{{item.columnsText}}</view>
+        <view class="workbook-sample" wx:for="{{item.sampleLines}}" wx:for-item="line" wx:for-index="lineIndex" wx:key="lineIndex">{{line}}</view>
+        <view class="workbook-sample more" wx:if="{{item.rowCount > item.sampleLines.length}}">… 共 {{item.rowCount}} 行，确认后在文件中查看全部</view>
+      </view>
+      <view class="workbook-warning" wx:for="{{run.pendingAction.preview.warnings}}" wx:for-index="warningIndex" wx:key="warningIndex">{{item}}</view>
     </view>
     <view class="customer-line" wx:if="{{run.pendingAction.preview.customerName}}"><text>客户</text><text class="customer-name">{{run.pendingAction.preview.customerName}}</text></view>
     <view class="operation-preview" wx:if="{{run.pendingAction.preview.productName}}">
@@ -156,25 +195,29 @@
   <view class="result-sheet tone-{{run.statusTone}}" wx:if="{{run && run.status !== 'WAITING_APPROVAL' && run.status !== 'RUNNING'}}">
     <view class="result-status">{{run.statusText}}</view><view class="result-copy">{{run.status === 'COMPLETED' ? '任务结果已显示在上方，可以继续查看对应业务页面。' : run.status === 'PARTIAL' ? '部分内容已经完成，请查看上方说明和未完成项目。' : run.status === 'FAILED' ? '本次任务没有完成，原输入和附件仍可继续使用。' : '任务已经结束，详细说明保留在当前会话中。'}}</view>
     <view class="result-summary-grid" wx:if="{{run.summary}}"><view><text>{{run.summary.successCount || 0}}</text><text>完成</text></view><view><text>{{run.summary.skippedCount || 0}}</text><text>跳过</text></view><view class="danger"><text>{{run.summary.failedCount || 0}}</text><text>失败</text></view></view>
-    <view class="result-actions"><view wx:for="{{run.actions}}" wx:key="label" data-target="{{item.target}}" data-params="{{item.params}}" bindtap="openResultAction">{{item.label}}</view><view bindtap="openWorkbench">返回工作台</view><view bindtap="openFileTasks">查看文件任务</view><view wx:if="{{run.status === 'FAILED' || (run.retry && run.retry.supported)}}" bindtap="retryLastMessage">重新输入并重试</view></view>
+    <view class="result-actions"><view wx:for="{{run.actions}}" wx:key="label" data-target="{{item.target}}" data-params="{{item.params}}" bindtap="openResultAction">{{item.label}}</view><view bindtap="openWorkbench">返回工作台</view><view wx:if="{{run.files && run.files.length}}" bindtap="openMyFiles">我的文件</view><view bindtap="openFileTasks">查看文件任务</view><view wx:if="{{run.status === 'FAILED' || (run.retry && run.retry.supported)}}" bindtap="retryLastMessage">重新输入并重试</view></view>
   </view>
   <view id="conversation-end" class="conversation-end"></view>
   </scroll-view>
 
   <view class="composer">
     <view class="composer-attachments" wx:if="{{pendingAttachments.length || uploading}}">
+      <view class="attachment-mode-note">
+        <view><text>对话附件</text>用于阅读、问答和提取，不会自动写入业务数据</view>
+        <view class="attachment-mode-link" role="button" aria-label="进入业务文件处理" bindtap="openExcelWorkflow">需要核对或导出？进入文件处理 ›</view>
+      </view>
       <view class="attachment-card" wx:for="{{pendingAttachments}}" wx:key="id">
-        <view class="attachment-icon">{{item.typeText === '图片' ? '图' : '表'}}</view>
-        <view class="attachment-copy"><view class="attachment-name">{{item.originalName}}</view><view class="attachment-meta {{item.ready ? '' : 'waiting'}}">{{item.ready ? item.sizeText + ' · 已解析' : item.errorMessage}}</view></view>
-        <view class="attachment-remove" data-id="{{item.id}}" bindtap="removeAttachment">×</view>
+        <view class="attachment-icon">{{item.typeMark}}</view>
+        <view class="attachment-copy"><view class="attachment-name">{{item.originalName}}</view><view class="attachment-meta {{item.ready ? '' : 'waiting'}}">{{item.typeText}} · {{item.sizeText}} · {{item.parseText}}</view></view>
+        <view class="attachment-remove" role="button" aria-label="移除附件" data-id="{{item.id}}" bindtap="removeAttachment">×</view>
       </view>
       <view class="uploading-line" wx:if="{{uploading}}">正在上传并解析附件…</view>
     </view>
     <view class="composer-row">
-      <view class="attach-button" role="button" aria-label="添加 Excel 或图片" bindtap="chooseAttachment">附件</view>
+      <view class="attach-button" role="button" aria-label="添加图片、表格、Word 或 PDF 附件" bindtap="chooseAttachment">附件</view>
       <textarea class="composer-input" aria-label="给小五发送消息" value="{{input}}" focus="{{inputFocus}}" bindblur="blurQuestion" bindinput="updateInput" auto-height maxlength="500" placeholder="给小五发消息" disabled="{{sending || resolving || uploading || (run && run.status === 'WAITING_APPROVAL')}}" />
       <button class="send-button" aria-label="发送消息" bindtap="send" disabled="{{(!input && !pendingAttachments.length) || sending || resolving || uploading || (run && run.status === 'WAITING_APPROVAL')}}">发送</button>
     </view>
-    <view class="composer-hint">小五会查询实时业务数据，正式操作需要你确认</view>
+    <view class="composer-hint">可直接提问；附件支持图片、表格、Word 和 PDF。正式操作需要你确认。</view>
   </view>
 </view>

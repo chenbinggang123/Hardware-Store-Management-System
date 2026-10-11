@@ -130,7 +130,9 @@ public class AgentAttachmentService {
                 + "金额格按十万千百十元角分理解，不能把连续OCR数字直接当整数元；"
                 + "优先使用附件中的验算金额，例如28×1.8=50.40元，OCR金额栏504不得写成504元；"
                 + "票面合计原文与明细验算合计分开显示；若票面原文没有明确小数点，只写原始数字并标注小数位待确认，禁止直接添加¥符号当成整数元；有差异只列为待核对项；"
-                + "整体回答保持简短，按基本信息、商品明细、待核对三部分展示，不要把整张表压成一段话。 ");
+                + "整体回答保持简短，按基本信息、商品明细、待核对三部分展示，不要把整张表压成一段话。"
+                + "如果用户要求把附件内容做成 Excel 或表格文件，先展示整理后的表格，再调用 generate_excel_workbook，"
+                + "参数中带上对应的附件 ID，数量、单价、金额列标注角色，单号等文本列使用 TEXT 类型。 ");
         for (AgentAttachment attachment : attachments) {
             prompt.append("\n\n--- 附件 ID：").append(attachment.getId())
                     .append("；名称：").append(attachment.getOriginalName()).append(" ---\n")

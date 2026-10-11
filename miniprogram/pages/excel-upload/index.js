@@ -58,8 +58,12 @@ Page({
   },
 
   selectFile(name, size, path, kind) {
+    const matched = String(name || '').toLowerCase().match(/\.([a-z0-9]+)$/)
+    const extension = matched ? matched[1] : ''
+    const documentOnly = ['doc', 'docx', 'pdf'].includes(extension)
     this.setData({
-      file: { name, size: Number(size || 0), sizeText: this.formatSize(size), path, kind },
+      file: { name, size: Number(size || 0), sizeText: this.formatSize(size), path, kind, extension, documentOnly },
+      purposeIndex: documentOnly ? 0 : this.data.purposeIndex,
       uploadError: ''
     })
   },
@@ -69,7 +73,10 @@ Page({
     return bytes > 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`
   },
 
-  changePurpose(event) { this.setData({ purposeIndex: Number(event.detail.value), uploadError: '' }) },
+  changePurpose(event) {
+    if (this.data.file && this.data.file.documentOnly) return showToast('Word 和 PDF 当前用于处理买家询价')
+    this.setData({ purposeIndex: Number(event.detail.value), uploadError: '' })
+  },
   changeSupplier(event) { this.setData({ supplierIndex: Number(event.detail.value), uploadError: '' }) },
   changeEffectiveDate(event) { this.setData({ effectiveDate: event.detail.value, uploadError: '' }) },
 

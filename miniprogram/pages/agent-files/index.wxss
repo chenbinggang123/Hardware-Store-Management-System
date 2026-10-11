@@ -1,0 +1,25 @@
+.files-screen { padding-top: 20rpx; }
+.files-head { display: flex; align-items: center; justify-content: space-between; gap: 22rpx; padding: 10rpx 0 28rpx; border-bottom: 1rpx solid #D6DEDA; }
+.files-title { color: #17231E; font-size: 46rpx; line-height: 1.2; font-weight: 750; }
+.files-subtitle { margin-top: 8rpx; color: #66746E; font-size: 24rpx; line-height: 1.5; }
+.files-count { flex: 0 0 auto; padding: 8rpx 18rpx; border-radius: 12rpx; color: #245E9B; background: #E7F0F8; font-size: 24rpx; font-weight: 700; }
+.files-list { margin-top: 24rpx; overflow: hidden; border-top: 1rpx solid #D6DEDA; border-bottom: 1rpx solid #D6DEDA; background: #FFF; }
+.files-row { position: relative; display: flex; align-items: flex-start; gap: 16rpx; padding: 24rpx 20rpx 24rpx 28rpx; border-bottom: 1rpx solid #E1E6E3; }
+.files-row:last-child { border-bottom: 0; }
+.files-row::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 7rpx; background: #247052; }
+.files-row.failed::before { background: #B94C3A; }
+.files-mark { width: 58rpx; height: 58rpx; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; border-radius: 12rpx; color: #247052; background: #E2F2E9; font-size: 20rpx; font-weight: 750; }
+.files-main { flex: 1; min-width: 0; }
+.files-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #17231E; font-size: 27rpx; font-weight: 700; }
+.files-meta { margin-top: 6rpx; color: #7A8681; font-size: 22rpx; line-height: 1.5; }
+.files-status { display: inline-block; margin-top: 10rpx; padding: 4rpx 12rpx; border-radius: 9rpx; font-size: 20rpx; font-weight: 700; }
+.files-status.success { color: #216846; background: #E2F2E9; }
+.files-status.info { color: #245E9B; background: #E7F0F8; }
+.files-status.danger { color: #A83F32; background: #FCE9E4; }
+.files-error { margin-top: 8rpx; color: #A83F32; font-size: 22rpx; line-height: 1.5; }
+.files-actions { display: flex; flex-direction: column; gap: 10rpx; flex: 0 0 auto; }
+.files-action { min-width: 108rpx; min-height: 64rpx; padding: 0 16rpx; display: flex; align-items: center; justify-content: center; box-sizing: border-box; border-radius: 10rpx; color: #245E9B; background: #E7F0F8; font-size: 24rpx; font-weight: 700; }
+.files-action.danger { color: #A83F32; background: #FCE9E4; }
+.error-state { margin-top: 28rpx; padding: 40rpx 32rpx; border-radius: 20rpx; background: #FFF; text-align: center; color: #66746E; font-size: 24rpx; line-height: 1.6; }
+.error-state-title { margin-bottom: 8rpx; color: #17231E; font-size: 28rpx; font-weight: 700; }
+.error-state .btn { margin-top: 24rpx; }

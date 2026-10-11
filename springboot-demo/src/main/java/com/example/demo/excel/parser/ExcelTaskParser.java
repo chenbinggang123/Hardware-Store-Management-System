@@ -21,11 +21,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 @Component
 public class ExcelTaskParser {
     static final int MAX_ROWS = 2_000;
     static final int MAX_COLUMNS = 80;
+    private static final int HEADER_SCAN_LIMIT = 40;
+    private static final Set<String> HEADER_TERMS = Set.of(
+            "商品", "商品名称", "产品", "产品名称", "品名", "名称", "条码", "编码",
+            "规格", "型号", "单位", "数量", "单价", "价格", "金额", "货号",
+            "厂家货号", "客户货号", "备注", "库存", "成本", "售价");
     private final PdfProcurementParser pdfParser;
     private final WordTableParser wordParser;
     private final OcrTableParser ocrTableParser;
@@ -120,12 +126,39 @@ public class ExcelTaskParser {
     }
 
     private ParsedWorkbook.ParsedSheet toSheet(int index, String name, List<ParsedWorkbook.ParsedRow> sourceRows) {
-        ParsedWorkbook.ParsedRow header = sourceRows.get(0);
+        int headerIndex = detectHeaderIndex(sourceRows);
+        ParsedWorkbook.ParsedRow header = sourceRows.get(headerIndex);
         List<String> columns = normalizedHeaders(header.cells());
-        List<ParsedWorkbook.ParsedRow> dataRows = sourceRows.size() == 1
-                ? List.of() : new ArrayList<>(sourceRows.subList(1, sourceRows.size()));
+        List<ParsedWorkbook.ParsedRow> dataRows = sourceRows.size() == headerIndex + 1
+                ? List.of() : new ArrayList<>(sourceRows.subList(headerIndex + 1, sourceRows.size()));
         int dataStart = dataRows.isEmpty() ? header.rowNumber() + 1 : dataRows.get(0).rowNumber();
         return new ParsedWorkbook.ParsedSheet(index, safeSheetName(name), header.rowNumber(), dataStart, columns, dataRows);
+    }
+
+    private int detectHeaderIndex(List<ParsedWorkbook.ParsedRow> rows) {
+        int bestIndex = 0;
+        int bestScore = -1;
+        int limit = Math.min(rows.size(), HEADER_SCAN_LIMIT);
+        for (int index = 0; index < limit; index++) {
+            List<String> cells = rows.get(index).cells();
+            int nonEmpty = 0;
+            int termHits = 0;
+            for (String cell : cells) {
+                if (!StringUtils.hasText(cell)) continue;
+                nonEmpty++;
+                String normalized = cell.replaceAll("[\\s：:()（）]", "").toLowerCase(Locale.ROOT);
+                if (HEADER_TERMS.stream().anyMatch(term -> normalized.equals(term)
+                        || normalized.endsWith(term) || normalized.startsWith(term))) termHits++;
+            }
+            boolean plausible = termHits >= 2 || (termHits >= 1 && nonEmpty >= 3);
+            if (!plausible) continue;
+            int score = termHits * 100 + Math.min(nonEmpty, 20);
+            if (score > bestScore) {
+                bestScore = score;
+                bestIndex = index;
+            }
+        }
+        return bestScore < 0 ? 0 : bestIndex;
     }
 
     private List<String> normalizedHeaders(List<String> source) {

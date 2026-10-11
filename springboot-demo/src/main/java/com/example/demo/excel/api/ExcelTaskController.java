@@ -167,6 +167,18 @@ public class ExcelTaskController {
 
     @DeleteMapping("/{taskId}")
     public ApiResponse<Void> delete(@PathVariable Long taskId, HttpServletRequest request) {
+        return deleteTask(taskId, request);
+    }
+
+    /**
+     * Compatibility endpoint for clients or gateways that do not reliably forward DELETE.
+     */
+    @PostMapping("/{taskId}/delete")
+    public ApiResponse<Void> deleteByPost(@PathVariable Long taskId, HttpServletRequest request) {
+        return deleteTask(taskId, request);
+    }
+
+    private ApiResponse<Void> deleteTask(Long taskId, HttpServletRequest request) {
         lifecycleService.delete(taskId, currentUserId(request));
         return ApiResponse.ok("文件任务已删除", null);
     }

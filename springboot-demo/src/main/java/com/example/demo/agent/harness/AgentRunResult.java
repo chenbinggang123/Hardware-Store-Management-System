@@ -1,6 +1,9 @@
 package com.example.demo.agent.harness;
 
+import com.example.demo.agent.dto.AgentFileView;
 import lombok.Data;
+
+import java.util.List;
 
 @Data
 public class AgentRunResult {
@@ -9,6 +12,8 @@ public class AgentRunResult {
     private AgentRunStatus status;
     private String output;
     private AgentPendingAction pendingAction;
+    /** Files the agent generated in this run, so the client can show download cards without parsing text. */
+    private List<AgentFileView> files = List.of();
 
     public AgentRunResult(Long runId, AgentRunStatus status, String output) {
         this(runId, status, output, null);

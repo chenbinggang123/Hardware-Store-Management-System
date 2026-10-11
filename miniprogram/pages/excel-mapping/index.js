@@ -122,6 +122,11 @@ Page({
     })
   },
 
+  primaryAction() {
+    if (!this.data.canMatchProducts) return this.skipSheet()
+    return this.continueReview()
+  },
+
   continueReview() {
     if (this.data.saving) return
     const codes = this.data.mappings.map((item) => item.targetCode)

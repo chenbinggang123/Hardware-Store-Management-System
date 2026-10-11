@@ -3,7 +3,7 @@
     <view class="workbench-heading">
       <view class="workbench-date">{{todayText}} · {{dashboardMeta.status}}</view>
       <view class="workbench-title">今天先做什么</view>
-      <view class="workbench-subtitle">常用事情直接做，复杂文件交给小五</view>
+      <view class="workbench-subtitle">常用事情直接做，文件和复杂任务分流程处理</view>
     </view>
     <view class="workbench-profile" bindtap="openPage" data-path="/pages/settings/index" aria-label="打开设置">{{userInitial}}</view>
   </view>
@@ -21,16 +21,16 @@
     <view class="daily-row warning" bindtap="openPage" data-path="/pages/inventories/index"><view class="daily-mark">货</view><text>库存预警</text><view class="daily-value">{{inventoryWarning}} 件</view><view class="daily-arrow">›</view></view>
   </view>
 
-  <view class="file-entry" bindtap="openUpload"><view class="file-entry-mark">表</view><view class="file-entry-copy"><view class="file-entry-title">收到新的 Excel？</view><view class="file-entry-desc">先识别和预览，确认后才会修改业务数据</view></view><view class="file-entry-action">选择文件</view></view>
+  <view class="file-entry" role="button" aria-label="开始处理业务文件" bindtap="openUpload"><view class="file-entry-mark">文</view><view class="file-entry-copy"><view class="file-entry-title">处理业务文件</view><view class="file-entry-desc">支持表格、Word、PDF 和价格表图片；先核对再写入</view></view><view class="file-entry-action">开始处理</view></view>
 
   <view class="block-head"><view><view class="block-title">待办与最近任务</view><view class="block-subtitle">真实文件任务 · 确认后才写入数据</view></view><view class="block-link" bindtap="openTasks">文件中心</view></view>
   <view class="todo-summary"><view class="todo-cell warning"><text>{{summary.attention}}</text><text>待确认</text></view><view class="todo-cell"><text>{{summary.processing}}</text><text>处理中</text></view><view class="todo-cell warning"><text>{{summary.failed}}</text><text>处理失败</text></view></view>
   <view class="home-task-ledger" wx:if="{{priorityTasks.length}}">
     <view class="home-task-row tone-{{item.statusTone}}" wx:for="{{priorityTasks}}" wx:key="id" data-id="{{item.id}}" bindtap="openTask"><view class="home-task-top"><view class="home-task-purpose">{{item.purpose}}</view><view class="home-task-status {{item.statusTone}}">{{item.statusText}}</view></view><view class="home-task-name">{{item.fileName}}</view><view class="home-task-progress"><view style="width: {{item.progress}}%;"></view></view><view class="home-task-foot"><text>{{item.progressText}}</text><view class="home-task-actions"><text>继续查看 ›</text><view wx:if="{{item.canDelete}}" class="home-task-delete" data-id="{{item.id}}" catchtap="deleteTask">{{deletingTaskId === item.id ? '删除中' : '删除'}}</view></view></view></view>
   </view>
-  <view class="empty-state compact" wx:else><view class="empty-title">今天没有待处理文件</view><view class="empty-desc">需要时可以从上方选择 Excel，或让小五帮忙。</view></view>
+  <view class="empty-state compact" wx:else><view class="empty-title">今天没有待处理文件</view><view class="empty-desc">需要时可以从上方选择表格、文档或价格表图片。</view></view>
 
   <view class="block-head"><view><view class="block-title">更多经营工具</view><view class="block-subtitle">客户、供应商、价格和报表</view></view></view>
   <view class="tool-ledger"><view class="tool-row" wx:for="{{toolActions}}" wx:key="title" bindtap="openPage" data-path="{{item.path}}"><view class="tool-mark">{{item.mark}}</view><view class="tool-copy"><view>{{item.title}}</view><text>{{item.desc}}</text></view><view class="quick-arrow">›</view></view></view>
-  <view class="agent-line" bindtap="openPage" data-path="/pages/agent/index"><view class="agent-line-mark">小</view><view><view>复杂事情，让小五分步骤帮你</view><text>处理表格、批量报价、分析库存和经营数据</text></view><view class="quick-arrow">›</view></view>
+  <view class="agent-line" role="button" aria-label="打开小五工作台" bindtap="openPage" data-path="/pages/agent/index"><view class="agent-line-mark">小</view><view><view>查询、开单和调整，直接告诉小五</view><text>聊天附件用于阅读问答；业务文件另有核对流程</text></view><view class="quick-arrow">›</view></view>
 </view>

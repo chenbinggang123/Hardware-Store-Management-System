@@ -1,0 +1,36 @@
+<view class="screen files-screen">
+  <view class="files-head">
+    <view>
+      <view class="files-title">小五生成的文件</view>
+      <view class="files-subtitle">对话中生成的 Excel 永久保存，可随时打开、转发或删除</view>
+    </view>
+    <view class="files-count" wx:if="{{files.length}}">{{files.length}} 个</view>
+  </view>
+
+  <view class="loading-state" wx:if="{{loading && !files.length}}">正在读取文件…</view>
+  <view class="error-state" wx:elif="{{loadError}}">
+    <view class="error-state-title">文件列表没有加载成功</view>
+    <view>{{loadError}}</view>
+    <button class="btn btn-secondary" bindtap="retryLoad">重新加载</button>
+  </view>
+  <view class="files-list" wx:elif="{{files.length}}">
+    <view class="files-row {{item.failed ? 'failed' : ''}}" wx:for="{{files}}" wx:key="id">
+      <view class="files-mark">{{item.mark}}</view>
+      <view class="files-main">
+        <view class="files-name">{{item.name}}</view>
+        <view class="files-meta">{{item.timeText}}<text wx:if="{{item.sizeText}}"> · {{item.sizeText}}</text><text wx:if="{{item.detailText}}"> · {{item.detailText}}</text></view>
+        <view class="files-status {{item.failed ? 'danger' : item.ready ? 'success' : 'info'}}">{{item.statusText}}</view>
+        <view class="files-error" wx:if="{{item.errorMessage}}">{{item.errorMessage}}</view>
+      </view>
+      <view class="files-actions">
+        <view class="files-action" wx:if="{{item.ready}}" role="button" aria-label="打开文件" data-id="{{item.id}}" bindtap="openFile">{{openingId === item.id ? '打开中…' : '打开'}}</view>
+        <view class="files-action danger" role="button" aria-label="删除文件" data-id="{{item.id}}" bindtap="deleteFile">{{deletingId === item.id ? '删除中…' : '删除'}}</view>
+      </view>
+    </view>
+  </view>
+  <view class="empty-state" wx:else>
+    <view class="empty-title">还没有生成过文件</view>
+    <view class="empty-desc">在小五对话里上传单据或说明需要的表格内容，再说“做成 Excel”，确认后文件会出现在这里。</view>
+    <view class="btn btn-primary btn-block" bindtap="openAgent">去找小五</view>
+  </view>
+</view>

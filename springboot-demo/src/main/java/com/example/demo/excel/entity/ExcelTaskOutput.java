@@ -17,8 +17,15 @@ public class ExcelTaskOutput {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    /** 文件任务 ID；对话中直接生成的文件没有任务，允许为空。 */
     private Long taskId;
     private Long operatorId;
+    /** EXCEL_TASK：文件任务输出；AGENT_WORKBOOK：小五按对话内容生成的 Excel。 */
+    private String sourceType = "EXCEL_TASK";
+    /** 对话生成文件时记录来源附件 ID。 */
+    private Long sourceId;
+    private Long runId;
+    private Long conversationId;
     private String outputType;
     private String objectKey;
     private String originalName;

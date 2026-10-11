@@ -539,6 +539,23 @@ module.exports = {
   resolveAgentApproval(runId, approved) {
     return agentRequest(`/agent/runs/${runId}/approval`, { method: 'POST', data: { approved } })
   },
+  getAgentOutputs() {
+    return agentRequest('/agent/outputs')
+  },
+  getAgentRunOutputs(runId) {
+    return agentRequest(`/agent/runs/${runId}/outputs`)
+  },
+  downloadAgentOutput(outputId) {
+    return agentRequest(`/agent/outputs/${outputId}/download`, { responseType: 'arraybuffer' })
+  },
+  deleteAgentOutput(outputId) {
+    // Some CloudBase gateway paths reject DELETE before reaching Spring MVC, so the POST action endpoint comes first.
+    return agentRequest(`/agent/outputs/${outputId}/delete`, { method: 'POST' }).catch((postError) => {
+      const message = String((postError && (postError.message || postError.errMsg)) || '')
+      if (!/No static resource|not found|404/i.test(message)) return Promise.reject(postError)
+      return agentRequest(`/agent/outputs/${outputId}`, { method: 'DELETE' })
+    })
+  },
   uploadExcelTask(file, purpose, context) {
     return uploadExcelFile(file, purpose, context)
   },
@@ -552,7 +569,22 @@ module.exports = {
     return request(`/excel-tasks/${taskId}/ocr-result`)
   },
   deleteExcelTask(taskId) {
-    return request(`/excel-tasks/${taskId}`, { method: 'DELETE' })
+    // Use an action endpoint because some CloudBase gateway paths reject DELETE
+    // before the request reaches Spring MVC.
+    return request(`/excel-tasks/${taskId}/delete`, { method: 'POST' }).catch((postError) => {
+      const postMessage = String((postError && (postError.message || postError.errMsg)) || '')
+      if (!/No static resource|not found|404/i.test(postMessage)) return Promise.reject(postError)
+      return request(`/excel-tasks/${taskId}`, { method: 'DELETE' }).catch((deleteError) => {
+        const deleteMessage = String((deleteError && (deleteError.message || deleteError.errMsg)) || '')
+        if (/not supported|method not allowed|405/i.test(deleteMessage)) {
+          return Promise.reject({
+            ...deleteError,
+            message: '云端服务版本过旧，暂时不能删除。请先部署最新后端服务。'
+          })
+        }
+        return Promise.reject(deleteError)
+      })
+    })
   },
   rewindExcelTaskToMapping(taskId, expectedVersion) {
     return request(`/excel-tasks/${taskId}/rewind-to-mapping`, { method: 'POST', data: { expectedVersion } })

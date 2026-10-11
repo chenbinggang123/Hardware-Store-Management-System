@@ -2,16 +2,25 @@ package com.example.demo.agent.harness;
 
 import com.example.demo.agent.entity.AgentRun;
 import com.example.demo.agent.service.AgentConversationService;
+import com.example.demo.agent.service.AgentOutputService;
 import com.example.demo.agent.tool.AgentTool;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 @Component
 public class AgentRunResultFactory {
     private final AgentConversationService conversationService;
+    private final AgentOutputService outputService;
 
     public AgentRunResultFactory(AgentConversationService conversationService) {
+        this(conversationService, null);
+    }
+
+    @Autowired
+    public AgentRunResultFactory(AgentConversationService conversationService, AgentOutputService outputService) {
         this.conversationService = conversationService;
+        this.outputService = outputService;
     }
 
     public AgentRunResult create(AgentRun run) {
@@ -24,6 +33,9 @@ public class AgentRunResultFactory {
         if (conversationService != null) {
             result.setConversationId(conversationService.conversationIdForRun(run.getId()));
             conversationService.touchByRunId(run.getId());
+        }
+        if (outputService != null && run.getId() != null) {
+            result.setFiles(outputService.forRun(run.getId()));
         }
         return result;
     }

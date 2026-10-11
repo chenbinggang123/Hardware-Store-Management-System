@@ -495,10 +495,16 @@ CREATE TABLE IF NOT EXISTS product_price_history (
 
 ALTER TABLE product_price_history MODIFY COLUMN after_price DECIMAL(12,2) NULL;
 
+-- 输出文件记录：既保存 Excel 文件任务的报价/导出文件，也保存小五在对话中直接生成的文件。
+-- task_id 允许为空；对话生成的文件通过 source_type / run_id 关联，expires_at 为空表示永久保存，由用户自行删除。
 CREATE TABLE IF NOT EXISTS excel_task_output (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    task_id BIGINT NOT NULL,
+    task_id BIGINT NULL,
     operator_id BIGINT NOT NULL,
+    source_type VARCHAR(32) NOT NULL DEFAULT 'EXCEL_TASK',
+    source_id BIGINT NULL,
+    run_id BIGINT NULL,
+    conversation_id BIGINT NULL,
     output_type VARCHAR(32) NOT NULL,
     object_key VARCHAR(500),
     original_name VARCHAR(255) NOT NULL,
@@ -513,8 +519,79 @@ CREATE TABLE IF NOT EXISTS excel_task_output (
     create_time DATETIME NOT NULL,
     expires_at DATETIME,
     UNIQUE KEY uk_excel_output_idempotency (operator_id, idempotency_key),
-    KEY idx_excel_output_task_time (task_id, create_time)
+    KEY idx_excel_output_task_time (task_id, create_time),
+    KEY idx_excel_output_run (run_id),
+    KEY idx_excel_output_operator_time (operator_id, source_type, create_time)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- 兼容已经存在的 excel_task_output：放开 task_id，并补充对话生成文件需要的来源列与索引。
+ALTER TABLE excel_task_output MODIFY COLUMN task_id BIGINT NULL;
+
+SET @add_excel_output_source_type = (
+    SELECT IF(COUNT(*) = 0,
+              'ALTER TABLE excel_task_output ADD COLUMN source_type VARCHAR(32) NOT NULL DEFAULT ''EXCEL_TASK'' AFTER operator_id',
+              'SELECT 1')
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'excel_task_output' AND column_name = 'source_type'
 );
+PREPARE add_excel_output_source_type_stmt FROM @add_excel_output_source_type;
+EXECUTE add_excel_output_source_type_stmt;
+DEALLOCATE PREPARE add_excel_output_source_type_stmt;
+
+SET @add_excel_output_source_id = (
+    SELECT IF(COUNT(*) = 0,
+              'ALTER TABLE excel_task_output ADD COLUMN source_id BIGINT NULL AFTER source_type',
+              'SELECT 1')
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'excel_task_output' AND column_name = 'source_id'
+);
+PREPARE add_excel_output_source_id_stmt FROM @add_excel_output_source_id;
+EXECUTE add_excel_output_source_id_stmt;
+DEALLOCATE PREPARE add_excel_output_source_id_stmt;
+
+SET @add_excel_output_run_id = (
+    SELECT IF(COUNT(*) = 0,
+              'ALTER TABLE excel_task_output ADD COLUMN run_id BIGINT NULL AFTER source_id',
+              'SELECT 1')
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'excel_task_output' AND column_name = 'run_id'
+);
+PREPARE add_excel_output_run_id_stmt FROM @add_excel_output_run_id;
+EXECUTE add_excel_output_run_id_stmt;
+DEALLOCATE PREPARE add_excel_output_run_id_stmt;
+
+SET @add_excel_output_conversation_id = (
+    SELECT IF(COUNT(*) = 0,
+              'ALTER TABLE excel_task_output ADD COLUMN conversation_id BIGINT NULL AFTER run_id',
+              'SELECT 1')
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'excel_task_output' AND column_name = 'conversation_id'
+);
+PREPARE add_excel_output_conversation_id_stmt FROM @add_excel_output_conversation_id;
+EXECUTE add_excel_output_conversation_id_stmt;
+DEALLOCATE PREPARE add_excel_output_conversation_id_stmt;
+
+SET @add_excel_output_run_index = (
+    SELECT IF(COUNT(*) = 0,
+              'ALTER TABLE excel_task_output ADD KEY idx_excel_output_run (run_id)',
+              'SELECT 1')
+    FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'excel_task_output' AND index_name = 'idx_excel_output_run'
+);
+PREPARE add_excel_output_run_index_stmt FROM @add_excel_output_run_index;
+EXECUTE add_excel_output_run_index_stmt;
+DEALLOCATE PREPARE add_excel_output_run_index_stmt;
+
+SET @add_excel_output_operator_index = (
+    SELECT IF(COUNT(*) = 0,
+              'ALTER TABLE excel_task_output ADD KEY idx_excel_output_operator_time (operator_id, source_type, create_time)',
+              'SELECT 1')
+    FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'excel_task_output' AND index_name = 'idx_excel_output_operator_time'
+);
+PREPARE add_excel_output_operator_index_stmt FROM @add_excel_output_operator_index;
+EXECUTE add_excel_output_operator_index_stmt;
+DEALLOCATE PREPARE add_excel_output_operator_index_stmt;
 
 CREATE TABLE IF NOT EXISTS excel_comparison (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,

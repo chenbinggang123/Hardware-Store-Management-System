@@ -15,6 +15,7 @@
     "pages/price-history/index",
     "pages/contacts/index",
     "pages/agent/index",
+    "pages/agent-files/index",
     "pages/products/index",
     "pages/product-detail/index",
     "pages/product-form/index",
@@ -45,6 +46,7 @@
     "pages/system-users/index",
     "pages/system-logs/index"
   ],
+  "lazyCodeLoading": "requiredComponents",
   "window": {
     "navigationBarTitleText": "恒迪五金",
     "navigationBarBackgroundColor": "#F3F5F2",

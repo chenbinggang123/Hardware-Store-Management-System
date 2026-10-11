@@ -36,6 +36,7 @@
 .mapping-note { margin-top: 22rpx; color: #66746E; font-size: 22rpx; line-height: 1.65; }
 .skip-sheet-card { min-height: 132rpx; margin-top: 28rpx; padding: 20rpx; display: flex; align-items: center; justify-content: space-between; gap: 18rpx; box-sizing: border-box; border: 1rpx solid #D6DEDA; background: #FFF; }
 .skip-sheet-card.urgent { border-color: #E5C38D; background: #FFFAF1; }
+.skip-sheet-card.urgent:active { background: #FFF2D9; }
 .skip-sheet-card > view:first-child { min-width: 0; }
 .skip-sheet-title { color: #26332E; font-size: 26rpx; font-weight: 750; }
 .skip-sheet-desc { margin-top: 4rpx; color: #66746E; font-size: 22rpx; line-height: 1.55; }

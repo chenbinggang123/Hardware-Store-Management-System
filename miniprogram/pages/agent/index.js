@@ -1,5 +1,6 @@
 const api = require('../../utils/api')
 const { formatAgentContent } = require('../../utils/agent-format')
+const { fileView, openAgentFile, confirmDeleteAgentFile } = require('../../utils/agent-files')
 const { openPage } = require('../../utils/router')
 
 const ACTIVE_RUN_KEY = 'agent_active_run_id'
@@ -11,12 +12,25 @@ function errorMessage(error, fallback) {
   return (error && (error.message || error.errMsg)) || fallback
 }
 
+function workbookPreview(preview) {
+  if (!preview || preview.kind !== 'EXCEL_WORKBOOK') return preview
+  return {
+    ...preview,
+    sheets: (preview.sheets || []).map((sheet) => ({
+      ...sheet,
+      columnsText: (sheet.columns || []).join(' · '),
+      sampleLines: (sheet.sampleRows || []).map((row) => (row || []).join(' · '))
+    }))
+  }
+}
+
 function normalizeResult(result) {
   if (!result) return null
   const action = result.pendingAction
-  const preview = action && action.preview ? action.preview : null
+  const preview = action && action.preview ? workbookPreview(action.preview) : null
   return {
     ...result,
+    files: (result.files || []).map(fileView),
     statusText: {
       WAITING_APPROVAL: '等待你确认', COMPLETED: '已完成', FAILED: '执行失败',
       PARTIAL: '部分完成', CANCELLED: '已取消', EXPIRED: '已过期', RUNNING: '处理中'
@@ -41,13 +55,14 @@ function normalizeResult(result) {
   }
 }
 
-function assistantMessage(content, status, streaming = false) {
+function assistantMessage(content, status, streaming = false, files = []) {
   return {
     role: status === 'FAILED' ? 'error' : 'assistant',
     content: content || '',
     blocks: streaming ? [] : formatAgentContent(content || ''),
     streaming,
-    statusText: streaming ? '正在生成' : ''
+    statusText: streaming ? '正在生成' : '',
+    files: files || []
   }
 }
 
@@ -58,7 +73,9 @@ function historyTime(value) {
 }
 
 function conversationMessage(message) {
-  if (message.role === 'assistant') return assistantMessage(message.content, message.status)
+  if (message.role === 'assistant') {
+    return assistantMessage(message.content, message.status, false, (message.files || []).map(fileView))
+  }
   return { role: 'user', content: message.content, attachments: (message.attachments || []).map(attachmentView) }
 }
 
@@ -68,14 +85,28 @@ function fileSize(value) {
   return `${Math.max(1, Math.round(bytes / 1024))} KB`
 }
 
+function fileExtension(name) {
+  const matched = String(name || '').toLowerCase().match(/\.([a-z0-9]+)$/)
+  return matched ? matched[1] : ''
+}
+
 function attachmentView(item) {
   const name = item.originalName || item.name || '附件'
+  const mimeType = item.mimeType || ''
+  const extension = fileExtension(name)
+  const isImage = /^image\//.test(mimeType) || ['jpg', 'jpeg', 'png', 'webp'].includes(extension)
+  const isPdf = mimeType === 'application/pdf' || extension === 'pdf'
+  const isWord = /word/.test(mimeType) || ['doc', 'docx'].includes(extension)
+  const typeText = isImage ? '图片' : isPdf ? 'PDF' : isWord ? 'Word' : ['xls', 'xlsx', 'csv'].includes(extension) ? '表格' : '文件'
+  const parseStatus = item.parseStatus || ''
   return {
     ...item,
     originalName: name,
     sizeText: fileSize(item.fileSize || item.size),
-    typeText: /image\//.test(item.mimeType || '') ? '图片' : '表格',
-    ready: item.parseStatus === 'PARSED'
+    typeText,
+    typeMark: isImage ? '图' : isPdf ? 'PDF' : isWord ? '文' : typeText === '表格' ? '表' : '件',
+    ready: parseStatus === 'PARSED',
+    parseText: parseStatus === 'PARSED' ? '已读取' : (item.errorMessage || (parseStatus === 'FAILED' ? '读取失败' : '等待读取'))
   }
 }
 
@@ -83,18 +114,21 @@ Page({
   data: {
     input: '', inputFocus: false, sending: false, streaming: false, resolving: false, loadingHistory: false,
     deletingConversationId: null, renamingConversationId: null, cancelling: false,
-    run: null, conversationId: null, currentTitle: '新对话', conversations: [], historyOpen: false, messages: [],
+    run: null, conversationId: null, currentTitle: '小五工作台', conversations: [], historyOpen: false, messages: [],
     pendingAttachments: [], uploading: false, connectionInterrupted: false, lastFailedInput: '',
-    scrollTarget: 'conversation-end',
+    scrollTarget: 'conversation-end', openingFileId: '', deletingFileId: '',
+    fileWorkflow: {
+      title: '识别并处理业务文件',
+      desc: 'Excel、CSV、Word、PDF 或价格表图片',
+      steps: '识别 → 核对 → 导出或写入'
+    },
     taskEntries: [
-      { title: '处理 Excel', desc: '识别询价、报价和价格表', mark: '表', kind: 'excel', tone: 'blue' },
       { title: '创建销售草稿', desc: '查客户、商品和库存后生成草稿', mark: '单', prompt: '帮我创建一张销售草稿', tone: 'green' },
-      { title: '新增商品', desc: '填写商品资料并建立初始库存', mark: '商', prompt: '帮我新增一个商品', tone: 'amber' },
       { title: '盘点库存', desc: '查询商品后调整为实际数量', mark: '库', prompt: '帮我盘点并调整一个商品的库存', tone: 'purple' },
-      { title: '商品上下架', desc: '搜索商品并确认修改状态', mark: '架', prompt: '帮我修改一个商品的上下架状态', tone: 'blue' },
-      { title: '其他问题', desc: '直接说你想了解什么', mark: '问', kind: 'question', tone: 'neutral' }
+      { title: '新增或修改商品', desc: '补充商品资料、库存或上下架状态', mark: '商', prompt: '帮我新增或修改一个商品', tone: 'amber' },
+      { title: '经营查询', desc: '查商品、库存、订单和经营情况', mark: '查', kind: 'question', prompt: '我想查询经营数据：', tone: 'neutral' }
     ],
-    suggestions: ['查一下电钻还有多少库存', '给老王开两把东成电钻，先记账', '把商品 2 上架', '把商品 2 的实际库存调整为 20，原因是门店盘点']
+    suggestions: ['查一下电钻还有多少库存', '给老王开两把东成电钻，先记账', '把商品 2 的实际库存调整为 20，原因是门店盘点']
   },
 
   onShow() {
@@ -121,7 +155,7 @@ Page({
   useSuggestion(event) { this.setData({ input: event.currentTarget.dataset.text || '' }) },
   startTask(event) {
     const kind = event.currentTarget.dataset.kind
-    if (kind === 'excel') return this.openExcelWorkflow()
+    if (kind === 'file') return this.openExcelWorkflow()
     this.setData({ input: event.currentTarget.dataset.prompt || '', inputFocus: true })
   },
   openExcelWorkflow() { openPage('/pages/excel-upload/index') },
@@ -130,12 +164,16 @@ Page({
 
   chooseAttachment() {
     if (this.data.uploading || this.data.pendingAttachments.length >= 3) return
-    wx.showActionSheet({ itemList: ['拍照或选择图片', '选择 Excel / CSV 文件'] }).then((result) => {
+    wx.showActionSheet({ itemList: ['拍照或选择图片', '选择文档或表格'] }).then((result) => {
       if (result.tapIndex === 0) {
         return wx.chooseMedia({ count: 3 - this.data.pendingAttachments.length, mediaType: ['image'], sourceType: ['album', 'camera'] })
           .then((choice) => this.uploadFiles(choice.tempFiles || []))
       }
-      return wx.chooseMessageFile({ count: 3 - this.data.pendingAttachments.length, type: 'file', extension: ['xls', 'xlsx', 'csv'] })
+      return wx.chooseMessageFile({
+        count: 3 - this.data.pendingAttachments.length,
+        type: 'file',
+        extension: ['xls', 'xlsx', 'csv', 'doc', 'docx', 'pdf']
+      })
         .then((choice) => this.uploadFiles(choice.tempFiles || []))
     }).catch(() => {})
   },
@@ -242,7 +280,7 @@ Page({
           wx.removeStorageSync(ACTIVE_RUN_KEY)
           wx.removeStorageSync(ACTIVE_CONVERSATION_KEY)
           Object.assign(update, {
-            conversationId: null, currentTitle: '新对话', run: null, messages: [], input: '',
+            conversationId: null, currentTitle: '小五工作台', run: null, messages: [], input: '',
             sending: false, streaming: false, pendingAttachments: []
           })
         }
@@ -291,7 +329,7 @@ Page({
       wx.showToast({ title: '附件尚未完成识别', icon: 'none' })
       return
     }
-    const displayContent = content || '请识别附件中的订单信息并生成销售草稿'
+    const displayContent = content || '请阅读这些附件，先概括主要内容并告诉我可以继续处理什么；不要写入业务数据。'
     this.setData({
       input: '', sending: true, streaming: true, pendingAttachments: [], connectionInterrupted: false,
       messages: this.data.messages.concat(
@@ -395,6 +433,48 @@ Page({
   },
   openWorkbench() { openPage('/pages/workbench/index') },
   openFileTasks() { openPage('/pages/excel-tasks/index') },
+  openMyFiles() {
+    this.setData({ historyOpen: false })
+    openPage('/pages/agent-files/index')
+  },
+
+  findGeneratedFile(id) {
+    const fromRun = ((this.data.run && this.data.run.files) || []).find((item) => Number(item.id) === id)
+    if (fromRun) return fromRun
+    for (const message of this.data.messages) {
+      const found = (message.files || []).find((item) => Number(item.id) === id)
+      if (found) return found
+    }
+    return null
+  },
+
+  openGeneratedFile(event) {
+    const id = Number(event.currentTarget.dataset.id)
+    const file = this.findGeneratedFile(id)
+    if (!file || this.data.openingFileId) return
+    this.setData({ openingFileId: file.id })
+    openAgentFile(file)
+      .catch((error) => wx.showToast({ title: errorMessage(error, '文件打开失败，请稍后重试'), icon: 'none', duration: 3000 }))
+      .finally(() => this.setData({ openingFileId: '' }))
+  },
+
+  deleteGeneratedFile(event) {
+    const id = Number(event.currentTarget.dataset.id)
+    const file = this.findGeneratedFile(id)
+    if (!file || this.data.deletingFileId) return
+    this.setData({ deletingFileId: file.id })
+    confirmDeleteAgentFile(file).then((deleted) => {
+      if (!deleted) return
+      const strip = (files) => (files || []).filter((item) => Number(item.id) !== id)
+      const messages = this.data.messages.map((message) => (
+        message.files && message.files.length ? { ...message, files: strip(message.files) } : message
+      ))
+      const run = this.data.run ? { ...this.data.run, files: strip(this.data.run.files) } : this.data.run
+      this.setData({ messages, run })
+      wx.showToast({ title: '文件已删除', icon: 'success' })
+    }).catch((error) => wx.showToast({ title: errorMessage(error, '删除失败，请重试'), icon: 'none' }))
+      .finally(() => this.setData({ deletingFileId: '' }))
+  },
   openResultAction(event) {
     const target = event.currentTarget.dataset.target
     const params = event.currentTarget.dataset.params || {}
@@ -429,7 +509,7 @@ Page({
       return
     }
     wx.removeStorageSync(ACTIVE_RUN_KEY)
-    this.finalizeStreamingMessage(run.output, run.status)
+    this.finalizeStreamingMessage(run.output, run.status, run.files)
     this.setData({ run, conversationId, sending: false, streaming: false }, () => this.scrollToBottom())
     this.loadConversations()
   },
@@ -455,10 +535,10 @@ Page({
     this.setData({ messages: this.data.messages.filter((item) => !item.streaming) })
   },
 
-  finalizeStreamingMessage(content, status) {
+  finalizeStreamingMessage(content, status, files) {
     const messages = this.data.messages.slice()
     const index = messages.map((item) => item.streaming).lastIndexOf(true)
-    const finalMessage = assistantMessage(content || '任务已结束', status)
+    const finalMessage = assistantMessage(content || '任务已结束', status, false, files || [])
     if (index >= 0) messages[index] = finalMessage
     else if (content) messages.push(finalMessage)
     this.setData({ messages })
@@ -489,7 +569,7 @@ Page({
     wx.removeStorageSync(ACTIVE_RUN_KEY)
     wx.removeStorageSync(ACTIVE_CONVERSATION_KEY)
     this.setData({
-      run: null, conversationId: null, currentTitle: '新对话', messages: [], input: '', historyOpen: false,
+      run: null, conversationId: null, currentTitle: '小五工作台', messages: [], input: '', historyOpen: false,
       sending: false, streaming: false, pendingAttachments: []
     })
   }

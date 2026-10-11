@@ -21,6 +21,9 @@
 .upload-picker { min-height: 58rpx; display: flex; align-items: center; justify-content: space-between; color: #17231E; font-size: 29rpx; font-weight: 650; }
 .upload-picker text { color: #83908A; font-size: 34rpx; }
 .upload-picker .picker-value { min-width: 0; overflow: hidden; color: #17231E; font-size: 29rpx; text-overflow: ellipsis; white-space: nowrap; }
+.fixed-purpose { padding: 14rpx 16rpx; border-radius: 12rpx; background: #EEF4F8; }
+.fixed-purpose > text { color: #52718A; font-size: 21rpx; }
+.fixed-purpose-note { margin-top: 2rpx; color: #596A62; font-size: 20rpx; font-weight: 400; }
 .upload-hint { margin-top: 8rpx; color: #83908A; font-size: 21rpx; }
 .supplier-error { margin-top: 9rpx; color: #A83F32; font-size: 23rpx; }
 .supplier-error text { color: #245E9B; font-weight: 700; }

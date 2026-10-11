@@ -1,5 +1,5 @@
 <view class="screen upload-screen">
-  <view class="flow-head"><view class="flow-step-label">第 1 步，共 4 步</view><view class="flow-title">先选择要处理的表格</view><view class="flow-desc">优先上传原始 Excel；也支持 Word、CSV、文字型 PDF，以及拍照或截图得到的价格表。确认前不会修改商品、价格或库存。</view></view>
+  <view class="flow-head"><view class="flow-step-label">业务文件处理 · 第 1 步，共 4 步</view><view class="flow-title">选择文件并说明用途</view><view class="flow-desc">Excel、CSV 和表格图片可用于多种业务；Word、PDF 当前用于买家询价。系统会先识别和核对，确认前不会修改数据。</view></view>
   <view class="flow-progress"><view class="flow-progress-value" style="width: 25%;"></view></view>
 
   <view class="file-drop {{file ? 'selected' : ''}}" bindtap="chooseFile" aria-label="选择表格文件">
@@ -15,7 +15,8 @@
   <view class="upload-form">
     <view class="upload-field">
       <view class="upload-label">这次准备处理什么</view>
-      <picker range="{{purposes}}" value="{{purposeIndex}}" bindchange="changePurpose"><view class="upload-picker">{{purposes[purposeIndex]}}<text>›</text></view></picker>
+      <view class="upload-picker fixed-purpose" wx:if="{{file && file.documentOnly}}"><view><view>买家询价</view><view class="fixed-purpose-note">Word / PDF 当前支持的处理方式</view></view><text>已限定</text></view>
+      <picker wx:else range="{{purposes}}" value="{{purposeIndex}}" bindchange="changePurpose"><view class="upload-picker">{{purposes[purposeIndex]}}<text>›</text></view></picker>
       <view class="upload-hint">用途会决定必填字段和最后允许修改的数据。</view>
     </view>
     <block wx:if="{{purposes[purposeIndex] === '厂家价格'}}">

@@ -32,6 +32,7 @@ public class AgentConversationService {
     private final AgentRunRepository runRepository;
     private final AgentAttachmentRepository attachmentRepository;
     private final AttachmentStorage attachmentStorage;
+    private final AgentOutputService outputService;
 
     @Autowired
     public AgentConversationService(
@@ -39,12 +40,23 @@ public class AgentConversationService {
             AgentConversationRunRepository conversationRunRepository,
             AgentRunRepository runRepository,
             AgentAttachmentRepository attachmentRepository,
-            AttachmentStorage attachmentStorage) {
+            AttachmentStorage attachmentStorage,
+            AgentOutputService outputService) {
         this.conversationRepository = conversationRepository;
         this.conversationRunRepository = conversationRunRepository;
         this.runRepository = runRepository;
         this.attachmentRepository = attachmentRepository;
         this.attachmentStorage = attachmentStorage;
+        this.outputService = outputService;
+    }
+
+    public AgentConversationService(
+            AgentConversationRepository conversationRepository,
+            AgentConversationRunRepository conversationRunRepository,
+            AgentRunRepository runRepository,
+            AgentAttachmentRepository attachmentRepository,
+            AttachmentStorage attachmentStorage) {
+        this(conversationRepository, conversationRunRepository, runRepository, attachmentRepository, attachmentStorage, null);
     }
 
     public AgentConversationService(
@@ -168,7 +180,10 @@ public class AgentConversationService {
                 messages.add(new AgentConversationMessage(run.getId(), "user", run.getInputText(), run.getStatus(), attachments));
             }
             if (StringUtils.hasText(run.getOutputText())) {
-                messages.add(new AgentConversationMessage(run.getId(), "assistant", run.getOutputText(), run.getStatus()));
+                var files = outputService == null ? List.<com.example.demo.agent.dto.AgentFileView>of()
+                        : outputService.forRun(run.getId());
+                messages.add(new AgentConversationMessage(run.getId(), "assistant", run.getOutputText(), run.getStatus(),
+                        List.of(), files));
             }
         }
         return new AgentConversationDetail(conversation.getId(), conversation.getTitle(), messages);
