@@ -1,7 +1,8 @@
 package com.example.demo.agent;
 
 import com.example.demo.agent.service.attachment.AttachmentContentParser;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.demo.agent.service.attachment.ocr.DocumentOcrClient;
+import com.example.demo.agent.service.attachment.ocr.DocumentOcrResult;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.junit.jupiter.api.Test;
@@ -11,7 +12,12 @@ import java.io.ByteArrayOutputStream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class AttachmentContentParserTest {
-    private final AttachmentContentParser parser = new AttachmentContentParser("", 5, new ObjectMapper());
+    private final AttachmentContentParser parser = new AttachmentContentParser(new DocumentOcrClient() {
+        @Override public boolean isConfigured() { return false; }
+        @Override public DocumentOcrResult recognize(String fileName, String mimeType, byte[] content) {
+            throw new IllegalStateException("不应调用");
+        }
+    }, "ffmpeg", 60);
 
     @Test
     void extractsRowsFromXlsx() throws Exception {
@@ -70,7 +76,23 @@ class AttachmentContentParserTest {
         var result = parser.parse("订单.png", "image/png", new byte[]{1, 2, 3});
 
         assertThat(result.status()).isEqualTo("WAITING_OCR");
-        assertThat(result.error()).contains("PaddleOCR");
+        assertThat(result.error()).contains("OCR");
+    }
+
+    @Test
+    void imageKeepsRawOcrTextAndShowsReviewWarning() {
+        var configuredParser = new AttachmentContentParser(new DocumentOcrClient() {
+            @Override public boolean isConfigured() { return true; }
+            @Override public DocumentOcrResult recognize(String fileName, String mimeType, byte[] content) {
+                return new DocumentOcrResult("tencent-table-v3", "request-1", "商品：航量3.8",
+                        java.util.List.of("商品名称必须由用户审核"));
+            }
+        }, "ffmpeg", 60);
+
+        var result = configuredParser.parse("订单.png", "image/png", new byte[]{1, 2, 3});
+
+        assertThat(result.status()).isEqualTo("PARSED");
+        assertThat(result.text()).contains("航量3.8", "tencent-table-v3", "request-1", "[审核提醒] 商品名称必须由用户审核");
     }
 
     @Test

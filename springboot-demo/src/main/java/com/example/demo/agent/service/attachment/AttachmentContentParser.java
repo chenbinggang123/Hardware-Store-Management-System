@@ -1,7 +1,7 @@
 package com.example.demo.agent.service.attachment;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.demo.agent.service.attachment.ocr.DocumentOcrClient;
+import com.example.demo.agent.service.attachment.ocr.DocumentOcrResult;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.DataFormatter;
@@ -18,20 +18,13 @@ import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
-import org.springframework.web.client.RestClient;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -43,31 +36,18 @@ public class AttachmentContentParser {
     private static final int MAX_COLUMNS = 80;
     private static final int MAX_EXTRACTED_CHARS = 60_000;
 
-    private final String ocrUrl;
-    private final RestClient restClient;
-    private final ObjectMapper objectMapper;
+    private final DocumentOcrClient ocrClient;
     private final String ffmpegPath;
     private final int videoTimeoutSeconds;
 
     @Autowired
     public AttachmentContentParser(
-            @Value("${agent.attachment.ocr-url:}") String ocrUrl,
-            @Value("${agent.attachment.ocr-timeout-seconds:45}") int timeoutSeconds,
+            DocumentOcrClient ocrClient,
             @Value("${agent.attachment.ffmpeg-path:ffmpeg}") String ffmpegPath,
-            @Value("${agent.attachment.video-timeout-seconds:60}") int videoTimeoutSeconds,
-            ObjectMapper objectMapper) {
-        this.ocrUrl = ocrUrl;
-        this.objectMapper = objectMapper;
+            @Value("${agent.attachment.video-timeout-seconds:60}") int videoTimeoutSeconds) {
+        this.ocrClient = ocrClient;
         this.ffmpegPath = ffmpegPath;
         this.videoTimeoutSeconds = Math.max(videoTimeoutSeconds, 10);
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(Duration.ofSeconds(Math.min(timeoutSeconds, 10)));
-        requestFactory.setReadTimeout(Duration.ofSeconds(timeoutSeconds));
-        this.restClient = RestClient.builder().requestFactory(requestFactory).build();
-    }
-
-    public AttachmentContentParser(String ocrUrl, int timeoutSeconds, ObjectMapper objectMapper) {
-        this(ocrUrl, timeoutSeconds, "ffmpeg", 60, objectMapper);
     }
 
     public AttachmentParseResult parse(String fileName, String mimeType, byte[] content) {
@@ -218,27 +198,22 @@ public class AttachmentContentParser {
     }
 
     private AttachmentParseResult parseImage(String fileName, String mimeType, byte[] content) throws Exception {
-        if (!StringUtils.hasText(ocrUrl)) {
-            return AttachmentParseResult.waiting("图片已保存；部署并配置 PaddleOCR 服务后即可识别");
+        if (!ocrClient.isConfigured()) {
+            return AttachmentParseResult.waiting("图片已保存；配置腾讯云 OCR 密钥或 HTTP OCR 服务后即可识别");
         }
-        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-        body.add("file", new ByteArrayResource(content) {
-            @Override public String getFilename() { return fileName; }
-        });
-        String response = restClient.post().uri(ocrUrl)
-                .contentType(MediaType.MULTIPART_FORM_DATA)
-                .body(body).retrieve().body(String.class);
-        JsonNode root = objectMapper.readTree(response);
-        JsonNode text = root.path("text");
-        if (!text.isTextual()) text = root.path("data").path("text");
-        if (!text.isTextual() || !StringUtils.hasText(text.asText())) {
+        DocumentOcrResult result = ocrClient.recognize(fileName, mimeType, content);
+        if (!StringUtils.hasText(result.text())) {
             throw new IllegalStateException("OCR 服务未返回可识别文字");
         }
-        return AttachmentParseResult.parsed(limit(text.asText()));
+        StringBuilder output = new StringBuilder(result.text());
+        if (StringUtils.hasText(result.provider())) append(output, "\n[OCR Provider] " + result.provider());
+        if (StringUtils.hasText(result.requestId())) append(output, "\n[OCR RequestId] " + result.requestId());
+        for (String warning : result.warnings()) append(output, "\n[审核提醒] " + warning);
+        return AttachmentParseResult.parsed(limit(output.toString()));
     }
 
     private AttachmentParseResult parseVideo(String fileName, byte[] content) throws Exception {
-        if (!StringUtils.hasText(ocrUrl)) {
+        if (!ocrClient.isConfigured()) {
             return AttachmentParseResult.waiting("视频已保存；配置 OCR 服务后即可抽帧识别");
         }
         Path directory = Files.createTempDirectory("agent-video-");

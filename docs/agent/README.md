@@ -102,12 +102,18 @@ COS_REGION=ap-shanghai
 COS_BUCKET=your-private-bucket-1250000000
 ```
 
-Excel 和 CSV 由 Spring Boot 直接解析。图片需要先部署 [`tools/paddleocr-service`](../../tools/paddleocr-service/README.md)，然后设置：
+Excel 和 CSV 由 Spring Boot 直接解析。图片和视频代表帧由 Spring Boot 直接调用腾讯云 OCR，生产环境设置：
 
 ```text
-AGENT_ATTACHMENT_OCR_URL=http://paddleocr-service:8090/ocr
+OCR_PROVIDER=tencent
+TENCENT_OCR_SECRET_ID=腾讯云 CAM 子用户 SecretId
+TENCENT_OCR_SECRET_KEY=腾讯云 CAM 子用户 SecretKey
+TENCENT_OCR_REGION=
+TENCENT_OCR_TIMEOUT_SECONDS=45
 ```
 
-单个文件默认不超过 10MB，每条消息最多 3 个附件。附件内容会作为不可信业务数据交给模型，识别结果只能生成待确认草稿，不能绕过已有审批流程直接创建正式订单。
+后端优先调用“表格识别 V3”，没有结构化表格时回退“通用文字识别（高精度版）”。不需要单独部署 OCR 服务器；`AGENT_ATTACHMENT_OCR_URL` 仅作为旧 HTTP OCR 服务的兼容配置保留。OCR 原文不得按常识自动纠错，数量、单价、金额和合计的差异只能提示用户核对。
+
+单个文件默认不超过 30MB，每条消息最多 3 个附件。腾讯云 OCR 的单张图片 Base64 内容不能超过 10MB，超限图片需先压缩或裁剪。附件内容会作为不可信业务数据交给模型，识别结果只能生成待确认草稿；用户修改并确认后，才能创建正式采购凭证、账本流水或入库记录。
 
 生产环境需确认 `CLOUDBASE_ENV_ID` 与小程序的 CloudBase 环境一致，并把云存储安全规则限制为当前小程序用户可写。后端只接受当前环境的 `cloud://` fileID，并只从 CloudBase/COS 官方域名读取短期下载地址。
