@@ -1,0 +1,27 @@
+<view class="screen ledger-screen">
+  <view class="ledger-head">
+    <view><view class="page-kicker">电子月结本</view><view class="ledger-title">工厂账本</view><view class="ledger-subtitle">一家工厂一本账，每次拿货、退货和付款都记在这里</view></view>
+    <view class="btn btn-primary btn-sm" role="button" aria-label="新建工厂账本" bindtap="openCreate">＋ 新建</view>
+  </view>
+  <view class="ledger-summary" aria-label="本月账本汇总">
+    <view class="summary-cell"><text>月结工厂</text><text class="summary-value">{{totals.factoryCount}}</text><text class="summary-unit">家</text></view>
+    <view class="summary-cell"><text>本月拿货</text><text class="summary-value">¥{{totals.purchaseAmount}}</text></view>
+    <view class="summary-cell danger"><text>当前应收</text><text class="summary-value">¥{{totals.balanceAmount}}</text></view>
+    <view class="summary-cell"><text>待处理</text><text class="summary-value">{{totals.pendingCount}}</text><text class="summary-unit">家</text></view>
+  </view>
+  <view class="filter-ledger">
+    <picker mode="date" fields="month" value="{{month}}" bindchange="onMonthChange"><view class="month-picker">{{month}} 月账 ›</view></picker>
+    <view class="search-box"><text class="search-icon">查</text><input class="search-input" value="{{keyword}}" placeholder="工厂、联系人或电话" bindinput="onKeywordInput" bindconfirm="loadData" confirm-type="search" /></view>
+    <view class="filter-actions"><view class="btn btn-outline btn-sm" bindtap="loadData">查询</view><view class="btn btn-ghost btn-sm" bindtap="openSettlements">月底结账</view></view>
+  </view>
+  <view class="loading-state" wx:if="{{loading}}">正在同步工厂账本...</view>
+  <view class="error-state" wx:elif="{{error}}"><view class="error-state-title">账本暂时加载失败</view><view>{{error}}</view><view class="state-action" bindtap="loadData">重新加载</view></view>
+  <view class="book-list" wx:elif="{{ledgers.length}}">
+    <view class="book-row" wx:for="{{ledgers}}" wx:key="id" data-id="{{item.id}}" bindtap="openDetail" role="button" aria-label="打开{{item.factoryName}}账本">
+      <view class="book-spine {{item.balanceCents > 0 ? 'owing' : ''}}">账</view>
+      <view class="book-main"><view class="book-code">{{item.ledgerNo}}</view><view class="book-name">{{item.factoryName}}</view><view class="book-contact">{{item.contactPerson || '未填联系人'}} · {{item.phone || '未填电话'}}</view></view>
+      <view class="book-money"><text>当前应收</text><text class="book-amount {{item.balanceCents > 0 ? 'danger-text' : ''}}">¥{{item.balanceAmount}}</text><text class="book-status">{{item.statusLabel}} ›</text></view>
+    </view>
+  </view>
+  <view class="empty-state" wx:else><view class="empty-icon">账</view><view class="empty-title">还没有工厂账本</view><view class="empty-desc">按原来“一家工厂一本本子”的习惯，先建立第一本电子账。</view><view class="state-action" bindtap="openCreate">新建第一本账</view></view>
+</view>

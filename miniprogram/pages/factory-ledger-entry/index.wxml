@@ -1,0 +1,25 @@
+<view class="screen">
+  <view class="flow-head"><view class="flow-step-label">日常往来</view><view class="flow-title">给“{{ledger.factoryName || '这家工厂'}}”记一笔</view><view class="flow-desc">照着收据或本子逐项填写，系统会自动计算金额，保存前再次核对。</view></view>
+  <view class="form-card">
+    <view class="grid-2">
+      <view class="form-group"><view class="form-label">记录类型</view><picker range="{{typeNames}}" value="{{typeIndex}}" bindchange="changeType"><view class="form-picker">{{typeNames[typeIndex]}} ›</view></picker></view>
+      <view class="form-group"><view class="form-label">日期</view><picker mode="date" value="{{form.date}}" bindchange="changeDate"><view class="form-picker">{{form.date}} ›</view></picker></view>
+    </view>
+    <view class="form-group"><view class="form-label">收据编号</view><input class="form-input" value="{{form.receiptNo}}" data-field="receiptNo" bindinput="updateField" placeholder="建议填写，防止重复记账" maxlength="40" /></view>
+    <view class="form-group" wx:if="{{form.type === 'PAYMENT'}}"><view class="form-label">本次收款金额（元）</view><input class="form-input amount-input" value="{{form.paymentAmount}}" data-field="paymentAmount" bindinput="updateField" type="digit" placeholder="0.00" /></view>
+    <view wx:else>
+      <view class="goods-head"><view><view class="form-section-title">商品明细</view><view class="form-hint">可连续添加多种商品</view></view><view class="btn btn-outline btn-sm" bindtap="addItem">＋ 加一行</view></view>
+      <view class="goods-row" wx:for="{{form.items}}" wx:key="index">
+        <view class="goods-index">{{index + 1}}</view>
+        <view class="form-group wide"><view class="form-label">商品名称</view><input class="form-input" value="{{item.productName}}" data-index="{{index}}" data-field="productName" bindinput="updateItem" placeholder="例如：直导柱" /></view>
+        <view class="form-group"><view class="form-label">规格</view><input class="form-input" value="{{item.specification}}" data-index="{{index}}" data-field="specification" bindinput="updateItem" placeholder="Φ16×90" /></view>
+        <view class="form-group"><view class="form-label">单位</view><input class="form-input" value="{{item.unit}}" data-index="{{index}}" data-field="unit" bindinput="updateItem" /></view>
+        <view class="form-group"><view class="form-label">数量</view><input class="form-input" value="{{item.quantity}}" data-index="{{index}}" data-field="quantity" bindinput="updateItem" type="digit" /></view>
+        <view class="form-group"><view class="form-label">单价（元）</view><input class="form-input" value="{{item.unitPrice}}" data-index="{{index}}" data-field="unitPrice" bindinput="updateItem" type="digit" placeholder="0.00" /></view>
+        <view class="remove-line" wx:if="{{form.items.length > 1}}" data-index="{{index}}" bindtap="removeItem">删除这一行</view>
+      </view>
+    </view>
+    <view class="form-group"><view class="form-label">备注</view><textarea class="form-textarea" value="{{form.remark}}" data-field="remark" bindinput="updateField" placeholder="可填写领货人、特殊价格等" maxlength="200" /></view>
+  </view>
+  <view class="fixed-action-space"></view><view class="fixed-action"><button class="fixed-primary {{saving ? 'disabled' : ''}}" disabled="{{saving}}" bindtap="preview">{{saving ? '正在写入…' : '核对金额并记账'}}</button></view>
+</view>

@@ -1,0 +1,117 @@
+package com.example.demo.service;
+
+import com.example.demo.dto.FactoryLedgerTransactionRequest;
+import com.example.demo.entity.FactoryLedger;
+import com.example.demo.entity.FactoryLedgerSettlement;
+import com.example.demo.entity.FactoryLedgerTransaction;
+import com.example.demo.repository.FactoryLedgerRepository;
+import com.example.demo.repository.FactoryLedgerSettlementRepository;
+import com.example.demo.repository.FactoryLedgerTransactionRepository;
+import com.example.demo.repository.OperationLogRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+class FactoryLedgerServiceTest {
+    private FactoryLedgerRepository ledgerRepository;
+    private FactoryLedgerTransactionRepository transactionRepository;
+    private FactoryLedgerSettlementRepository settlementRepository;
+    private FactoryLedgerService service;
+    private FactoryLedger ledger;
+
+    @BeforeEach
+    void setUp() {
+        ledgerRepository = mock(FactoryLedgerRepository.class);
+        transactionRepository = mock(FactoryLedgerTransactionRepository.class);
+        settlementRepository = mock(FactoryLedgerSettlementRepository.class);
+        OperationLogRepository operationLogRepository = mock(OperationLogRepository.class);
+        service = new FactoryLedgerService(ledgerRepository, transactionRepository, settlementRepository, operationLogRepository);
+        ledger = ledger();
+        when(ledgerRepository.findById(1L)).thenReturn(Optional.of(ledger));
+        when(ledgerRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(transactionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(settlementRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    }
+
+    @Test
+    void calculatesMonthlyBalanceUsingIntegerCents() {
+        when(transactionRepository.findByLedgerIdOrderByTransactionDateDescCreateTimeDesc(1L)).thenReturn(List.of(
+                transaction("PURCHASE", "2026-09-30", 1000),
+                transaction("PURCHASE", "2026-10-09", 10560),
+                transaction("RETURN", "2026-10-10", 2000),
+                transaction("PAYMENT", "2026-10-11", 5000)
+        ));
+        when(settlementRepository.findByLedgerIdAndSettlementMonth(1L, "2026-10"))
+                .thenReturn(Optional.empty());
+
+        Map<String, Object> detail = service.get(1L, "2026-10");
+        Map<?, ?> summary = (Map<?, ?>) detail.get("summary");
+
+        assertEquals("138.50", summary.get("openingAmount"));
+        assertEquals("105.60", summary.get("purchaseAmount"));
+        assertEquals("20.00", summary.get("returnAmount"));
+        assertEquals("50.00", summary.get("paymentAmount"));
+        assertEquals("174.10", summary.get("balanceAmount"));
+    }
+
+    @Test
+    void rejectsDuplicateReceiptBeforeWriting() {
+        when(transactionRepository.existsByLedgerIdAndReceiptNo(1L, "A-001")).thenReturn(true);
+        FactoryLedgerTransactionRequest request = new FactoryLedgerTransactionRequest();
+        request.setType("PAYMENT");
+        request.setReceiptNo("A-001");
+        request.setPaymentAmount(new BigDecimal("50.00"));
+
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> service.addTransaction(1L, request, 7L));
+
+        assertEquals("这张收据已经记过账", error.getMessage());
+    }
+
+    @Test
+    void persistsSettlementProgress() {
+        when(settlementRepository.findByLedgerIdAndSettlementMonth(1L, "2026-10"))
+                .thenReturn(Optional.of(new FactoryLedgerSettlement()));
+
+        Map<String, Object> result = service.setSettlementStatus(1L, "2026-10", "CONFIRMED", 7L);
+
+        assertEquals("CONFIRMED", result.get("status"));
+        assertEquals("已确认", result.get("statusLabel"));
+    }
+
+    private FactoryLedger ledger() {
+        FactoryLedger value = new FactoryLedger();
+        value.setId(1L);
+        value.setLedgerNo("ZB-20261001-TEST");
+        value.setFactoryName("测试工厂");
+        value.setStartDate(LocalDate.of(2026, 10, 1));
+        value.setSettlementDay(31);
+        value.setOpeningBalanceCents(12850L);
+        value.setStatus("ACTIVE");
+        value.setCreateTime(LocalDateTime.now());
+        value.setUpdateTime(LocalDateTime.now());
+        return value;
+    }
+
+    private FactoryLedgerTransaction transaction(String type, String date, long amountCents) {
+        FactoryLedgerTransaction value = new FactoryLedgerTransaction();
+        value.setType(type);
+        value.setLedgerId(1L);
+        value.setTransactionDate(LocalDate.parse(date));
+        value.setAmountCents(amountCents);
+        value.setCreateTime(LocalDateTime.now());
+        return value;
+    }
+}

@@ -1,0 +1,19 @@
+<view class="screen" wx:if="{{loading}}"><view class="loading-state">正在同步账本明细...</view></view>
+<view class="screen" wx:elif="{{error}}"><view class="error-state"><view class="error-state-title">账本暂时加载失败</view><view>{{error}}</view><view class="state-action" bindtap="loadData">重新加载</view></view></view>
+<view class="screen" wx:elif="{{ledger}}">
+  <view class="detail-head"><view class="book-badge">账</view><view class="detail-copy"><view class="book-code">{{ledger.ledgerNo}}</view><view class="detail-title">{{ledger.factoryName}}</view><view class="detail-contact">{{ledger.contactPerson || '未填联系人'}} · {{ledger.phone || '未填电话'}}</view></view></view>
+  <view class="detail-actions"><view class="btn btn-primary" bindtap="addPurchase">记一笔拿货</view><view class="btn btn-outline" bindtap="addPayment">登记收款</view><view class="btn btn-ghost" bindtap="addReturn">登记退货</view></view>
+  <view class="month-line"><picker mode="date" fields="month" value="{{month}}" bindchange="onMonthChange"><view>{{month}} 月账 ›</view></picker><text>{{ledger.summary.transactionCount}} 笔流水 · {{ledger.summary.statusLabel}}</text></view>
+  <view class="money-grid" aria-label="账本金额汇总">
+    <view><text>上月结转</text><text class="money-value">¥{{ledger.summary.openingAmount}}</text></view><view><text>本月拿货</text><text class="money-value">¥{{ledger.summary.purchaseAmount}}</text></view>
+    <view><text>退货 / 冲抵</text><text class="money-value green">-¥{{ledger.summary.returnAmount}}</text></view><view><text>本月已收</text><text class="money-value green">-¥{{ledger.summary.paymentAmount}}</text></view>
+    <view class="balance"><text>当前应收</text><text class="money-value">¥{{ledger.summary.balanceAmount}}</text></view>
+  </view>
+  <view class="section-head flow-section"><view><view class="section-title">往来流水</view><view class="section-subtitle">按日期倒序，像翻原来的本子一样查看</view></view></view>
+  <view class="transaction-list" wx:if="{{ledger.transactions.length}}">
+    <view class="transaction-row" wx:for="{{ledger.transactions}}" wx:key="id">
+      <view class="transaction-date">{{item.date}}</view><view class="transaction-main"><view><text class="type-tag type-{{item.type}}">{{item.typeLabel}}</text><text class="receipt">{{item.receiptNo || '无收据号'}}</text></view><view class="transaction-content">{{item.content}}</view><view class="transaction-remark" wx:if="{{item.remark}}">{{item.remark}}</view></view><view class="transaction-money {{item.type === 'PURCHASE' ? 'plus' : 'minus'}}">{{item.signedAmount}}</view>
+    </view>
+  </view>
+  <view class="empty-state" wx:else><view class="empty-icon">记</view><view class="empty-title">这个月还没有记录</view><view class="empty-desc">工厂来拿货时，点击“记一笔拿货”开始。</view><view class="state-action" bindtap="addPurchase">记第一笔</view></view>
+</view>

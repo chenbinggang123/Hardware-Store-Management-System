@@ -10,6 +10,7 @@ const quickActions = [
 ]
 
 const toolActions = [
+  { title: '工厂账本', desc: '记录每天拿货，月底自动算账', mark: '账', path: '/pages/factory-ledgers/index' },
   { title: '客户与供应商', desc: '查看联系人和往来资料', mark: '人', path: '/pages/contacts/index' },
   { title: '价格变化记录', desc: '追溯进价和售价变化', mark: '价', path: '/pages/price-history/index' },
   { title: '经营报表', desc: '查看和导出经营数据', mark: '表', path: '/pages/report-center/index' },

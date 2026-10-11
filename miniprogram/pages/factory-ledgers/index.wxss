@@ -1,0 +1,29 @@
+.ledger-screen { padding-top: 22rpx; }
+.ledger-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 22rpx; }
+.ledger-title { margin-top: 4rpx; color: #17231E; font-size: 46rpx; line-height: 1.25; font-weight: 800; }
+.ledger-subtitle { max-width: 500rpx; margin-top: 8rpx; color: #52605A; font-size: 24rpx; line-height: 1.6; }
+.ledger-summary { margin-top: 26rpx; display: grid; grid-template-columns: 1fr 1fr; background: #FFF; border: 1rpx solid #CED8D3; }
+.summary-cell { min-height: 128rpx; padding: 20rpx; box-sizing: border-box; border-right: 1rpx solid #E0E6E3; border-bottom: 1rpx solid #E0E6E3; }
+.summary-cell:nth-child(2n) { border-right: 0; }
+.summary-cell:nth-child(n+3) { border-bottom: 0; }
+.summary-cell text { display: block; color: #66746E; font-size: 24rpx; }
+.summary-cell .summary-value { margin-top: 8rpx; color: #17231E; font-size: 36rpx; font-weight: 800; font-variant-numeric: tabular-nums; }
+.summary-cell .summary-unit { margin-left: 6rpx; color: #66746E; font-size: 22rpx; }
+.summary-cell.danger .summary-value, .danger-text { color: #A83F32 !important; }
+.filter-ledger { margin-top: 22rpx; }
+.month-picker { min-height: 78rpx; padding: 0 22rpx; display: flex; align-items: center; color: #245E9B; background: #E8F1F8; font-size: 27rpx; font-weight: 700; }
+.filter-ledger .search-box { margin-top: 12rpx; }
+.filter-actions { margin-top: 12rpx; display: grid; grid-template-columns: 1fr 1fr; gap: 12rpx; }
+.book-list { margin-top: 24rpx; border-top: 1rpx solid #CED8D3; border-bottom: 1rpx solid #CED8D3; background: #FFF; }
+.book-row { min-height: 150rpx; display: grid; grid-template-columns: 46rpx minmax(0,1fr) auto; border-bottom: 1rpx solid #DCE3DF; }
+.book-row:last-child { border-bottom: 0; }
+.book-spine { display: flex; align-items: center; justify-content: center; color: #53615A; background: #DDE3DF; font-size: 24rpx; font-weight: 800; writing-mode: vertical-rl; }
+.book-spine.owing { color: #6F480D; background: #F2B84B; }
+.book-main, .book-money { padding: 22rpx 18rpx; display: flex; flex-direction: column; justify-content: center; }
+.book-code { color: #718079; font-size: 21rpx; font-family: monospace; }
+.book-name { margin-top: 5rpx; color: #17231E; font-size: 31rpx; font-weight: 750; }
+.book-contact { margin-top: 5rpx; color: #66746E; font-size: 22rpx; }
+.book-money { min-width: 184rpx; align-items: flex-end; text-align: right; }
+.book-money > text:first-child, .book-status { color: #66746E; font-size: 21rpx; }
+.book-amount { margin: 5rpx 0; color: #17231E; font-size: 30rpx; font-weight: 800; }
+@media (max-width: 340px) { .book-row { grid-template-columns: 40rpx minmax(0,1fr); } .book-money { grid-column: 2; padding-top: 0; align-items: flex-start; text-align: left; } }

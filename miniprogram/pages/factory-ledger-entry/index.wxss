@@ -1,0 +1,6 @@
+.goods-head { margin: 34rpx 0 14rpx; display: flex; align-items: center; justify-content: space-between; gap: 18rpx; }
+.goods-row { position: relative; margin-top: 16rpx; padding: 22rpx 18rpx; display: grid; grid-template-columns: 1fr 1fr; gap: 0 14rpx; background: #F3F6F4; border-left: 7rpx solid #245E9B; }
+.goods-index { position: absolute; right: 14rpx; top: 12rpx; color: #8A9690; font: 22rpx monospace; }
+.goods-row .wide { grid-column: 1 / -1; }.goods-row .form-group { margin-top: 18rpx; }.remove-line { grid-column: 1 / -1; min-height: 68rpx; margin-top: 16rpx; display: flex; align-items: center; justify-content: center; color: #A83F32; background: #FCE9E4; font-size: 25rpx; font-weight: 700; }
+.amount-input { color: #A83F32; font-size: 38rpx; font-weight: 800; }.form-textarea { min-height: 140rpx; }
+@media (max-width: 340px) { .grid-2 { grid-template-columns: 1fr; gap: 0; } }

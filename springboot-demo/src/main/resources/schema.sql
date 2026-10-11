@@ -69,6 +69,54 @@ CREATE TABLE IF NOT EXISTS sales_order (
     UNIQUE KEY uk_sales_order_number (order_number)
 );
 
+CREATE TABLE IF NOT EXISTS factory_ledger (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ledger_no VARCHAR(64) NOT NULL,
+    factory_name VARCHAR(100) NOT NULL,
+    contact_person VARCHAR(50),
+    phone VARCHAR(30),
+    start_date DATE NOT NULL,
+    settlement_day INT NOT NULL DEFAULT 31,
+    opening_balance_cents BIGINT NOT NULL DEFAULT 0,
+    remark VARCHAR(255),
+    status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+    create_time DATETIME NOT NULL,
+    update_time DATETIME NOT NULL,
+    UNIQUE KEY uk_factory_ledger_no (ledger_no),
+    UNIQUE KEY uk_factory_ledger_name (factory_name),
+    KEY idx_factory_ledger_update (update_time)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS factory_ledger_transaction (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    transaction_no VARCHAR(64) NOT NULL,
+    ledger_id BIGINT NOT NULL,
+    type VARCHAR(32) NOT NULL,
+    transaction_date DATE NOT NULL,
+    receipt_no VARCHAR(64),
+    amount_cents BIGINT NOT NULL,
+    items_json LONGTEXT,
+    remark VARCHAR(255),
+    source VARCHAR(32) NOT NULL,
+    operator_id BIGINT,
+    create_time DATETIME NOT NULL,
+    UNIQUE KEY uk_factory_transaction_no (transaction_no),
+    UNIQUE KEY uk_factory_ledger_receipt (ledger_id, receipt_no),
+    KEY idx_factory_transaction_ledger_date (ledger_id, transaction_date, create_time)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS factory_ledger_settlement (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    ledger_id BIGINT NOT NULL,
+    settlement_month VARCHAR(7) NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    operator_id BIGINT,
+    update_time DATETIME NOT NULL,
+    version BIGINT NOT NULL DEFAULT 0,
+    UNIQUE KEY uk_factory_settlement_month (ledger_id, settlement_month),
+    KEY idx_factory_settlement_status (settlement_month, status)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS sales_order_draft (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     customer_id BIGINT NOT NULL,

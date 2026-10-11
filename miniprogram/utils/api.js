@@ -1,5 +1,6 @@
 const seedState = require('./mock-data')
 const cloudConfig = require('../config/cloud')
+const factoryLedgerStore = require('./factory-ledger')
 
 const AUTH_STORAGE_KEY = 'auth_session'
 const state = clone(seedState)
@@ -748,6 +749,36 @@ module.exports = {
         status: item.payStatus,
         createTime: item.createTime
       }))))
+  },
+  getFactoryLedgers(params = {}) {
+    return withFallback(
+      () => request('/factory-ledgers', { data: params }),
+      () => factoryLedgerStore.listLedgers(params)
+    )
+  },
+  getFactoryLedger(id, month) {
+    return withFallback(
+      () => request(`/factory-ledgers/${id}`, { data: { month } }),
+      () => factoryLedgerStore.getLedger(id, month)
+    )
+  },
+  createFactoryLedger(data) {
+    return withFallback(
+      () => request('/factory-ledgers', { method: 'POST', data }),
+      () => factoryLedgerStore.createLedger(data)
+    )
+  },
+  addFactoryLedgerTransaction(id, data) {
+    return withFallback(
+      () => request(`/factory-ledgers/${id}/transactions`, { method: 'POST', data }),
+      () => factoryLedgerStore.addTransaction(id, data)
+    )
+  },
+  setFactoryLedgerSettlementStatus(id, month, status) {
+    return withFallback(
+      () => request(`/factory-ledgers/${id}/settlements/${month}/status`, { method: 'PUT', data: { status } }),
+      () => factoryLedgerStore.setSettlementStatus(id, month, status)
+    )
   },
   getPurchaseOrders(params = {}) {
     return withFallback(() => request('/purchase-orders', { data: params }), () => filterPurchaseOrders(params))
