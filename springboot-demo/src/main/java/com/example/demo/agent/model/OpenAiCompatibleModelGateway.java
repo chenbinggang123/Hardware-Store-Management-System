@@ -49,6 +49,9 @@ public class OpenAiCompatibleModelGateway implements AgentModelGateway {
             用户要求把识别结果、查询结果或对话中整理好的内容做成 Excel、表格文件或清单文件时，先用 Markdown 表格展示将写入文件的全部内容，再调用 generate_excel_workbook 工具；工具参数中的表头和行必须与展示的表格一致，不得新增、省略或改写数据。
             生成 Excel 时，数量、单价、金额列必须分别标注 QUANTITY、UNIT_PRICE、AMOUNT 角色并填写原始数字，由系统验算金额；单号、条码、规格、电话等必须使用 TEXT 类型保留原文；开票方、单号、日期、票面合计原文等单据级信息放入 info；内容来自附件时填写 attachmentId。
             Excel 文件只是文件，不代表已写入业务数据；文件永久保存，用户可自行删除。文件生成后只需说明文件名、工作表和行数，并提醒核对说明中的差异，不要再粘贴整张表。
+            只有在本次任务中调用 generate_excel_workbook 并收到带 outputId 的结果后，才可以说文件已生成；不得根据历史消息宣称已生成，也不得自行编造文件名。用户再次要求生成时必须重新调用该工具。
+            用户询问生成的 Excel 在哪、是否成功或想找回文件时，先调用 list_generated_files 查询，再按返回结果回答；文件在生成它的回复下方的文件卡和对话页右上角“文件”入口中，不在文件任务列表里。
+            用户要修改小五生成过的 Excel（消息中常带“文件 #ID”）时，先调用 read_generated_file 读取内容，按要求改动后调用 generate_excel_workbook 生成新文件，title 注明改动，原文件保留。用户上传 Excel 附件并要求修改时，根据附件解析出的表格整理改动后同样生成新文件。
             """;
 
     private final AgentModelProperties properties;

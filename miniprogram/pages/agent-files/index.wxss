@@ -19,6 +19,7 @@
 .files-error { margin-top: 8rpx; color: #A83F32; font-size: 22rpx; line-height: 1.5; }
 .files-actions { display: flex; flex-direction: column; gap: 10rpx; flex: 0 0 auto; }
 .files-action { min-width: 108rpx; min-height: 64rpx; padding: 0 16rpx; display: flex; align-items: center; justify-content: center; box-sizing: border-box; border-radius: 10rpx; color: #245E9B; background: #E7F0F8; font-size: 24rpx; font-weight: 700; }
+.files-action.secondary { color: #247052; background: #E3F2E9; }
 .files-action.danger { color: #A83F32; background: #FCE9E4; }
 .error-state { margin-top: 28rpx; padding: 40rpx 32rpx; border-radius: 20rpx; background: #FFF; text-align: center; color: #66746E; font-size: 24rpx; line-height: 1.6; }
 .error-state-title { margin-bottom: 8rpx; color: #17231E; font-size: 28rpx; font-weight: 700; }

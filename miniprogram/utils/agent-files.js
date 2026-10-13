@@ -28,14 +28,15 @@ function fileView(item) {
   const status = source.status || 'READY'
   const mimeType = String(source.mimeType || '')
   const fileType = /pdf/.test(mimeType) ? 'pdf' : 'xlsx'
+  const statusText = { READY: '可打开', FAILED: '生成失败', MISSING: '文件已丢失，请删除后重新生成' }[status] || '生成中'
   return {
     ...source,
     name: source.name || `文件.${fileType}`,
     fileType,
     mark: fileType === 'pdf' ? 'PDF' : '表',
     ready: status === 'READY',
-    failed: status === 'FAILED',
-    statusText: status === 'READY' ? '可打开' : status === 'FAILED' ? '生成失败' : '生成中',
+    failed: status === 'FAILED' || status === 'MISSING',
+    statusText,
     sizeText: sizeText(source.size),
     timeText: timeText(source.createTime),
     detailText: detailText(source.summary)
@@ -48,7 +49,9 @@ function safeFileName(file) {
 
 function openAgentFile(file) {
   if (!file || !file.id) return Promise.reject({ message: '文件信息不完整' })
-  if (file.ready === false) return Promise.reject({ message: file.failed ? '文件生成失败，无法打开' : '文件还在生成中' })
+  if (file.ready === false) {
+    return Promise.reject({ message: file.status === 'MISSING' ? '文件内容已丢失，请删除后让小五重新生成' : file.failed ? '文件生成失败，无法打开' : '文件还在生成中' })
+  }
   const filePath = `${wx.env.USER_DATA_PATH}/${Date.now()}-${safeFileName(file)}`
   return api.downloadAgentOutput(file.id).then((data) => new Promise((resolve, reject) => {
     wx.getFileSystemManager().writeFile({ filePath, data, success: resolve, fail: reject })
@@ -70,4 +73,13 @@ function confirmDeleteAgentFile(file) {
   })
 }
 
-module.exports = { fileView, openAgentFile, confirmDeleteAgentFile }
+const PENDING_PROMPT_KEY = 'agent_pending_prompt'
+
+/** Sends the user back to the agent tab with a prefilled request to change this file. */
+function askAgentToModify(file, openPage) {
+  if (!file || !file.id) return
+  wx.setStorageSync(PENDING_PROMPT_KEY, `请修改文件 #${file.id}「${file.name}」：`)
+  openPage('/pages/agent/index')
+}
+
+module.exports = { fileView, openAgentFile, confirmDeleteAgentFile, askAgentToModify, PENDING_PROMPT_KEY }

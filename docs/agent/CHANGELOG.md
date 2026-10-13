@@ -9,6 +9,13 @@
 - 小程序对话中显示文件卡，可直接打开、转发或删除；新增“小五生成的文件”页集中管理；会话抽屉与结果区增加入口。
 - 对话生成的文件永久保存，由用户自行删除；删除同时清理存储对象并记录审计。
 - 系统提示词与附件提示增加生成 Excel 的规则：先展示表格再调用工具、文本列用 TEXT 保留原文、数量单价金额标注角色、生成文件不代表写入业务数据。
+- 新增只读工具 `list_generated_files`；提示词要求只有本次任务收到 outputId 才能说“已生成”，再次要求生成必须重新调用工具，问“文件在哪”先查询。
+- 下载前校验存储对象仍存在；对象丢失的记录改为 `MISSING`，接口和小程序都提示删除后重新生成，不再返回 COS 的 500 错误。
+- 新增只读工具 `read_generated_file`：读回已生成文件的表头和数据行，模型按要求修改后用 `generate_excel_workbook` 生成新版本；提示词补充“修改已生成文件先读再改”的规则。
+
+### Changed（小程序对话页）
+- 对话页改为单一色板重做：欢迎页以“单据做成 Excel”“修改 Excel”两块入口开头，其余工作为清单，示例问法为可点短句；移除“识别并处理业务文件”入口、附件区的文件任务提示和“查看文件任务”按钮。
+- 文件卡新增“让小五修改”，文件列表页同样可一键回到对话并带上“请修改文件 #ID”。
 
 ### Added（图片文件任务 OCR）
 - 新增 `TencentTableOcrProvider` 与 `ConfiguredTableOcrProvider`：图片文件任务可直接使用腾讯云 SDK 的表格识别 V3，`TABLE_OCR_MODE` 默认 `auto`，配置 `TABLE_OCR_URL` 时仍优先 HTTP 适配器；网格外文字保留为上下文警告，不再进入表头。
@@ -21,7 +28,7 @@
 - `schema.sql` 自动补列补索引；已有 MySQL 环境可执行 `migrations/20261012_agent_workbook_output.sql`。
 
 ### Evaluation
-- 新增 `AgentWorkbookServiceTest`、`AgentOutputServiceTest`、`GenerateExcelWorkbookToolTest`、`AgentOutputControllerTest`、`AgentRunResultFilesTest` 共 19 项；后端全量回归通过。
+- 新增 `AgentWorkbookServiceTest`、`AgentOutputServiceTest`、`GenerateExcelWorkbookToolTest`、`AgentOutputControllerTest`、`AgentRunResultFilesTest`、`TencentTableOcrProviderTest`、`ConfiguredTableOcrProviderTest` 与端到端的 `AgentWorkbookEndToEndTest`；后端全量回归通过。
 
 ## [0.8.0-dev] - 2026-10-06
 

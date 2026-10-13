@@ -2,11 +2,19 @@ package com.example.demo.agent.service;
 
 import com.example.demo.agent.dto.AgentFileView;
 import com.example.demo.agent.service.attachment.AttachmentStorage;
+import com.example.demo.agent.workbook.AgentWorkbookSheets;
 import com.example.demo.entity.OperationLog;
 import com.example.demo.excel.entity.ExcelTaskOutput;
 import com.example.demo.excel.repository.ExcelTaskOutputRepository;
 import com.example.demo.repository.OperationLogRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.DataFormatter;
+import org.apache.poi.ss.usermodel.FormulaEvaluator;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,8 +22,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 /**
  * Files the agent generated for a user: listing, download checks and user-driven deletion.
@@ -24,6 +38,10 @@ import java.util.List;
 @Service
 public class AgentOutputService {
     public static final String AGENT_SOURCE_TYPE = "AGENT_WORKBOOK";
+    public static final String MISSING_STATUS = "MISSING";
+    static final int DEFAULT_READ_ROWS = 200;
+    static final int MAX_READ_ROWS = 500;
+    public static final String MISSING_MESSAGE = "文件内容已不在存储中，可能是在切换存储方式前生成的；请删除这条记录后让小五重新生成";
     private static final Logger log = LoggerFactory.getLogger(AgentOutputService.class);
 
     private final ExcelTaskOutputRepository outputRepository;
@@ -79,9 +97,30 @@ public class AgentOutputService {
         if (output.getExpiresAt() != null && !output.getExpiresAt().isAfter(LocalDateTime.now())) {
             throw new IllegalArgumentException("文件已过期");
         }
+        if (MISSING_STATUS.equals(output.getStatus())) throw new IllegalArgumentException(MISSING_MESSAGE);
         if (!"READY".equals(output.getStatus())) throw new IllegalArgumentException("文件尚未生成完成或生成失败");
         if (!StringUtils.hasText(output.getObjectKey())) throw new IllegalArgumentException("文件内容不存在");
         return output;
+    }
+
+    /**
+     * Like {@link #requireReady} but also confirms the object still exists in storage. A record whose
+     * object is gone (for example generated on container disk before COS was configured) is marked
+     * {@code MISSING} so the client stops offering to open it and tells the user to regenerate.
+     */
+    @Transactional
+    public ExcelTaskOutput openForDownload(Long outputId, Long operatorId) {
+        ExcelTaskOutput output = requireReady(outputId, operatorId);
+        try {
+            storage.stat(output.getObjectKey());
+            return output;
+        } catch (RuntimeException exception) {
+            log.warn("小五生成文件对象缺失 outputId={} key={}：{}", output.getId(), output.getObjectKey(), exception.getMessage());
+            output.setStatus(MISSING_STATUS);
+            output.setErrorMessage(MISSING_MESSAGE);
+            outputRepository.save(output);
+            throw new IllegalArgumentException(MISSING_MESSAGE);
+        }
     }
 
     @Transactional
@@ -100,6 +139,97 @@ public class AgentOutputService {
         }
         outputRepository.delete(output);
         audit(operatorId, "DELETE", "删除小五生成的文件：" + output.getOriginalName() + "（#" + output.getId() + "）");
+    }
+
+    /**
+     * Reads a generated workbook back as plain cells so the model can apply a change and regenerate it.
+     * System sheets, the system “核对说明” column and the SUM footer are left out, because the generator
+     * adds them again; the “单据信息” sheet comes back as label/value pairs.
+     */
+    @Transactional
+    public Map<String, Object> readWorkbookContent(Long outputId, Long operatorId, String sheetName, Integer maxRows) {
+        ExcelTaskOutput output = openForDownload(outputId, operatorId);
+        int rowLimit = maxRows == null ? DEFAULT_READ_ROWS : Math.max(1, Math.min(maxRows, MAX_READ_ROWS));
+        String wanted = StringUtils.hasText(sheetName) ? sheetName.trim() : null;
+        List<Map<String, Object>> sheets = new ArrayList<>();
+        List<Map<String, String>> info = new ArrayList<>();
+        try (InputStream input = storage.openStream(output.getObjectKey()); Workbook workbook = WorkbookFactory.create(input)) {
+            DataFormatter formatter = new DataFormatter(Locale.CHINA);
+            FormulaEvaluator evaluator = workbook.getCreationHelper().createFormulaEvaluator();
+            for (Sheet sheet : workbook) {
+                String name = sheet.getSheetName();
+                if (AgentWorkbookSheets.SYSTEM_SHEETS.contains(name)) continue;
+                if (AgentWorkbookSheets.INFO.equals(name)) {
+                    for (Row row : sheet) {
+                        if (row.getRowNum() == 0) continue;
+                        String label = text(row, 0, formatter, evaluator);
+                        if (!StringUtils.hasText(label)) continue;
+                        Map<String, String> entry = new LinkedHashMap<>();
+                        entry.put("label", label);
+                        entry.put("value", text(row, 1, formatter, evaluator));
+                        info.add(entry);
+                    }
+                    continue;
+                }
+                if (wanted != null && !wanted.equals(name)) continue;
+                Row header = sheet.getRow(0);
+                if (header == null) continue;
+                List<Integer> keptColumns = new ArrayList<>();
+                List<String> columns = new ArrayList<>();
+                for (int column = 0; column < header.getLastCellNum(); column++) {
+                    String title = text(header, column, formatter, evaluator);
+                    if (!StringUtils.hasText(title) || AgentWorkbookSheets.NOTE_COLUMN.equals(title)) continue;
+                    keptColumns.add(column);
+                    columns.add(title);
+                }
+                List<List<String>> rows = new ArrayList<>();
+                boolean truncated = false;
+                for (int index = 1; index <= sheet.getLastRowNum(); index++) {
+                    Row row = sheet.getRow(index);
+                    if (row == null) continue;
+                    String first = text(row, 0, formatter, evaluator);
+                    if (AgentWorkbookSheets.TOTAL_LABEL.equals(first) || first.startsWith("说明：")) continue;
+                    List<String> values = new ArrayList<>();
+                    for (int column : keptColumns) values.add(text(row, column, formatter, evaluator));
+                    if (values.stream().noneMatch(StringUtils::hasText)) continue;
+                    if (rows.size() >= rowLimit) {
+                        truncated = true;
+                        break;
+                    }
+                    rows.add(values);
+                }
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("name", name);
+                item.put("columns", columns);
+                item.put("rows", rows);
+                item.put("rowCount", rows.size());
+                item.put("truncated", truncated);
+                sheets.add(item);
+            }
+        } catch (IOException | RuntimeException exception) {
+            throw new IllegalArgumentException("文件内容无法读取：" + exception.getMessage(), exception);
+        }
+        if (sheets.isEmpty()) {
+            throw new IllegalArgumentException(wanted == null ? "文件里没有可读取的数据工作表" : "文件里没有名为“" + wanted + "”的工作表");
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("outputId", output.getId());
+        result.put("fileName", output.getOriginalName());
+        result.put("sheets", sheets);
+        result.put("info", info);
+        result.put("note", "修改时把改动应用到这些行，再调用 generate_excel_workbook 生成新文件；数量、单价、金额列仍需标注角色，原文件会保留");
+        return result;
+    }
+
+    private String text(Row row, int column, DataFormatter formatter, FormulaEvaluator evaluator) {
+        if (row == null || column < 0) return "";
+        Cell cell = row.getCell(column, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+        if (cell == null) return "";
+        try {
+            return formatter.formatCellValue(cell, evaluator).trim();
+        } catch (RuntimeException exception) {
+            return formatter.formatCellValue(cell).trim();
+        }
     }
 
     public AgentFileView view(ExcelTaskOutput output) {

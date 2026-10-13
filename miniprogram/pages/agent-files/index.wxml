@@ -24,13 +24,14 @@
       </view>
       <view class="files-actions">
         <view class="files-action" wx:if="{{item.ready}}" role="button" aria-label="打开文件" data-id="{{item.id}}" bindtap="openFile">{{openingId === item.id ? '打开中…' : '打开'}}</view>
+        <view class="files-action secondary" wx:if="{{item.ready}}" role="button" aria-label="让小五修改这个文件" data-id="{{item.id}}" bindtap="modifyFile">让小五修改</view>
         <view class="files-action danger" role="button" aria-label="删除文件" data-id="{{item.id}}" bindtap="deleteFile">{{deletingId === item.id ? '删除中…' : '删除'}}</view>
       </view>
     </view>
   </view>
   <view class="empty-state" wx:else>
     <view class="empty-title">还没有生成过文件</view>
-    <view class="empty-desc">在小五对话里上传单据或说明需要的表格内容，再说“做成 Excel”，确认后文件会出现在这里。</view>
+    <view class="empty-desc">在小五对话里上传单据或说明需要的表格内容，再说“做成 Excel”，确认后文件会出现在这里；之后还可以让小五继续修改。</view>
     <view class="btn btn-primary btn-block" bindtap="openAgent">去找小五</view>
   </view>
 </view>

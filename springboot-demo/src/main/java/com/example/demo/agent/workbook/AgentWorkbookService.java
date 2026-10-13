@@ -73,10 +73,10 @@ public class AgentWorkbookService {
     static final int MAX_INFO_ENTRIES = 40;
     static final int MAX_SOURCE_LINES = 3000;
     static final int PREVIEW_ROWS = 5;
-    static final String INFO_SHEET = "单据信息";
-    static final String SOURCE_SHEET = "附件原文";
-    static final String ABOUT_SHEET = "生成说明";
-    static final String NOTE_COLUMN = "核对说明";
+    static final String INFO_SHEET = AgentWorkbookSheets.INFO;
+    static final String SOURCE_SHEET = AgentWorkbookSheets.SOURCE;
+    static final String ABOUT_SHEET = AgentWorkbookSheets.ABOUT;
+    static final String NOTE_COLUMN = AgentWorkbookSheets.NOTE_COLUMN;
     private static final String RETENTION = "永久保存，可在“我的文件”中随时删除";
     private static final String EFFECT = "只生成一份可编辑的 Excel 文件，不修改商品、库存、价格、订单或账本";
     private static final BigDecimal AMOUNT_TOLERANCE = new BigDecimal("0.005");
@@ -418,7 +418,7 @@ public class AgentWorkbookService {
             Row total = sheet.createRow(rowIndex++);
             if (!prepared.totalColumns.contains(0)) {
                 Cell label = total.createCell(0);
-                label.setCellValue("合计");
+                label.setCellValue(AgentWorkbookSheets.TOTAL_LABEL);
                 label.setCellStyle(styles.totalText);
             }
             for (int column : prepared.totalColumns) {

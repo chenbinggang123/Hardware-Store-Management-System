@@ -82,7 +82,7 @@ class AgentOutputControllerTest {
         output.setOriginalName("收据.xlsx");
         output.setMimeType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         output.setFileSize(5L);
-        when(service.requireReady(5L, 9L)).thenReturn(output);
+        when(service.openForDownload(5L, 9L)).thenReturn(output);
         when(storage.openStream("agent-outputs/9/202610/5-abcd.xlsx"))
                 .thenReturn(new ByteArrayInputStream("hello".getBytes(StandardCharsets.UTF_8)));
 

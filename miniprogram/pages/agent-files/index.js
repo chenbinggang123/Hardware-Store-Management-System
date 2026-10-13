@@ -1,5 +1,5 @@
 const api = require('../../utils/api')
-const { fileView, openAgentFile, confirmDeleteAgentFile } = require('../../utils/agent-files')
+const { fileView, openAgentFile, confirmDeleteAgentFile, askAgentToModify } = require('../../utils/agent-files')
 const { openPage, showToast } = require('../../utils/router')
 
 function errorText(error, fallback) {
@@ -26,6 +26,13 @@ Page({
 
   retryLoad() { this.loadFiles() },
   openAgent() { openPage('/pages/agent/index') },
+
+  modifyFile(event) {
+    const file = this.data.files.find((item) => Number(item.id) === Number(event.currentTarget.dataset.id))
+    if (!file) return
+    if (!file.ready) return showToast(file.failed ? '这个文件已失效，请删除后重新生成' : '文件还在生成中')
+    askAgentToModify(file, openPage)
+  },
 
   openFile(event) {
     const file = this.data.files.find((item) => Number(item.id) === Number(event.currentTarget.dataset.id))

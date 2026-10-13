@@ -51,7 +51,7 @@ public class AgentOutputController {
 
     @GetMapping("/outputs/{outputId}/download")
     public ResponseEntity<StreamingResponseBody> download(@PathVariable Long outputId, HttpServletRequest request) {
-        ExcelTaskOutput output = service.requireReady(outputId, currentUserId(request));
+        ExcelTaskOutput output = service.openForDownload(outputId, currentUserId(request));
         StreamingResponseBody body = stream -> {
             try (var input = storage.openStream(output.getObjectKey())) {
                 input.transferTo(stream);

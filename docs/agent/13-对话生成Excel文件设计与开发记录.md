@@ -44,6 +44,9 @@
 | `agent/workbook/AgentWorkbookService` | 校验、规范化、验算、渲染、落库、幂等与审计 |
 | `agent/service/AgentOutputService` | 小五生成文件的列表、下载校验、删除 |
 | `agent/tool/builtin/GenerateExcelWorkbookTool` | 模型工具 `generate_excel_workbook`，风险 `R1_DRAFT`，确认标题“确认生成 Excel 文件” |
+| `agent/tool/builtin/ListGeneratedFilesTool` | 只读工具 `list_generated_files`，让模型如实回答文件是否生成、在哪里打开 |
+| `agent/tool/builtin/ReadGeneratedFileTool` | 只读工具 `read_generated_file`，读回已生成文件的表头和数据行，供修改后重新生成 |
+| `agent/workbook/AgentWorkbookSheets` | 生成器与读取器共用的系统工作表名、核对说明列名和合计行标签 |
 | `agent/api/AgentOutputController` | `/agent/outputs` 列表、详情、下载、删除，以及 `/agent/runs/{runId}/outputs` |
 | `agent/dto/AgentFileView` | 对话与文件页共用的文件视图 |
 | `agent/harness/AgentRunResult`、`AgentRunResultFactory` | Run 结果新增 `files` |
@@ -141,11 +144,22 @@ GET    /api/agent/runs/{runId}/outputs         某次任务生成的文件
 
 `GET /api/agent/runs/{runId}` 与 `GET /api/agent/conversations/{conversationId}` 的返回中新增 `files`。
 
+## 3.7 修改已生成的 Excel
+
+```text
+用户：请修改文件 #7「…」：把备注列补上
+  → 模型调用 read_generated_file(outputId=7) 取得表头和数据行
+  → 按要求改动后调用 generate_excel_workbook，title 注明改动
+  → 确认卡 → 新文件；原文件保留，用户可自行删除旧版本
+```
+
+用户上传 Excel 附件并要求修改时，附件内容已由 `AttachmentContentParser` 解析进提示词，模型整理改动后同样走 `generate_excel_workbook`。读取时跳过 `附件原文`、`生成说明` 工作表、`核对说明` 列和合计行，`单据信息` 以键值对返回。
+
 ## 4. 小程序实现
 
-- `utils/agent-files.js`：文件视图、下载后 `wx.openDocument` 打开、带确认的删除。
-- `pages/agent`：确认卡新增 Excel 预览分支；助手消息下方显示文件卡，可打开或删除；结果区新增“我的文件”；会话抽屉新增“小五生成的文件”入口。
-- `pages/agent-files`：永久文件列表，支持下拉刷新、打开和删除，并在 `app.json` 注册。
+- `utils/agent-files.js`：文件视图、下载后 `wx.openDocument` 打开、带确认的删除、`askAgentToModify` 通过本地存储把“请修改文件 #ID”带回对话页。
+- `pages/agent`：2026-10-13 重做为单一色板的对话页。欢迎页以“单据做成 Excel”“修改 Excel”两块入口开头，其余工作是一张清单，示例问法改为可点的短句；“识别并处理业务文件”入口、附件区的文件任务提示和结果区的“查看文件任务”已移除。确认卡新增 Excel 预览分支，助手消息下方的文件卡可打开、让小五修改或删除；右上角“文件”、会话抽屉和结果区都能进入文件列表。
+- `pages/agent-files`：永久文件列表，支持下拉刷新、打开、让小五修改和删除，并在 `app.json` 注册。
 - `utils/api.js`：`getAgentOutputs`、`getAgentRunOutputs`、`downloadAgentOutput`、`deleteAgentOutput`。
 
 ## 5. 测试
@@ -157,6 +171,7 @@ GET    /api/agent/runs/{runId}/outputs         某次任务生成的文件
 | `GenerateExcelWorkbookToolTest` | 工具定义、嵌套参数与纯字符串表头的转换、空参数拒绝 |
 | `AgentOutputControllerTest` | 列表、两种删除入口、下载流与附件头 |
 | `AgentRunResultFilesTest` | Run 结果与会话历史携带文件 |
+| `AgentWorkbookEndToEndTest` | 走真实 HTTP 接口和 MySQL：登录、脚本化模型发起工具调用、确认卡、确认后生成、Run/会话/列表均可见、下载回读校验、磁盘落盘位置、删除后记录与文件同时消失 |
 | `ExcelWorkbookExportServiceTest` | 渲染抽取后原有导出行为不变 |
 
 运行方式：
@@ -167,6 +182,17 @@ cd springboot-demo
 ```
 
 集成测试需要本地 MySQL 库 `hardware_store_test`。
+
+## 5.1 文件在哪里
+
+- 小程序：确认后的助手回复下方出现文件卡；对话页右上角“文件”按钮、会话抽屉“小五生成的文件”和结果区“我的文件”都进入 `pages/agent-files` 列表。点“打开”会先下载到小程序私有目录再用微信预览，预览右上角菜单可以转发或保存到手机。
+- 后端存储：对象键为 `agent-outputs/<操作人ID>/<年月>/<输出ID>-<随机串>.xlsx`，根目录由 `agent.attachment.local-directory` 决定，默认 `./data/agent-attachments`，即本地运行时在 `springboot-demo/data/agent-attachments/agent-outputs/...`。
+- 云托管：未配置 `AGENT_ATTACHMENT_STORAGE=cos` 时文件写在容器磁盘，容器重建后会丢失，与“永久保存”不符；生产环境应配置 COS，`CosAttachmentStorage` 会使用同样的对象键。
+- 数据库：`excel_task_output` 中 `source_type = 'AGENT_WORKBOOK'` 的记录，`run_id` 对应对话任务。
+- 文件丢失：下载前会用 `storage.stat` 确认对象仍在；对象不存在时记录改为 `MISSING`，接口返回“文件内容已不在存储中…请删除后重新生成”，小程序文件卡显示“文件已丢失”并只保留删除按钮。典型场景是切换到 COS 之前写在容器磁盘上的旧文件。
+- 模型查询：只读工具 `list_generated_files` 返回当前用户真实生成过的文件和状态，用户问“文件在哪”时模型必须先查再答，不得凭历史消息声称已生成。
+
+线上复测记录（2026-10-13）：`GET /api/agent/outputs/7/download` 从 COS 取回合法 xlsx；编号 1、2 是 COS 配置前生成的，COS 返回 NoSuchKey；会话 9 的第 55 次任务模型未调用工具却回复“已再次生成”，因此补充了上述两项约束。
 
 ## 6. 验收清单
 

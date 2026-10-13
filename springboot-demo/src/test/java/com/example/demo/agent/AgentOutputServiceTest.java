@@ -87,6 +87,79 @@ class AgentOutputServiceTest {
     }
 
     @Test
+    void downloadMarksRecordMissingWhenStorageObjectIsGone() {
+        ExcelTaskOutput lost = agentFile(38L, 2L, "READY");
+        when(outputs.findByIdAndOperatorId(38L, 2L)).thenReturn(Optional.of(lost));
+        when(outputs.save(lost)).thenReturn(lost);
+        when(storage.stat(lost.getObjectKey())).thenThrow(new IllegalStateException("NoSuchKey"));
+
+        assertThatThrownBy(() -> service.openForDownload(38L, 2L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("重新生成");
+        assertThat(lost.getStatus()).isEqualTo(AgentOutputService.MISSING_STATUS);
+        assertThat(lost.getErrorMessage()).contains("不在存储中");
+        verify(outputs).save(lost);
+
+        assertThatThrownBy(() -> service.requireReady(38L, 2L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("重新生成");
+
+        ExcelTaskOutput present = agentFile(39L, 2L, "READY");
+        when(outputs.findByIdAndOperatorId(39L, 2L)).thenReturn(Optional.of(present));
+        when(storage.stat(present.getObjectKey())).thenReturn(new com.example.demo.agent.service.attachment.StoredObjectMetadata(10, "x"));
+        assertThat(service.openForDownload(39L, 2L)).isSameAs(present);
+        assertThat(present.getStatus()).isEqualTo("READY");
+    }
+
+    @Test
+    void readsGeneratedWorkbookBackWithoutSystemSheetsNoteColumnOrTotals() throws Exception {
+        byte[] bytes;
+        try (org.apache.poi.xssf.usermodel.XSSFWorkbook workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook();
+             java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream()) {
+            org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("商品明细");
+            String[] headers = {"项目", "数量", "金额", "核对说明"};
+            org.apache.poi.ss.usermodel.Row header = sheet.createRow(0);
+            for (int i = 0; i < headers.length; i++) header.createCell(i).setCellValue(headers[i]);
+            org.apache.poi.ss.usermodel.Row first = sheet.createRow(1);
+            first.createCell(0).setCellValue("钻头 2.2"); first.createCell(1).setCellValue(10); first.createCell(2).setCellValue(15); first.createCell(3).setCellValue("");
+            org.apache.poi.ss.usermodel.Row second = sheet.createRow(2);
+            second.createCell(0).setCellValue("气管 10"); second.createCell(1).setCellValue(28); second.createCell(2).setCellValue(504); second.createCell(3).setCellValue("金额验算不一致");
+            org.apache.poi.ss.usermodel.Row total = sheet.createRow(3);
+            total.createCell(0).setCellValue("合计"); total.createCell(2).setCellFormula("SUM(C2:C3)");
+            org.apache.poi.ss.usermodel.Sheet info = workbook.createSheet("单据信息");
+            info.createRow(0).createCell(0).setCellValue("项目");
+            org.apache.poi.ss.usermodel.Row entry = info.createRow(1);
+            entry.createCell(0).setCellValue("开票方"); entry.createCell(1).setCellValue("恒迪模具五金");
+            workbook.createSheet("生成说明").createRow(0).createCell(0).setCellValue("文件标题");
+            workbook.write(buffer);
+            bytes = buffer.toByteArray();
+        }
+        ExcelTaskOutput output = agentFile(40L, 2L, "READY");
+        when(outputs.findByIdAndOperatorId(40L, 2L)).thenReturn(Optional.of(output));
+        when(storage.stat(output.getObjectKey())).thenReturn(new com.example.demo.agent.service.attachment.StoredObjectMetadata(bytes.length, "x"));
+        when(storage.openStream(output.getObjectKey())).thenReturn(new java.io.ByteArrayInputStream(bytes));
+
+        java.util.Map<String, Object> content = service.readWorkbookContent(40L, 2L, null, null);
+
+        @SuppressWarnings("unchecked")
+        List<java.util.Map<String, Object>> sheets = (List<java.util.Map<String, Object>>) content.get("sheets");
+        assertThat(sheets).hasSize(1);
+        assertThat(sheets.get(0).get("name")).isEqualTo("商品明细");
+        assertThat(sheets.get(0).get("columns")).isEqualTo(List.of("项目", "数量", "金额"));
+        assertThat(sheets.get(0).get("rows")).isEqualTo(List.of(List.of("钻头 2.2", "10", "15"), List.of("气管 10", "28", "504")));
+        assertThat(sheets.get(0).get("truncated")).isEqualTo(false);
+        @SuppressWarnings("unchecked")
+        List<java.util.Map<String, String>> info = (List<java.util.Map<String, String>>) content.get("info");
+        assertThat(info).hasSize(1);
+        assertThat(info.get(0)).containsEntry("label", "开票方").containsEntry("value", "恒迪模具五金");
+
+        when(storage.openStream(output.getObjectKey())).thenReturn(new java.io.ByteArrayInputStream(bytes));
+        assertThatThrownBy(() -> service.readWorkbookContent(40L, 2L, "不存在", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("没有名为");
+    }
+
+    @Test
     void listsOnlyAgentFilesWithDownloadPaths() {
         ExcelTaskOutput output = agentFile(37L, 2L, "READY");
         output.setSummaryJson("{\"rowCount\":7,\"mismatchCount\":1}");

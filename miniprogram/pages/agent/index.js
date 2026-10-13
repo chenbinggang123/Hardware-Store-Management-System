@@ -5,6 +5,7 @@ const { openPage } = require('../../utils/router')
 
 const ACTIVE_RUN_KEY = 'agent_active_run_id'
 const ACTIVE_CONVERSATION_KEY = 'agent_active_conversation_id'
+const PENDING_PROMPT_KEY = 'agent_pending_prompt'
 const STREAM_POLL_INTERVAL = 320
 const MAX_STREAM_POLL_FAILURES = 4
 
@@ -117,21 +118,21 @@ Page({
     run: null, conversationId: null, currentTitle: '小五工作台', conversations: [], historyOpen: false, messages: [],
     pendingAttachments: [], uploading: false, connectionInterrupted: false, lastFailedInput: '',
     scrollTarget: 'conversation-end', openingFileId: '', deletingFileId: '',
-    fileWorkflow: {
-      title: '识别并处理业务文件',
-      desc: 'Excel、CSV、Word、PDF 或价格表图片',
-      steps: '识别 → 核对 → 导出或写入'
-    },
-    taskEntries: [
-      { title: '创建销售草稿', desc: '查客户、商品和库存后生成草稿', mark: '单', prompt: '帮我创建一张销售草稿', tone: 'green' },
-      { title: '盘点库存', desc: '查询商品后调整为实际数量', mark: '库', prompt: '帮我盘点并调整一个商品的库存', tone: 'purple' },
-      { title: '新增或修改商品', desc: '补充商品资料、库存或上下架状态', mark: '商', prompt: '帮我新增或修改一个商品', tone: 'amber' },
-      { title: '经营查询', desc: '查商品、库存、订单和经营情况', mark: '查', kind: 'question', prompt: '我想查询经营数据：', tone: 'neutral' }
+    excelEntries: [
+      { key: 'excel-from-doc', title: '单据做成 Excel', desc: '拍照或上传收据、价格表、Word、PDF，小五整理后生成文件', mark: '表', action: '选择附件 ›' },
+      { key: 'excel-modify', title: '修改 Excel', desc: '上传表格或选一个生成过的文件，告诉小五改什么', mark: '改', action: '选择文件 ›' }
     ],
-    suggestions: ['查一下电钻还有多少库存', '给老王开两把东成电钻，先记账', '把商品 2 的实际库存调整为 20，原因是门店盘点']
+    taskEntries: [
+      { key: 'sales', title: '开销售单', desc: '查客户、商品和库存后生成草稿', mark: '单', prompt: '帮我创建一张销售草稿' },
+      { key: 'inventory', title: '盘点库存', desc: '查询商品后改为实际数量', mark: '库', prompt: '帮我盘点并调整一个商品的库存' },
+      { key: 'product', title: '商品管理', desc: '新增资料、上下架', mark: '商', prompt: '帮我新增或修改一个商品' },
+      { key: 'query', title: '经营查询', desc: '库存、订单和当天经营情况', mark: '查', prompt: '我想查询经营数据：' }
+    ],
+    suggestions: ['把这张收据做成 Excel', '把刚才的表格加一列备注，再生成一份', '查一下电钻还有多少库存', '给老王开两把东成电钻，先记账']
   },
 
   onShow() {
+    this.consumePendingPrompt()
     this.loadConversations()
     const conversationId = wx.getStorageSync(ACTIVE_CONVERSATION_KEY)
     if (conversationId && !this.data.conversationId) {
@@ -152,19 +153,50 @@ Page({
   },
 
   updateInput(event) { this.setData({ input: event.detail.value }) },
-  useSuggestion(event) { this.setData({ input: event.currentTarget.dataset.text || '' }) },
+  useSuggestion(event) { this.setData({ input: event.currentTarget.dataset.text || '', inputFocus: true }) },
   startTask(event) {
     const kind = event.currentTarget.dataset.kind
-    if (kind === 'file') return this.openExcelWorkflow()
+    if (kind === 'excel-from-doc') return this.startExcelFromDocument()
+    if (kind === 'excel-modify') return this.startExcelModify()
     this.setData({ input: event.currentTarget.dataset.prompt || '', inputFocus: true })
   },
-  openExcelWorkflow() { openPage('/pages/excel-upload/index') },
   focusQuestion() { this.setData({ inputFocus: true }) },
   blurQuestion() { this.setData({ inputFocus: false }) },
 
+  // The files page hands over a prompt such as “请修改文件 #7「…」：” through storage,
+  // because the agent page is a tab page and cannot receive URL parameters.
+  consumePendingPrompt() {
+    const pending = wx.getStorageSync(PENDING_PROMPT_KEY)
+    if (!pending) return
+    wx.removeStorageSync(PENDING_PROMPT_KEY)
+    this.setData({ input: pending, inputFocus: true })
+  },
+
+  startExcelFromDocument() {
+    if (!this.data.input) this.setData({ input: '请把这份单据整理成 Excel，表头按单据原样，金额由你验算。' })
+    this.chooseAttachment()
+  },
+
+  startExcelModify() {
+    wx.showActionSheet({ itemList: ['上传要修改的 Excel', '选一个小五生成过的文件'] }).then((result) => {
+      if (result.tapIndex === 1) return this.openMyFiles()
+      if (this.data.uploading || this.data.pendingAttachments.length >= 3) return null
+      return wx.chooseMessageFile({ count: 1, type: 'file', extension: ['xls', 'xlsx', 'csv'] }).then((choice) => {
+        if (!this.data.input) this.setData({ input: '请修改这个 Excel：' })
+        return this.uploadFiles(choice.tempFiles || [])
+      })
+    }).catch(() => {})
+  },
+
+  modifyGeneratedFile(event) {
+    const file = this.findGeneratedFile(Number(event.currentTarget.dataset.id))
+    if (!file) return
+    this.setData({ input: `请修改文件 #${file.id}「${file.name}」：`, inputFocus: true }, () => this.scrollToBottom())
+  },
+
   chooseAttachment() {
     if (this.data.uploading || this.data.pendingAttachments.length >= 3) return
-    wx.showActionSheet({ itemList: ['拍照或选择图片', '选择文档或表格'] }).then((result) => {
+    wx.showActionSheet({ itemList: ['拍照或选择图片', '选择表格、Word 或 PDF'] }).then((result) => {
       if (result.tapIndex === 0) {
         return wx.chooseMedia({ count: 3 - this.data.pendingAttachments.length, mediaType: ['image'], sourceType: ['album', 'camera'] })
           .then((choice) => this.uploadFiles(choice.tempFiles || []))
@@ -432,7 +464,6 @@ Page({
     if (id) openPage('/pages/product-detail/index', { id })
   },
   openWorkbench() { openPage('/pages/workbench/index') },
-  openFileTasks() { openPage('/pages/excel-tasks/index') },
   openMyFiles() {
     this.setData({ historyOpen: false })
     openPage('/pages/agent-files/index')
