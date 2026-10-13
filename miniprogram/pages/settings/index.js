@@ -42,6 +42,10 @@ Page({
     openPage('/pages/system-logs/index')
   },
 
+  openContacts() { openPage('/pages/contacts/index') },
+  openReports() { openPage('/pages/report-center/index') },
+  openPurchases() { openPage('/pages/purchase-orders/index') },
+
   backupNow() {
     api.backupSystem().then((result) => {
       this.setData({ lastBackup: result })

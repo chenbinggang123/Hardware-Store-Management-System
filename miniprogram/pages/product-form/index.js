@@ -25,8 +25,9 @@ Page({
     id: '',
     mode: 'create',
     saving: false,
-    statusOptions: ['上架', '下架'],
-    statusIndex: 0,
+    uploadingImage: false,
+    originalImageUrl: '',
+    pendingImageUrl: '',
     form: createDefaultForm()
   },
 
@@ -41,10 +42,14 @@ Page({
             ...createDefaultForm(),
             ...product
           },
-          statusIndex: Number(product.status) === 1 ? 0 : 1
+          originalImageUrl: product.imageUrl || ''
         })
       })
     }
+  },
+
+  onUnload() {
+    if (this.data.pendingImageUrl) wx.cloud.deleteFile({ fileList: [this.data.pendingImageUrl] }).catch(() => null)
   },
 
   updateField(event) {
@@ -54,12 +59,28 @@ Page({
     })
   },
 
-  changeStatus(event) {
-    const statusIndex = Number(event.detail.value)
-    this.setData({
-      statusIndex,
-      'form.status': statusIndex === 0 ? 1 : 0
-    })
+  chooseImage() {
+    if (this.data.uploadingImage) return
+    wx.chooseMedia({ count: 1, mediaType: ['image'], sourceType: ['album', 'camera'], sizeType: ['compressed'] }).then((result) => {
+      const file = result.tempFiles && result.tempFiles[0]
+      if (!file || !file.tempFilePath) return null
+      if (Number(file.size || 0) > 3 * 1024 * 1024) throw new Error('图片压缩后仍超过 3MB，请重新选择')
+      const extension = String(file.tempFilePath).split('.').pop().toLowerCase() || 'jpg'
+      const operatorId = (getApp().globalData.currentOperatorId || 'unknown')
+      const cloudPath = `product-images/${operatorId}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${extension}`
+      this.setData({ uploadingImage: true })
+      return wx.cloud.uploadFile({ cloudPath, filePath: file.tempFilePath }).then((uploaded) => {
+        const previousPending = this.data.pendingImageUrl
+        this.setData({ 'form.imageUrl': uploaded.fileID, pendingImageUrl: uploaded.fileID })
+        if (previousPending && previousPending !== uploaded.fileID) wx.cloud.deleteFile({ fileList: [previousPending] }).catch(() => null)
+      })
+    }).catch((error) => showToast((error && (error.message || error.errMsg)) || '图片上传失败')).finally(() => this.setData({ uploadingImage: false }))
+  },
+
+  removeImage() {
+    const pending = this.data.pendingImageUrl
+    this.setData({ 'form.imageUrl': '', pendingImageUrl: '' })
+    if (pending) wx.cloud.deleteFile({ fileList: [pending] }).catch(() => null)
   },
 
   validateForm(payload) {
@@ -130,6 +151,9 @@ Page({
       this.setData({ saving: true })
       const action = this.data.mode === 'edit' ? api.updateProduct(this.data.id, payload) : api.saveProduct(payload)
       action.then((savedProduct) => {
+        const original = this.data.originalImageUrl
+        if (original && original !== payload.imageUrl && String(original).startsWith('cloud://')) wx.cloud.deleteFile({ fileList: [original] }).catch(() => null)
+        this.setData({ pendingImageUrl: '', originalImageUrl: payload.imageUrl })
         showToast('商品已保存', 'success')
         setTimeout(() => {
           wx.redirectTo({

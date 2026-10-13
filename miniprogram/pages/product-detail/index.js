@@ -1,12 +1,13 @@
 const api = require('../../utils/api')
 const { openPage, showToast } = require('../../utils/router')
 
-function normalizeProduct(product) {
+function normalizeProduct(product, inventory) {
   if (!product) {
     return null
   }
-  const stock = Number(product.stock || 0)
-  const status = Number(product.status || 0)
+  const inventoryRecorded = Boolean(inventory)
+  const stock = Number(inventoryRecorded ? inventory.quantity : product.stock || 0)
+  const warningThreshold = Number(inventoryRecorded ? inventory.warningThreshold : 10)
   const name = product.name || '商品'
   return {
     id: product.id,
@@ -21,14 +22,15 @@ function normalizeProduct(product) {
     oldCustomerPrice: product.oldCustomerPrice || 0,
     costPrice: product.costPrice || 0,
     stock,
-    locationText: product.locationId || '--',
+    inventoryId: inventory && inventory.id,
+    inventoryRecorded,
+    warningThreshold,
+    locationText: (inventory && inventory.locationId) || product.locationId || '--',
     barcodeText: product.barcode || '--',
     unitConvertText: product.unitConvert || '--',
     createTimeText: product.createTime || '--',
-    status,
-    statusText: status === 1 ? '上架' : '下架',
-    toggleStatusText: status === 1 ? '下架商品' : '上架商品',
-    lowStock: stock <= 10
+    stockStateText: !inventoryRecorded ? '未记录' : stock <= 0 ? '缺货' : stock <= warningThreshold ? '不多' : '有货',
+    lowStock: inventoryRecorded && stock <= warningThreshold
   }
 }
 
@@ -59,9 +61,10 @@ Page({
       return
     }
     this.setData({ loading: true, loadError: '' })
-    api.getProduct(this.data.id).then((product) => {
+    Promise.all([api.getProduct(this.data.id), api.getInventories({})]).then(([product, inventories]) => {
+      const inventory = (inventories || []).find((item) => `${item.productId}` === `${this.data.id}`)
       this.setData({
-        product: normalizeProduct(product), loading: false
+        product: normalizeProduct(product, inventory), loading: false
       })
     }).catch((error) => this.setData({ product: null, loading: false, loadError: (error && (error.message || error.errMsg)) || '商品详情加载失败' }))
   },
@@ -85,17 +88,14 @@ Page({
     openPage('/pages/price-sync-review/index', { productId: this.data.id })
   },
 
-  toggleStatus() {
-    const product = this.data.product
-    if (!product) {
-      return
-    }
-    const nextStatus = product.status === 1 ? 0 : 1
-    const actionText = nextStatus === 1 ? '上架' : '下架'
-    wx.showModal({ title: `${actionText}商品`, content: `${actionText}后会改变开单和查询时的可用状态，不会修改库存和价格。`, confirmText: `确认${actionText}` }).then((result) => {
-      if (!result.confirm) return null
-      return api.changeProductStatus(product.id, nextStatus).then(() => { showToast(`商品已${actionText}`, 'success'); this.loadDetail() })
-    }).catch((error) => showToast((error && (error.message || error.errMsg)) || '状态更新失败'))
+  openInventoryAdjust() {
+    if (!this.data.product || !this.data.product.inventoryId) return showToast('这个商品还没有库存记录')
+    openPage('/pages/inventory-adjust/index', { id: this.data.product.inventoryId })
+  },
+
+  openInventoryLogs() {
+    if (!this.data.product || !this.data.product.inventoryId) return showToast('这个商品还没有库存记录')
+    openPage('/pages/inventory-detail/index', { id: this.data.product.inventoryId })
   },
 
   deleteProduct() {

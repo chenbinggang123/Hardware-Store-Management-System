@@ -228,9 +228,6 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             }
             Product product = productRepository.findById(item.getProductId())
                     .orElseThrow(() -> new IllegalArgumentException("商品不存在：" + item.getProductId()));
-            if (product.getStatus() != null && product.getStatus() != 1) {
-                throw new IllegalArgumentException("商品已下架：" + product.getName());
-            }
             if (!StringUtils.hasText(item.getProductName())) {
                 item.setProductName(product.getName());
             }

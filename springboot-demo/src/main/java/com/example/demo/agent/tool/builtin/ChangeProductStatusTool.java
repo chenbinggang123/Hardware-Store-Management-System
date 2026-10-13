@@ -6,12 +6,15 @@ import com.example.demo.agent.tool.AgentToolDefinition;
 import com.example.demo.agent.tool.AgentToolRisk;
 import com.example.demo.entity.Product;
 import com.example.demo.service.ProductService;
-import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
 
-@Component
+/**
+ * Retained only for backwards-compatible unit coverage and old pending runs.
+ * It is intentionally not registered as a Spring component: product availability
+ * is no longer a daily operation exposed to the agent.
+ */
 public class ChangeProductStatusTool implements AgentTool {
     private final ProductService productService;
 

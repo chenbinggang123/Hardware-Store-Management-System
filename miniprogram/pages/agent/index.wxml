@@ -48,8 +48,8 @@
   <scroll-view class="conversation-scroll" scroll-y scroll-into-view="{{scrollTarget}}" enhanced show-scrollbar="{{false}}">
 
   <view class="welcome" wx:if="{{!messages.length && !run}}">
-    <view class="welcome-title">今天要做什么？</view>
-    <view class="welcome-subtitle">单据和表格交给小五整理成 Excel，查询和开单直接说。</view>
+    <view class="welcome-title">有文件或经营问题，直接发给我</view>
+    <view class="welcome-subtitle">拍照、选择文件，或告诉小五你想查什么。</view>
 
     <view class="excel-tiles">
       <view class="excel-tile" role="button" aria-label="{{item.title}}" wx:for="{{excelEntries}}" wx:key="key" data-kind="{{item.key}}" bindtap="startTask">
@@ -137,7 +137,7 @@
     <view class="run-progress-track"><view class="{{run.progressPercent ? 'determinate' : ''}}" style="width: {{run.progressPercent ? run.progressPercent + '%' : '38%'}};"></view></view>
     <view class="run-progress-count" wx:if="{{run.progressTotal}}">已完成 {{run.progressCompleted}} / {{run.progressTotal}}<text wx:if="{{run.issueCount}}"> · {{run.issueCount}} 个问题待确认</text></view>
     <view class="run-progress-note">{{run.canLeave ? '可以先去别的页面，任务会继续处理，回来后从最近会话查看。' : '请暂时留在当前页面，完成后会立即显示结果。'}}</view>
-    <view class="run-progress-actions"><view class="run-progress-action secondary" wx:if="{{run.canCancel}}" bindtap="cancelRun">{{cancelling ? '正在取消…' : '取消任务'}}</view><view class="run-progress-action" bindtap="openWorkbench">去工作台</view></view>
+    <view class="run-progress-actions"><view class="run-progress-action secondary" wx:if="{{run.canCancel}}" bindtap="cancelRun">{{cancelling ? '正在取消…' : '取消任务'}}</view><view class="run-progress-action" bindtap="openWorkbench">查看财务</view></view>
   </view>
   <view class="network-state" wx:if="{{connectionInterrupted}}"><view><view class="network-title">网络连接中断</view><view class="network-desc">任务可能仍在后台处理，当前会话已经保留。</view></view><view class="network-retry" bindtap="retryConnection">重新连接</view></view>
 
@@ -200,7 +200,7 @@
   <view class="result-sheet tone-{{run.statusTone}}" wx:if="{{run && run.status !== 'WAITING_APPROVAL' && run.status !== 'RUNNING'}}">
     <view class="result-status">{{run.statusText}}</view><view class="result-copy">{{run.status === 'COMPLETED' ? (run.files && run.files.length ? '文件已放在上面的回复里，可以打开、转发，或让小五继续修改。' : '结果已显示在上方，可以继续提问或去对应页面查看。') : run.status === 'PARTIAL' ? '部分内容已经完成，请查看上方说明和未完成项目。' : run.status === 'FAILED' ? '这次没有完成，原来的输入和附件仍可继续使用。' : '任务已经结束，说明保留在当前会话中。'}}</view>
     <view class="result-summary-grid" wx:if="{{run.summary}}"><view><text>{{run.summary.successCount || 0}}</text><text>完成</text></view><view><text>{{run.summary.skippedCount || 0}}</text><text>跳过</text></view><view class="danger"><text>{{run.summary.failedCount || 0}}</text><text>失败</text></view></view>
-    <view class="result-actions"><view wx:for="{{run.actions}}" wx:key="label" data-target="{{item.target}}" data-params="{{item.params}}" bindtap="openResultAction">{{item.label}}</view><view bindtap="openMyFiles">{{run.files && run.files.length ? '全部生成的文件' : '我的文件'}}</view><view bindtap="openWorkbench">去工作台</view><view wx:if="{{run.status === 'FAILED' || (run.retry && run.retry.supported)}}" bindtap="retryLastMessage">重新输入并重试</view></view>
+    <view class="result-actions"><view wx:for="{{run.actions}}" wx:key="label" data-target="{{item.target}}" data-params="{{item.params}}" bindtap="openResultAction">{{item.label}}</view><view bindtap="openMyFiles">{{run.files && run.files.length ? '全部生成的文件' : '我的文件'}}</view><view bindtap="openWorkbench">查看财务</view><view wx:if="{{run.status === 'FAILED' || (run.retry && run.retry.supported)}}" bindtap="retryLastMessage">重新输入并重试</view></view>
   </view>
   <view id="conversation-end" class="conversation-end"></view>
   </scroll-view>

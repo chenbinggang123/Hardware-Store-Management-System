@@ -32,8 +32,12 @@
       <input class="form-input" value="{{form.sourceFactory}}" data-key="sourceFactory" bindinput="updateField" placeholder="请输入源头厂商" />
     </view>
     <view class="form-group">
-      <view class="form-label">图片地址</view>
-      <input class="form-input" value="{{form.imageUrl}}" data-key="imageUrl" bindinput="updateField" placeholder="可先填网络图片地址" />
+      <view class="form-label">商品图片</view>
+      <view class="product-image-editor">
+        <image class="product-image-preview" wx:if="{{form.imageUrl}}" src="{{form.imageUrl}}" mode="aspectFill" />
+        <view class="product-image-empty" wx:else><text>图</text><text>拍包装或商品外观，查找时更容易辨认</text></view>
+        <view class="product-image-actions"><view class="btn btn-outline btn-sm" bindtap="chooseImage">{{uploadingImage ? '上传中…' : form.imageUrl ? '更换图片' : '拍照或选择'}}</view><view class="btn btn-ghost btn-sm" wx:if="{{form.imageUrl}}" bindtap="removeImage">移除</view></view>
+      </view>
     </view>
   </view>
 
@@ -67,17 +71,11 @@
       <view class="form-label">库位</view>
       <input class="form-input" value="{{form.locationId}}" data-key="locationId" bindinput="updateField" placeholder="例如 A-01" />
     </view>
-    <view class="form-group">
-      <view class="form-label">状态</view>
-      <picker mode="selector" range="{{statusOptions}}" value="{{statusIndex}}" bindchange="changeStatus">
-        <view class="form-picker">{{statusOptions[statusIndex]}}</view>
-      </picker>
-    </view>
   </view>
 
   <view class="banner banner-info">
     <text class="banner-icon">💡</text>
-    <view><view class="banner-title">填写建议</view><view class="banner-desc">名称、条码、规格、单位是必填项。库存数量会同步影响商品列表和库存模块展示。</view></view>
+    <view><view class="banner-title">填写建议</view><view class="banner-desc">名称、条码、规格、单位是必填项。保存后商品默认可用于查询和开单，无需维护上下架。</view></view>
   </view>
 
   <view class="bottom-actions">

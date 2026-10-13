@@ -23,7 +23,7 @@ public class SearchProductsTool implements AgentTool {
     public AgentToolDefinition definition() {
         return new AgentToolDefinition(
                 "search_products",
-                "按名称、条码、规格或厂商搜索已上架商品",
+                "按名称、条码、规格或厂商搜索商品",
                 AgentToolRisk.R0_READ_ONLY,
                 Map.of(
                         "type", "object",
@@ -38,7 +38,7 @@ public class SearchProductsTool implements AgentTool {
         if (keyword == null || keyword.isBlank()) {
             throw new IllegalArgumentException("商品搜索关键词不能为空");
         }
-        List<Product> products = productService.getAllProducts(keyword, 1);
+        List<Product> products = productService.getAllProducts(keyword, null);
         return products.stream().limit(10).map(product -> Map.of(
                 "id", product.getId(),
                 "name", safe(product.getName()),

@@ -10,3 +10,6 @@
 .supply-main view { color: #26342D; font-size: 24rpx; font-weight: 700; }
 .supply-main text { color: #75817B; font-size: 19rpx; }
 .supply-arrow { color: #245E9B; font-size: 25rpx; text-align: right; }
+.inventory-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16rpx; }
+.inventory-source { color: #75817B; font-size: 19rpx; }
+.inventory-actions { display: flex; gap: 16rpx; margin-top: 20rpx; }

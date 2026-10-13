@@ -115,7 +115,7 @@ Page({
   data: {
     input: '', inputFocus: false, sending: false, streaming: false, resolving: false, loadingHistory: false,
     deletingConversationId: null, renamingConversationId: null, cancelling: false,
-    run: null, conversationId: null, currentTitle: '小五工作台', conversations: [], historyOpen: false, messages: [],
+    run: null, conversationId: null, currentTitle: '和小五聊聊', conversations: [], historyOpen: false, messages: [],
     pendingAttachments: [], uploading: false, connectionInterrupted: false, lastFailedInput: '',
     scrollTarget: 'conversation-end', openingFileId: '', deletingFileId: '',
     excelEntries: [
@@ -125,8 +125,8 @@ Page({
     taskEntries: [
       { key: 'sales', title: '开销售单', desc: '查客户、商品和库存后生成草稿', mark: '单', prompt: '帮我创建一张销售草稿' },
       { key: 'inventory', title: '盘点库存', desc: '查询商品后改为实际数量', mark: '库', prompt: '帮我盘点并调整一个商品的库存' },
-      { key: 'product', title: '商品管理', desc: '新增资料、上下架', mark: '商', prompt: '帮我新增或修改一个商品' },
-      { key: 'query', title: '经营查询', desc: '库存、订单和当天经营情况', mark: '查', prompt: '我想查询经营数据：' }
+      { key: 'finance', title: '查往来账', desc: '客户或厂商欠款、已付和余额', mark: '财', prompt: '帮我查一下客户或厂商的往来账：' },
+      { key: 'product', title: '查商品', desc: '价格、图片和库存一起查', mark: '商', prompt: '帮我查一个商品的价格和库存：' }
     ],
     suggestions: ['把这张收据做成 Excel', '把刚才的表格加一列备注，再生成一份', '查一下电钻还有多少库存', '给老王开两把东成电钻，先记账']
   },
@@ -312,7 +312,7 @@ Page({
           wx.removeStorageSync(ACTIVE_RUN_KEY)
           wx.removeStorageSync(ACTIVE_CONVERSATION_KEY)
           Object.assign(update, {
-            conversationId: null, currentTitle: '小五工作台', run: null, messages: [], input: '',
+            conversationId: null, currentTitle: '和小五聊聊', run: null, messages: [], input: '',
             sending: false, streaming: false, pendingAttachments: []
           })
         }
@@ -463,7 +463,7 @@ Page({
     const id = event.currentTarget.dataset.id
     if (id) openPage('/pages/product-detail/index', { id })
   },
-  openWorkbench() { openPage('/pages/workbench/index') },
+  openWorkbench() { openPage('/pages/finance/index') },
   openMyFiles() {
     this.setData({ historyOpen: false })
     openPage('/pages/agent-files/index')
@@ -600,7 +600,7 @@ Page({
     wx.removeStorageSync(ACTIVE_RUN_KEY)
     wx.removeStorageSync(ACTIVE_CONVERSATION_KEY)
     this.setData({
-      run: null, conversationId: null, currentTitle: '小五工作台', messages: [], input: '', historyOpen: false,
+      run: null, conversationId: null, currentTitle: '和小五聊聊', messages: [], input: '', historyOpen: false,
       sending: false, streaming: false, pendingAttachments: []
     })
   }

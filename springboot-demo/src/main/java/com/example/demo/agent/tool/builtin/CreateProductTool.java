@@ -40,10 +40,9 @@ public class CreateProductTool implements AgentTool {
         properties.put("stock", Map.of("type", "integer", "minimum", 0, "description", "初始库存，默认 0"));
         properties.put("locationId", Map.of("type", "string", "description", "库位"));
         properties.put("sourceFactory", Map.of("type", "string", "description", "源头厂商"));
-        properties.put("status", Map.of("type", "integer", "enum", List.of(0, 1), "description", "1 上架，0 下架，默认 1"));
         return new AgentToolDefinition(
                 "create_product",
-                "新增商品并建立初始库存记录，可选择立即上架",
+                "新增商品并建立初始库存记录",
                 AgentToolRisk.R2_WRITE,
                 Map.of("type", "object", "additionalProperties", false,
                         "properties", properties, "required", List.of("name", "barcode")),
@@ -54,7 +53,7 @@ public class CreateProductTool implements AgentTool {
     public Object approvalPreview(AgentToolContext context, Map<String, Object> arguments) {
         Product product = fromArguments(arguments);
         Map<String, Object> preview = productView(product);
-        preview.put("effect", "新增商品、建立初始库存，并将商品设为" + statusText(product.getStatus()));
+        preview.put("effect", "新增商品并建立初始库存记录");
         return preview;
     }
 
@@ -87,7 +86,7 @@ public class CreateProductTool implements AgentTool {
         product.setStock(integer(arguments, "stock", 0));
         product.setLocationId(optionalText(arguments, "locationId"));
         product.setSourceFactory(optionalText(arguments, "sourceFactory"));
-        product.setStatus(integer(arguments, "status", 1));
+        product.setStatus(1);
         return product;
     }
 
@@ -100,8 +99,6 @@ public class CreateProductTool implements AgentTool {
         result.put("retailPrice", product.getRetailPrice());
         result.put("stock", product.getStock());
         result.put("locationId", safe(product.getLocationId()));
-        result.put("status", product.getStatus());
-        result.put("statusText", statusText(product.getStatus()));
         return result;
     }
 
@@ -130,6 +127,5 @@ public class CreateProductTool implements AgentTool {
         return number.intValue();
     }
 
-    private String statusText(Integer status) { return Integer.valueOf(1).equals(status) ? "上架" : "下架"; }
     private String safe(String value) { return value == null ? "" : value; }
 }

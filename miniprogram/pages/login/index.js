@@ -10,6 +10,12 @@ Page({
     loginError: ''
   },
 
+  onShow() {
+    if (api.getStoredSession()) {
+      wx.switchTab({ url: '/pages/agent/index' })
+    }
+  },
+
   onUsernameInput(event) {
     this.setData({ username: event.detail.value, loginError: '' })
   },
@@ -33,7 +39,7 @@ Page({
       getApp().setSession(session)
       showToast('登录成功', 'success')
       wx.switchTab({
-        url: '/pages/workbench/index'
+        url: '/pages/agent/index'
       })
     }).catch((error) => {
       const message = (error && (error.message || (error.data && error.data.message) || error.errMsg)) || '登录失败'

@@ -16,6 +16,7 @@
     "pages/contacts/index",
     "pages/agent/index",
     "pages/agent-files/index",
+    "pages/finance/index",
     "pages/products/index",
     "pages/product-detail/index",
     "pages/product-form/index",
@@ -61,8 +62,20 @@
     "borderStyle": "black",
     "list": [
       {
-        "pagePath": "pages/workbench/index",
-        "text": "工作台",
+        "pagePath": "pages/agent/index",
+        "text": "小五",
+        "iconPath": "assets/tabbar/agent.png",
+        "selectedIconPath": "assets/tabbar/agent-active.png"
+      },
+      {
+        "pagePath": "pages/agent-files/index",
+        "text": "文件",
+        "iconPath": "assets/tabbar/files.png",
+        "selectedIconPath": "assets/tabbar/files-active.png"
+      },
+      {
+        "pagePath": "pages/finance/index",
+        "text": "财务",
         "iconPath": "assets/tabbar/home.png",
         "selectedIconPath": "assets/tabbar/home-active.png"
       },
@@ -73,22 +86,10 @@
         "selectedIconPath": "assets/tabbar/products-active.png"
       },
       {
-        "pagePath": "pages/sales-orders/index",
-        "text": "单据",
-        "iconPath": "assets/tabbar/orders.png",
-        "selectedIconPath": "assets/tabbar/orders-active.png"
-      },
-      {
-        "pagePath": "pages/inventories/index",
-        "text": "库存",
+        "pagePath": "pages/settings/index",
+        "text": "我的",
         "iconPath": "assets/tabbar/inventory.png",
         "selectedIconPath": "assets/tabbar/inventory-active.png"
-      },
-      {
-        "pagePath": "pages/agent/index",
-        "text": "小五",
-        "iconPath": "assets/tabbar/agent.png",
-        "selectedIconPath": "assets/tabbar/agent-active.png"
       }
     ]
   },

@@ -62,13 +62,16 @@ class AgentBusinessToolsTest {
 
         Map<String, Object> result = cast(tool.execute(context, Map.of(
                 "name", "测试扳手", "barcode", "TEST-0009", "retailPrice", 18.5,
-                "stock", 6, "unit", "把", "status", 1)));
+                "stock", 6, "unit", "把")));
 
         assertEquals(9L, result.get("productId"));
         assertEquals(19L, result.get("inventoryId"));
         ArgumentCaptor<Inventory> inventoryCaptor = ArgumentCaptor.forClass(Inventory.class);
         verify(inventoryService).saveInventory(inventoryCaptor.capture());
         assertEquals(6, inventoryCaptor.getValue().getQuantity());
+        ArgumentCaptor<Product> productCaptor = ArgumentCaptor.forClass(Product.class);
+        verify(productService).saveProduct(productCaptor.capture());
+        assertEquals(1, productCaptor.getValue().getStatus());
     }
 
     @Test

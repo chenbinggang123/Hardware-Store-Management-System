@@ -162,9 +162,6 @@ public class SalesDraftServiceImpl implements SalesDraftService {
             }
             Product product = productRepository.findById(itemRequest.getProductId())
                     .orElseThrow(() -> new IllegalArgumentException("商品不存在：" + itemRequest.getProductId()));
-            if (product.getStatus() != null && product.getStatus() != 1) {
-                throw new IllegalArgumentException("商品已下架：" + product.getName());
-            }
             BigDecimal price = itemRequest.getPrice();
             if (price == null) {
                 price = findLastPrice(customer.getId(), product.getId());

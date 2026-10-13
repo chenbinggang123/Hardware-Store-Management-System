@@ -445,6 +445,41 @@ function filterInventories(params = {}) {
   }))
 }
 
+function localCatalog(params = {}) {
+  const inventoryMap = state.inventories.reduce((map, item) => { map[String(item.productId)] = item; return map }, {})
+  const activityMap = {}
+  const record = (productId, kind, time) => {
+    const key = String(productId)
+    const current = activityMap[key] || { count: 0, lastSoldAt: '', lastPurchasedAt: '' }
+    current.count += 1
+    if (kind === 'sale' && String(time || '') > current.lastSoldAt) current.lastSoldAt = time || ''
+    if (kind === 'purchase' && String(time || '') > current.lastPurchasedAt) current.lastPurchasedAt = time || ''
+    activityMap[key] = current
+  }
+  state.salesOrders.forEach((order) => (order.items || []).forEach((item) => record(item.productId, 'sale', order.orderTime || order.createTime)))
+  state.purchaseOrders.forEach((order) => (order.items || []).forEach((item) => record(item.productId, 'purchase', order.orderTime || order.createTime)))
+  const all = filterProducts({ keyword: params.keyword }).map((product) => {
+    const inventory = inventoryMap[String(product.id)]
+    const recorded = Boolean(inventory)
+    const quantity = toNumber(recorded ? inventory.quantity : product.stock)
+    const warningThreshold = toNumber(recorded ? inventory.warningThreshold : 10)
+    const reasons = []
+    if (!recorded) reasons.push('库存未记录')
+    else if (quantity <= warningThreshold) reasons.push(quantity <= 0 ? '缺货' : '库存不多')
+    if (toNumber(product.retailPrice) <= 0) reasons.push('售价未填写')
+    const activity = activityMap[String(product.id)] || { count: 0, lastSoldAt: '', lastPurchasedAt: '' }
+    return { ...product, inventoryId: inventory && inventory.id, quantity, warningThreshold, locationId: (inventory && inventory.locationId) || product.locationId, inventoryRecorded: recorded, lowStock: recorded && quantity <= warningThreshold, stockState: !recorded ? 'UNKNOWN' : quantity <= 0 ? 'OUT_OF_STOCK' : quantity <= warningThreshold ? 'LOW' : 'IN_STOCK', lastSoldAt: activity.lastSoldAt, lastPurchasedAt: activity.lastPurchasedAt, lastActivityAt: activity.lastSoldAt > activity.lastPurchasedAt ? activity.lastSoldAt : activity.lastPurchasedAt, activityCount: activity.count, attentionReasons: reasons }
+  })
+  let items = all
+  if (params.view === 'frequent') items = items.filter((item) => item.activityCount > 0).sort((left, right) => right.activityCount - left.activityCount || String(right.lastActivityAt).localeCompare(String(left.lastActivityAt)))
+  else if (params.view === 'attention') items = items.filter((item) => item.attentionReasons.length).sort((left, right) => right.attentionReasons.length - left.attentionReasons.length)
+  else items = items.sort((left, right) => String(left.name || '').localeCompare(String(right.name || ''), 'zh-CN'))
+  const page = Math.max(toNumber(params.page), 0)
+  const size = Math.min(Math.max(toNumber(params.size, 20), 1), 50)
+  const start = page * size
+  return { items: clone(items.slice(start, start + size)), page, size, totalElements: items.length, totalPages: items.length ? Math.ceil(items.length / size) : 0, totalProducts: state.products.length, inventoryRecorded: state.inventories.length, attentionCount: all.filter((item) => item.attentionReasons.length).length }
+}
+
 function sanitizeUser(user) {
   if (!user) {
     return null
@@ -541,6 +576,9 @@ module.exports = {
   },
   getAgentOutputs() {
     return agentRequest('/agent/outputs')
+  },
+  getFileCenter(params = {}) {
+    return request('/file-center', { query: params })
   },
   getAgentRunOutputs(runId) {
     return agentRequest(`/agent/runs/${runId}/outputs`)
@@ -645,6 +683,9 @@ module.exports = {
   },
   getProducts(params = {}) {
     return withFallback(() => request('/products', { data: params }), () => filterProducts(params))
+  },
+  getCatalog(params = {}) {
+    return withFallback(() => request('/catalog', { query: params }), () => localCatalog(params))
   },
   getProduct(id) {
     return withFallback(() => request(`/products/${id}`), () => findById(state.products, id))
