@@ -118,14 +118,15 @@ class AgentOutputServiceTest {
              java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream()) {
             org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("商品明细");
             String[] headers = {"项目", "数量", "金额", "核对说明"};
-            org.apache.poi.ss.usermodel.Row header = sheet.createRow(0);
+            sheet.createRow(0).createCell(0).setCellValue("客户对账单");
+            org.apache.poi.ss.usermodel.Row header = sheet.createRow(5);
             for (int i = 0; i < headers.length; i++) header.createCell(i).setCellValue(headers[i]);
-            org.apache.poi.ss.usermodel.Row first = sheet.createRow(1);
+            org.apache.poi.ss.usermodel.Row first = sheet.createRow(6);
             first.createCell(0).setCellValue("钻头 2.2"); first.createCell(1).setCellValue(10); first.createCell(2).setCellValue(15); first.createCell(3).setCellValue("");
-            org.apache.poi.ss.usermodel.Row second = sheet.createRow(2);
+            org.apache.poi.ss.usermodel.Row second = sheet.createRow(7);
             second.createCell(0).setCellValue("气管 10"); second.createCell(1).setCellValue(28); second.createCell(2).setCellValue(504); second.createCell(3).setCellValue("金额验算不一致");
-            org.apache.poi.ss.usermodel.Row total = sheet.createRow(3);
-            total.createCell(0).setCellValue("合计"); total.createCell(2).setCellFormula("SUM(C2:C3)");
+            org.apache.poi.ss.usermodel.Row total = sheet.createRow(8);
+            total.createCell(0).setCellValue("合计"); total.createCell(2).setCellFormula("SUM(C7:C8)");
             org.apache.poi.ss.usermodel.Sheet info = workbook.createSheet("单据信息");
             info.createRow(0).createCell(0).setCellValue("项目");
             org.apache.poi.ss.usermodel.Row entry = info.createRow(1);

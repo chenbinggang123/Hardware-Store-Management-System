@@ -1,0 +1,29 @@
+<view class="editor-screen">
+  <view class="loading-state" wx:if="{{loading}}">正在读取表格内容…</view>
+  <view class="error-state" wx:elif="{{loadError}}"><view class="error-title">表格没有打开成功</view><view>{{loadError}}</view><button class="retry-button" bindtap="retry">重新加载</button></view>
+  <block wx:elif="{{activeSheet}}">
+    <view class="editor-head">
+      <view class="head-label">新版本名称</view>
+      <input class="title-input" aria-label="新版本名称" value="{{title}}" maxlength="80" bindinput="inputTitle" />
+      <view class="head-note">直接修改下方内容。保存后会生成新的 Excel，原文件不会被覆盖。</view>
+    </view>
+
+    <scroll-view class="sheet-tabs" scroll-x wx:if="{{sheets.length > 1}}">
+      <view class="sheet-tab {{index === sheetIndex ? 'active' : ''}}" role="button" aria-label="打开工作表 {{item.name}}" wx:for="{{sheets}}" wx:key="name" data-index="{{index}}" bindtap="selectSheet">{{item.name}}</view>
+    </scroll-view>
+
+    <view class="sheet-summary"><view><text>{{activeSheet.name}}</text><text>{{activeSheet.rows.length}} 行 · {{activeSheet.columns.length}} 列</text></view><view class="add-row" role="button" aria-label="新增一行" bindtap="addRow">＋ 新增一行</view></view>
+    <view class="truncated-note" wx:if="{{activeSheet.truncated}}">当前只载入前 200 行。请先用小五处理更大的表格，避免遗漏。</view>
+
+    <view class="row-card" wx:for="{{activeSheet.rows}}" wx:key="key" wx:for-index="rowIndex" wx:for-item="row">
+      <view class="row-head"><text>第 {{rowIndex + 1}} 行</text><view class="row-actions"><text role="button" aria-label="复制第 {{rowIndex + 1}} 行" data-row="{{rowIndex}}" bindtap="duplicateRow">复制</text><text class="danger" role="button" aria-label="删除第 {{rowIndex + 1}} 行" data-row="{{rowIndex}}" bindtap="deleteRow">删除</text></view></view>
+      <view class="cell-field" wx:for="{{activeSheet.columns}}" wx:key="*this" wx:for-index="columnIndex" wx:for-item="column">
+        <view class="cell-label">{{column}}</view>
+        <input class="cell-input" aria-label="第 {{rowIndex + 1}} 行 {{column}}" value="{{row.values[columnIndex]}}" data-row="{{rowIndex}}" data-column="{{columnIndex}}" bindinput="inputCell" />
+      </view>
+    </view>
+    <view class="empty-sheet" wx:if="{{!activeSheet.rows.length}}">这个工作表暂时没有数据，点击“新增一行”开始填写。</view>
+    <view class="bottom-space"></view>
+    <view class="save-bar"><view class="save-state">{{dirty ? '有修改尚未保存' : '当前内容已读取'}}</view><button class="save-button" disabled="{{saving || !dirty}}" bindtap="save">{{saving ? '正在生成…' : '保存为新版本'}}</button></view>
+  </block>
+</view>

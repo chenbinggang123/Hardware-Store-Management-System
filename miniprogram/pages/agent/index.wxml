@@ -48,25 +48,9 @@
   <scroll-view class="conversation-scroll" scroll-y scroll-into-view="{{scrollTarget}}" enhanced show-scrollbar="{{false}}">
 
   <view class="welcome" wx:if="{{!messages.length && !run}}">
-    <view class="welcome-title">有文件或经营问题，直接发给我</view>
-    <view class="welcome-subtitle">拍照、选择文件，或告诉小五你想查什么。</view>
-
-    <view class="excel-tiles">
-      <view class="excel-tile" role="button" aria-label="{{item.title}}" wx:for="{{excelEntries}}" wx:key="key" data-kind="{{item.key}}" bindtap="startTask">
-        <view class="excel-tile-mark"><text>{{item.mark}}</text></view>
-        <view class="excel-tile-title">{{item.title}}</view>
-        <view class="excel-tile-desc">{{item.desc}}</view>
-        <view class="excel-tile-action">{{item.action}}</view>
-      </view>
-    </view>
-
-    <view class="job-list">
-      <view class="job-row" role="button" aria-label="{{item.title}}" wx:for="{{taskEntries}}" wx:key="key" data-kind="{{item.key}}" data-prompt="{{item.prompt}}" bindtap="startTask">
-        <view class="job-mark">{{item.mark}}</view>
-        <view class="job-copy"><view class="job-title">{{item.title}}</view><view class="job-desc">{{item.desc}}</view></view>
-        <view class="job-arrow">›</view>
-      </view>
-    </view>
+    <view class="welcome-mark">小</view>
+    <view class="welcome-title">直接告诉小五要做什么</view>
+    <view class="welcome-subtitle">输入问题，或点下方＋添加照片和文件。已有 Excel 也可以交给小五修改并生成新版本。</view>
 
     <view class="suggestions">
       <view class="suggestion-title">试试这样说</view>
@@ -110,7 +94,8 @@
                   <view class="file-card-error" wx:if="{{file.errorMessage}}">{{file.errorMessage}}</view>
                   <view class="file-card-actions">
                     <view class="file-card-action" wx:if="{{file.ready}}" role="button" aria-label="打开文件" data-id="{{file.id}}" catchtap="openGeneratedFile">{{openingFileId === file.id ? '打开中…' : '打开'}}</view>
-                    <view class="file-card-action secondary" wx:if="{{file.ready}}" role="button" aria-label="让小五修改这个文件" data-id="{{file.id}}" catchtap="modifyGeneratedFile">让小五修改</view>
+                    <view class="file-card-action secondary" wx:if="{{file.ready && file.fileType === 'xlsx'}}" role="button" aria-label="快速修改这个表格" data-id="{{file.id}}" catchtap="quickEditGeneratedFile">快速修改</view>
+                    <view class="file-card-action secondary" wx:if="{{file.ready}}" role="button" aria-label="让小五修改这个文件" data-id="{{file.id}}" catchtap="modifyGeneratedFile">小五修改</view>
                     <view class="file-card-action danger" role="button" aria-label="删除文件" data-id="{{file.id}}" catchtap="deleteGeneratedFile">{{deletingFileId === file.id ? '删除中…' : '删除'}}</view>
                   </view>
                 </view>
@@ -205,7 +190,18 @@
   <view id="conversation-end" class="conversation-end"></view>
   </scroll-view>
 
+  <view class="attachment-backdrop" wx:if="{{attachmentMenuOpen}}" bindtap="closeAttachmentMenu"></view>
   <view class="composer">
+    <view class="attachment-menu" wx:if="{{attachmentMenuOpen}}" catchtap="preventClose">
+      <view class="attachment-menu-title">添加到当前对话</view>
+      <view class="attachment-menu-grid">
+        <view class="attachment-option" role="button" aria-label="拍照" bindtap="chooseCamera"><view class="attachment-option-icon">拍</view><text>拍照</text></view>
+        <view class="attachment-option" role="button" aria-label="从相册选择图片" bindtap="chooseAlbum"><view class="attachment-option-icon">图</view><text>相册</text></view>
+        <view class="attachment-option" role="button" aria-label="从微信选择表格 Word 或 PDF" bindtap="chooseDocument"><view class="attachment-option-icon">件</view><text>微信文件</text></view>
+        <view class="attachment-option" role="button" aria-label="选择小五生成过的 Excel 继续修改" bindtap="chooseGeneratedExcel"><view class="attachment-option-icon excel">改</view><text>修改 Excel</text></view>
+      </view>
+      <view class="attachment-menu-note">Excel 在微信里只能预览；交给小五修改后会生成一份新文件，原件不会被覆盖。</view>
+    </view>
     <view class="composer-attachments" wx:if="{{pendingAttachments.length || uploading}}">
       <view class="attachment-card" wx:for="{{pendingAttachments}}" wx:key="id">
         <view class="attachment-icon">{{item.typeMark}}</view>
@@ -215,10 +211,10 @@
       <view class="uploading-line" wx:if="{{uploading}}">正在上传并识别附件…</view>
     </view>
     <view class="composer-row">
-      <view class="attach-button" role="button" aria-label="添加图片、表格、Word 或 PDF 附件" bindtap="chooseAttachment">＋</view>
+      <view class="attach-button {{attachmentMenuOpen ? 'active' : ''}}" role="button" aria-label="添加照片或文件" aria-expanded="{{attachmentMenuOpen}}" bindtap="toggleAttachmentMenu">＋</view>
       <textarea class="composer-input" aria-label="给小五发送消息" value="{{input}}" focus="{{inputFocus}}" bindblur="blurQuestion" bindinput="updateInput" auto-height maxlength="500" placeholder="说一件事，或先加附件" disabled="{{sending || resolving || uploading || (run && run.status === 'WAITING_APPROVAL')}}" />
       <button class="send-button" aria-label="发送消息" bindtap="send" disabled="{{(!input && !pendingAttachments.length) || sending || resolving || uploading || (run && run.status === 'WAITING_APPROVAL')}}">发送</button>
     </view>
-    <view class="composer-hint">附件先识别再确认；写入业务数据前都会先问你。</view>
+    <view class="composer-hint">附件先读取再处理；修改文件会生成新版本。</view>
   </view>
 </view>

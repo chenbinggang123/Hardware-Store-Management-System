@@ -88,7 +88,10 @@ public class FinanceService {
         BigDecimal settled = paymentRepository.findByOperatorIdOrderByPaymentDateDescIdDesc(operatorId).stream()
                 .filter(item -> selectedMonth.equals(YearMonth.from(item.getPaymentDate())))
                 .map(AccountPayment::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
-        List<AccountDocument> open = all.stream().filter(item -> !"SETTLED".equals(item.getStatus())).toList();
+        List<AccountDocument> open = all.stream()
+                .filter(item -> !"SETTLED".equals(item.getStatus()))
+                .filter(item -> wantedDirection == null || wantedDirection.equals(item.getDirection()))
+                .toList();
         List<AccountDocument> overdue = open.stream().filter(this::isOverdue).toList();
         return new FinanceOverview(sumOpen(all, "RECEIVABLE"), sumOpen(all, "PAYABLE"), money(occurred), money(settled),
                 open.size(), sumOutstanding(overdue), overdue.size(), aging(open), visible);

@@ -172,7 +172,7 @@ public class AgentOutputService {
                     continue;
                 }
                 if (wanted != null && !wanted.equals(name)) continue;
-                Row header = sheet.getRow(0);
+                Row header = headerRow(sheet, formatter, evaluator);
                 if (header == null) continue;
                 List<Integer> keptColumns = new ArrayList<>();
                 List<String> columns = new ArrayList<>();
@@ -184,7 +184,7 @@ public class AgentOutputService {
                 }
                 List<List<String>> rows = new ArrayList<>();
                 boolean truncated = false;
-                for (int index = 1; index <= sheet.getLastRowNum(); index++) {
+                for (int index = header.getRowNum() + 1; index <= sheet.getLastRowNum(); index++) {
                     Row row = sheet.getRow(index);
                     if (row == null) continue;
                     String first = text(row, 0, formatter, evaluator);
@@ -219,6 +219,26 @@ public class AgentOutputService {
         result.put("info", info);
         result.put("note", "修改时把改动应用到这些行，再调用 generate_excel_workbook 生成新文件；数量、单价、金额列仍需标注角色，原文件会保留");
         return result;
+    }
+
+    /** Finds the densest row near the top, so title rows in statements are not mistaken for headers. */
+    private Row headerRow(Sheet sheet, DataFormatter formatter, FormulaEvaluator evaluator) {
+        Row best = null;
+        int bestCells = 0;
+        int limit = Math.min(sheet.getLastRowNum(), 12);
+        for (int rowIndex = 0; rowIndex <= limit; rowIndex++) {
+            Row candidate = sheet.getRow(rowIndex);
+            if (candidate == null) continue;
+            int cells = 0;
+            for (int column = 0; column < candidate.getLastCellNum(); column++) {
+                if (StringUtils.hasText(text(candidate, column, formatter, evaluator))) cells++;
+            }
+            if (cells > bestCells) {
+                best = candidate;
+                bestCells = cells;
+            }
+        }
+        return bestCells == 0 ? null : best;
     }
 
     private String text(Row row, int column, DataFormatter formatter, FormulaEvaluator evaluator) {

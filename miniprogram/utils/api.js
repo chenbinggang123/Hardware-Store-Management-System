@@ -577,6 +577,12 @@ module.exports = {
   getAgentOutputs() {
     return agentRequest('/agent/outputs')
   },
+  getAgentWorkbook(outputId) {
+    return agentRequest(`/agent/outputs/${outputId}/workbook`)
+  },
+  saveAgentWorkbookVersion(outputId, data) {
+    return agentRequest(`/agent/outputs/${outputId}/workbook-versions`, { method: 'POST', data })
+  },
   getFileCenter(params = {}) {
     return request('/file-center', { query: params })
   },

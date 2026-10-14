@@ -149,7 +149,8 @@ public class FinanceStatementService {
             text(total.createCell(3), "合计");
             for (int column = 4; column <= 6; column++) {
                 Cell cell = total.createCell(column);
-                cell.setCellFormula("SUM(" + column(column) + "7:" + column(column) + rowIndex + ")");
+                if (rowIndex > 6) cell.setCellFormula("SUM(" + column(column) + "7:" + column(column) + rowIndex + ")");
+                else cell.setCellValue(0);
                 cell.setCellStyle(styles.totalMoney());
             }
             finish(accounts, headers.length, rowIndex, new int[]{14, 14, 20, 12, 16, 16, 16, 12, 32});
@@ -171,7 +172,8 @@ public class FinanceStatementService {
             text(paymentTotal.createCell(1), "合计");
             for (int column = 2; column <= 3; column++) {
                 Cell cell = paymentTotal.createCell(column);
-                cell.setCellFormula("SUM(" + column(column) + "7:" + column(column) + rowIndex + ")");
+                if (rowIndex > 6) cell.setCellFormula("SUM(" + column(column) + "7:" + column(column) + rowIndex + ")");
+                else cell.setCellValue(0);
                 cell.setCellStyle(styles.totalMoney());
             }
             finish(cash, paymentHeaders.length, rowIndex, new int[]{14, 18, 16, 16, 36});

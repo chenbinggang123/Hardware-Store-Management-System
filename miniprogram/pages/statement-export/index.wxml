@@ -1,2 +1,10 @@
-<!--pages/statement-export/index.wxml-->
-<text>pages/statement-export/index.wxml</text>
+<view class="screen export-screen">
+  <view class="intro"><view class="title">导出对账单</view><view class="desc">按客户或厂商导出单据、收付款和当前未结金额。生成后也会保存在文件中心。</view></view>
+  <view class="direction"><view class="choice {{direction === 'RECEIVABLE' ? 'active receive' : ''}}" data-value="RECEIVABLE" bindtap="selectDirection">客户应收</view><view class="choice {{direction === 'PAYABLE' ? 'active pay' : ''}}" data-value="PAYABLE" bindtap="selectDirection">厂商应付</view></view>
+  <view class="form-card">
+    <view class="field"><view class="label">{{direction === 'RECEIVABLE' ? '客户' : '厂商'}} *</view><picker mode="selector" range="{{parties}}" range-key="name" value="{{partyIndex < 0 ? 0 : partyIndex}}" bindchange="party"><view class="picker {{partyIndex < 0 ? 'placeholder' : ''}}">{{partyIndex < 0 ? '请选择' : parties[partyIndex].name}}<text>›</text></view></picker><view class="field-help" wx:if="{{!parties.length && !loading}}">暂无可选择的往来单位</view></view>
+    <view class="field"><view class="label">单据日期范围</view><view class="date-grid"><picker mode="date" value="{{dateFrom}}" end="{{dateTo}}" bindchange="dateFrom"><view class="picker">{{dateFrom}}</view></picker><view class="date-separator">至</view><picker mode="date" value="{{dateTo}}" start="{{dateFrom}}" bindchange="dateTo"><view class="picker">{{dateTo}}</view></picker></view></view>
+    <view class="export-note">Excel 包含“往来账”和“收付款”两个工作表，金额与日期保持为可计算格式。</view>
+  </view>
+  <view class="space"></view><view class="fixed-action"><button class="fixed-primary" disabled="{{loading || exporting}}" bindtap="exportFile">{{exporting ? '正在生成…' : '生成并打开 Excel'}}</button></view>
+</view>

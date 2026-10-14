@@ -169,6 +169,10 @@ Page({
     const item = this.data.items.find((entry) => entry.key === event.currentTarget.dataset.key)
     if (item && item.ready) askAgentToModify(item, openPage)
   },
+  quickEditFile(event) {
+    const item = this.data.items.find((entry) => entry.key === event.currentTarget.dataset.key)
+    if (item && item.ready && item.fileType === 'xlsx') openPage('/pages/workbook-editor/index', { id: item.id })
+  },
 
   deleteFile(event) {
     const item = this.data.items.find((entry) => entry.key === event.currentTarget.dataset.key)

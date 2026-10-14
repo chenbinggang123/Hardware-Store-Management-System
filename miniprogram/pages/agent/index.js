@@ -116,18 +116,8 @@ Page({
     input: '', inputFocus: false, sending: false, streaming: false, resolving: false, loadingHistory: false,
     deletingConversationId: null, renamingConversationId: null, cancelling: false,
     run: null, conversationId: null, currentTitle: '和小五聊聊', conversations: [], historyOpen: false, messages: [],
-    pendingAttachments: [], uploading: false, connectionInterrupted: false, lastFailedInput: '',
+    pendingAttachments: [], uploading: false, attachmentMenuOpen: false, connectionInterrupted: false, lastFailedInput: '',
     scrollTarget: 'conversation-end', openingFileId: '', deletingFileId: '',
-    excelEntries: [
-      { key: 'excel-from-doc', title: '单据做成 Excel', desc: '拍照或上传收据、价格表、Word、PDF，小五整理后生成文件', mark: '表', action: '选择附件 ›' },
-      { key: 'excel-modify', title: '修改 Excel', desc: '上传表格或选一个生成过的文件，告诉小五改什么', mark: '改', action: '选择文件 ›' }
-    ],
-    taskEntries: [
-      { key: 'sales', title: '开销售单', desc: '查客户、商品和库存后生成草稿', mark: '单', prompt: '帮我创建一张销售草稿' },
-      { key: 'inventory', title: '盘点库存', desc: '查询商品后改为实际数量', mark: '库', prompt: '帮我盘点并调整一个商品的库存' },
-      { key: 'finance', title: '查往来账', desc: '客户或厂商欠款、已付和余额', mark: '财', prompt: '帮我查一下客户或厂商的往来账：' },
-      { key: 'product', title: '查商品', desc: '价格、图片和库存一起查', mark: '商', prompt: '帮我查一个商品的价格和库存：' }
-    ],
     suggestions: ['把这张收据做成 Excel', '把刚才的表格加一列备注，再生成一份', '查一下电钻还有多少库存', '给老王开两把东成电钻，先记账']
   },
 
@@ -143,7 +133,7 @@ Page({
     if (runId && !this.pollTimer) this.loadRun(runId, true)
   },
 
-  onHide() { this.stopPolling() },
+  onHide() { this.stopPolling(); this.closeAttachmentMenu() },
   onUnload() { this.stopPolling() },
 
   onPullDownRefresh() {
@@ -154,13 +144,6 @@ Page({
 
   updateInput(event) { this.setData({ input: event.detail.value }) },
   useSuggestion(event) { this.setData({ input: event.currentTarget.dataset.text || '', inputFocus: true }) },
-  startTask(event) {
-    const kind = event.currentTarget.dataset.kind
-    if (kind === 'excel-from-doc') return this.startExcelFromDocument()
-    if (kind === 'excel-modify') return this.startExcelModify()
-    this.setData({ input: event.currentTarget.dataset.prompt || '', inputFocus: true })
-  },
-  focusQuestion() { this.setData({ inputFocus: true }) },
   blurQuestion() { this.setData({ inputFocus: false }) },
 
   // The files page hands over a prompt such as “请修改文件 #7「…」：” through storage,
@@ -172,42 +155,41 @@ Page({
     this.setData({ input: pending, inputFocus: true })
   },
 
-  startExcelFromDocument() {
-    if (!this.data.input) this.setData({ input: '请把这份单据整理成 Excel，表头按单据原样，金额由你验算。' })
-    this.chooseAttachment()
-  },
-
-  startExcelModify() {
-    wx.showActionSheet({ itemList: ['上传要修改的 Excel', '选一个小五生成过的文件'] }).then((result) => {
-      if (result.tapIndex === 1) return this.openMyFiles()
-      if (this.data.uploading || this.data.pendingAttachments.length >= 3) return null
-      return wx.chooseMessageFile({ count: 1, type: 'file', extension: ['xls', 'xlsx', 'csv'] }).then((choice) => {
-        if (!this.data.input) this.setData({ input: '请修改这个 Excel：' })
-        return this.uploadFiles(choice.tempFiles || [])
-      })
-    }).catch(() => {})
-  },
-
   modifyGeneratedFile(event) {
     const file = this.findGeneratedFile(Number(event.currentTarget.dataset.id))
     if (!file) return
     this.setData({ input: `请修改文件 #${file.id}「${file.name}」：`, inputFocus: true }, () => this.scrollToBottom())
   },
+  quickEditGeneratedFile(event) {
+    const id = Number(event.currentTarget.dataset.id)
+    if (id) openPage('/pages/workbook-editor/index', { id })
+  },
 
-  chooseAttachment() {
-    if (this.data.uploading || this.data.pendingAttachments.length >= 3) return
-    wx.showActionSheet({ itemList: ['拍照或选择图片', '选择表格、Word 或 PDF'] }).then((result) => {
-      if (result.tapIndex === 0) {
-        return wx.chooseMedia({ count: 3 - this.data.pendingAttachments.length, mediaType: ['image'], sourceType: ['album', 'camera'] })
-          .then((choice) => this.uploadFiles(choice.tempFiles || []))
-      }
-      return wx.chooseMessageFile({
-        count: 3 - this.data.pendingAttachments.length,
-        type: 'file',
-        extension: ['xls', 'xlsx', 'csv', 'doc', 'docx', 'pdf']
-      })
-        .then((choice) => this.uploadFiles(choice.tempFiles || []))
-    }).catch(() => {})
+  toggleAttachmentMenu() {
+    if (this.data.sending || this.data.resolving || this.data.uploading) return
+    if (this.data.pendingAttachments.length >= 3) return wx.showToast({ title: '一次最多添加 3 个附件', icon: 'none' })
+    this.setData({ attachmentMenuOpen: !this.data.attachmentMenuOpen, inputFocus: false })
+  },
+  closeAttachmentMenu() { this.setData({ attachmentMenuOpen: false }) },
+  chooseCamera() { this.chooseMedia(['camera']) },
+  chooseAlbum() { this.chooseMedia(['album']) },
+  chooseMedia(sourceType) {
+    const count = 3 - this.data.pendingAttachments.length
+    this.closeAttachmentMenu()
+    return wx.chooseMedia({ count, mediaType: ['image'], sourceType })
+      .then((choice) => this.uploadFiles(choice.tempFiles || []))
+      .catch(() => {})
+  },
+  chooseDocument() {
+    const count = 3 - this.data.pendingAttachments.length
+    this.closeAttachmentMenu()
+    return wx.chooseMessageFile({ count, type: 'file', extension: ['xls', 'xlsx', 'csv', 'doc', 'docx', 'pdf'] })
+      .then((choice) => this.uploadFiles(choice.tempFiles || []))
+      .catch(() => {})
+  },
+  chooseGeneratedExcel() {
+    this.closeAttachmentMenu()
+    this.openMyFiles()
   },
 
   uploadFiles(paths) {
@@ -363,7 +345,7 @@ Page({
     }
     const displayContent = content || '请阅读这些附件，先概括主要内容并告诉我可以继续处理什么；不要写入业务数据。'
     this.setData({
-      input: '', sending: true, streaming: true, pendingAttachments: [], connectionInterrupted: false,
+      input: '', sending: true, streaming: true, pendingAttachments: [], attachmentMenuOpen: false, connectionInterrupted: false,
       messages: this.data.messages.concat(
         { role: 'user', content: displayContent, attachments },
         assistantMessage('', 'RUNNING', true)
