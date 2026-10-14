@@ -232,6 +232,143 @@ CREATE TABLE IF NOT EXISTS agent_tool_call (
     KEY idx_agent_tool_call_run_id (run_id)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS file_center_metadata (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    operator_id BIGINT NOT NULL,
+    source_kind VARCHAR(32) NOT NULL,
+    source_id BIGINT NOT NULL,
+    purpose_code VARCHAR(32) NOT NULL DEFAULT 'UNCLASSIFIED',
+    related_type VARCHAR(32) NOT NULL DEFAULT 'NONE',
+    related_id BIGINT,
+    related_name VARCHAR(255),
+    note VARCHAR(1000),
+    manual_upload BOOLEAN NOT NULL DEFAULT FALSE,
+    create_time DATETIME NOT NULL,
+    update_time DATETIME NOT NULL,
+    UNIQUE KEY uk_file_center_source (operator_id, source_kind, source_id),
+    KEY idx_file_center_operator_time (operator_id, update_time)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS file_center_activity (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    metadata_id BIGINT NOT NULL,
+    activity_type VARCHAR(32) NOT NULL,
+    title VARCHAR(100) NOT NULL,
+    detail VARCHAR(500),
+    create_time DATETIME NOT NULL,
+    KEY idx_file_center_activity_time (metadata_id, create_time)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS account_document (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    operator_id BIGINT NOT NULL,
+    direction VARCHAR(20) NOT NULL,
+    counterparty_type VARCHAR(20) NOT NULL,
+    counterparty_id BIGINT NOT NULL,
+    counterparty_name VARCHAR(255) NOT NULL,
+    document_number VARCHAR(100),
+    document_date DATE NOT NULL,
+    due_date DATE,
+    total_amount DECIMAL(14,2) NOT NULL,
+    settled_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+    outstanding_amount DECIMAL(14,2) NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    note VARCHAR(1000),
+    file_source_kind VARCHAR(32),
+    file_source_id BIGINT,
+    business_source_type VARCHAR(32),
+    business_source_id BIGINT,
+    create_time DATETIME NOT NULL,
+    update_time DATETIME NOT NULL,
+    KEY idx_account_document_operator_date (operator_id, document_date),
+    KEY idx_account_document_counterparty (counterparty_type, counterparty_id),
+    KEY idx_account_document_status (operator_id, direction, status),
+    UNIQUE KEY uk_account_document_business_source (operator_id, business_source_type, business_source_id)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS account_payment (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    operator_id BIGINT NOT NULL,
+    direction VARCHAR(20) NOT NULL,
+    counterparty_type VARCHAR(20) NOT NULL,
+    counterparty_id BIGINT NOT NULL,
+    counterparty_name VARCHAR(255) NOT NULL,
+    payment_date DATE NOT NULL,
+    amount DECIMAL(14,2) NOT NULL,
+    unallocated_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+    payment_method VARCHAR(50),
+    note VARCHAR(500),
+    create_time DATETIME NOT NULL,
+    KEY idx_account_payment_operator_date (operator_id, payment_date),
+    KEY idx_account_payment_counterparty (counterparty_type, counterparty_id)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- 兼容已经存在的账款表，补充订单来源和未分配金额。
+SET @add_account_document_source_type = (
+    SELECT IF(COUNT(*) = 0,
+              'ALTER TABLE account_document ADD COLUMN business_source_type VARCHAR(32) NULL AFTER file_source_id',
+              'SELECT 1')
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'account_document' AND column_name = 'business_source_type'
+);
+PREPARE add_account_document_source_type_stmt FROM @add_account_document_source_type;
+EXECUTE add_account_document_source_type_stmt;
+DEALLOCATE PREPARE add_account_document_source_type_stmt;
+
+SET @add_account_document_due_date = (
+    SELECT IF(COUNT(*) = 0,
+              'ALTER TABLE account_document ADD COLUMN due_date DATE NULL AFTER document_date',
+              'SELECT 1')
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'account_document' AND column_name = 'due_date'
+);
+PREPARE add_account_document_due_date_stmt FROM @add_account_document_due_date;
+EXECUTE add_account_document_due_date_stmt;
+DEALLOCATE PREPARE add_account_document_due_date_stmt;
+
+SET @add_account_document_source_id = (
+    SELECT IF(COUNT(*) = 0,
+              'ALTER TABLE account_document ADD COLUMN business_source_id BIGINT NULL AFTER business_source_type',
+              'SELECT 1')
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'account_document' AND column_name = 'business_source_id'
+);
+PREPARE add_account_document_source_id_stmt FROM @add_account_document_source_id;
+EXECUTE add_account_document_source_id_stmt;
+DEALLOCATE PREPARE add_account_document_source_id_stmt;
+
+SET @add_account_document_source_index = (
+    SELECT IF(COUNT(*) = 0,
+              'ALTER TABLE account_document ADD UNIQUE KEY uk_account_document_business_source (operator_id, business_source_type, business_source_id)',
+              'SELECT 1')
+    FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'account_document' AND index_name = 'uk_account_document_business_source'
+);
+PREPARE add_account_document_source_index_stmt FROM @add_account_document_source_index;
+EXECUTE add_account_document_source_index_stmt;
+DEALLOCATE PREPARE add_account_document_source_index_stmt;
+
+SET @add_account_payment_unallocated = (
+    SELECT IF(COUNT(*) = 0,
+              'ALTER TABLE account_payment ADD COLUMN unallocated_amount DECIMAL(14,2) NOT NULL DEFAULT 0 AFTER amount',
+              'SELECT 1')
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'account_payment' AND column_name = 'unallocated_amount'
+);
+PREPARE add_account_payment_unallocated_stmt FROM @add_account_payment_unallocated;
+EXECUTE add_account_payment_unallocated_stmt;
+DEALLOCATE PREPARE add_account_payment_unallocated_stmt;
+
+CREATE TABLE IF NOT EXISTS payment_allocation (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    payment_id BIGINT NOT NULL,
+    document_id BIGINT NOT NULL,
+    amount DECIMAL(14,2) NOT NULL,
+    create_time DATETIME NOT NULL,
+    KEY idx_payment_allocation_document (document_id, create_time),
+    KEY idx_payment_allocation_payment (payment_id)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 -- 兼容旧库的 MySQL utf8（最多 3 字节）。Agent 输入、输出与工具结果可能包含 Emoji，必须升级为 utf8mb4。
 SET @convert_agent_conversation_utf8mb4 = (
     SELECT IF(COUNT(*) > 0,

@@ -1,0 +1,15 @@
+<view class="screen form-screen">
+  <view class="intro"><view class="title">记一笔往来账</view><view class="desc">只填对象和金额也可以，其他资料以后再补。</view></view>
+  <view class="review-tip" wx:if="{{fileSourceId}}">已从文件带入可识别资料，请核对后保存。<text wx:if="{{reviewFields}}">需要重点确认：{{reviewFields}}</text></view>
+  <view class="direction"><view class="choice {{direction === 'RECEIVABLE' ? 'active receive' : ''}}" data-value="RECEIVABLE" bindtap="selectDirection">客户欠我（应收）</view><view class="choice {{direction === 'PAYABLE' ? 'active pay' : ''}}" data-value="PAYABLE" bindtap="selectDirection">我欠厂商（应付）</view></view>
+  <view class="form-card">
+    <view class="field"><view class="label">{{direction === 'RECEIVABLE' ? '客户' : '厂商'}} *</view><picker mode="selector" range="{{parties}}" range-key="name" value="{{partyIndex < 0 ? 0 : partyIndex}}" bindchange="party"><view class="picker {{partyIndex < 0 ? 'placeholder' : ''}}">{{partyIndex < 0 ? '请选择' : parties[partyIndex].name}}<text>›</text></view></picker></view>
+    <view class="field"><view class="label">单据日期</view><picker mode="date" value="{{date}}" bindchange="date"><view class="picker">{{date}}<text>›</text></view></picker></view>
+    <view class="field"><view class="switch-row"><view><view class="label">设置到期日</view><view class="field-help">用于逾期提醒，可不设置</view></view><switch color="#245E9B" checked="{{useDueDate}}" bindchange="toggleDueDate" /></view><picker wx:if="{{useDueDate}}" mode="date" value="{{dueDate}}" start="{{date}}" bindchange="dueDate"><view class="picker due-picker">{{dueDate}}<text>›</text></view></picker></view>
+    <view class="field"><view class="label">单据金额 *</view><input type="digit" aria-label="单据金额" placeholder="0.00" value="{{total}}" data-field="total" bindinput="input" /></view>
+    <view class="field"><view class="label">已经收付</view><input type="digit" aria-label="已经收付金额" placeholder="0.00，可不填" value="{{settled}}" data-field="settled" bindinput="input" /></view>
+    <view class="field"><view class="label">单号</view><input aria-label="单据编号" placeholder="送货单号或自定义编号" value="{{number}}" data-field="number" bindinput="input" /></view>
+    <view class="field"><view class="label">备注</view><textarea maxlength="500" aria-label="账款备注" placeholder="例如：货款月底结算" value="{{note}}" data-field="note" bindinput="input" /></view>
+  </view>
+  <view class="space"></view><view class="fixed-action"><button class="fixed-primary" disabled="{{saving || loading}}" bindtap="save">{{saving ? '正在保存…' : '建立往来账'}}</button></view>
+</view>

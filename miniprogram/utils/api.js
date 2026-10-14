@@ -580,6 +580,36 @@ module.exports = {
   getFileCenter(params = {}) {
     return request('/file-center', { query: params })
   },
+  getFileCenterDetail(kind, id) {
+    return request(`/file-center/${String(kind || '').toLowerCase()}/${id}`)
+  },
+  organizeFile(kind, id, data) {
+    return request(`/file-center/${String(kind || '').toLowerCase()}/${id}`, { method: 'PUT', data })
+  },
+  getFinanceOverview(params = {}) {
+    return request('/finance', { query: params })
+  },
+  createAccountDocument(data) {
+    return request('/finance/documents', { method: 'POST', data })
+  },
+  getAccountDocument(id) {
+    return request(`/finance/documents/${id}`)
+  },
+  recordAccountPayment(id, data) {
+    return request(`/finance/documents/${id}/payments`, { method: 'POST', data })
+  },
+  recordCounterpartyPayment(data) {
+    return request('/finance/payments', { method: 'POST', data })
+  },
+  getAccountSyncPreview() {
+    return request('/finance/sync-preview')
+  },
+  syncOrderAccounts() {
+    return request('/finance/sync-orders', { method: 'POST' })
+  },
+  exportFinanceStatement(data) {
+    return request('/finance/statements', { method: 'POST', data })
+  },
   getAgentRunOutputs(runId) {
     return agentRequest(`/agent/runs/${runId}/outputs`)
   },

@@ -16,7 +16,13 @@
     "pages/contacts/index",
     "pages/agent/index",
     "pages/agent-files/index",
+    "pages/file-detail/index",
     "pages/finance/index",
+    "pages/finance-ledger/index",
+    "pages/account-form/index",
+    "pages/account-detail/index",
+    "pages/payment-form/index",
+    "pages/statement-export/index",
     "pages/products/index",
     "pages/product-detail/index",
     "pages/product-form/index",
@@ -74,7 +80,7 @@
         "selectedIconPath": "assets/tabbar/files-active.png"
       },
       {
-        "pagePath": "pages/finance/index",
+        "pagePath": "pages/finance-ledger/index",
         "text": "财务",
         "iconPath": "assets/tabbar/home.png",
         "selectedIconPath": "assets/tabbar/home-active.png"

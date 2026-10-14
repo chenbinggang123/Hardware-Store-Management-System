@@ -17,5 +17,10 @@ public record FileCenterItem(
         LocalDateTime createTime,
         LocalDateTime updateTime,
         String errorMessage,
-        boolean downloadable) {
+        boolean downloadable,
+        String relatedType,
+        Long relatedId,
+        String relatedName,
+        boolean organized,
+        boolean manualUpload) {
 }

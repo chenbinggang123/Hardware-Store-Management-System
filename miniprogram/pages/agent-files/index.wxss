@@ -1,5 +1,8 @@
 .files-screen { padding-top: 20rpx; }
 .files-head { display: flex; align-items: center; justify-content: space-between; gap: 22rpx; padding: 10rpx 0 24rpx; }
+.files-head-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 10rpx; flex: 0 0 auto; }
+.add-file { min-width: 132rpx; min-height: 64rpx; padding: 0 18rpx; display: flex; align-items: center; justify-content: center; border-radius: 12rpx; color: #FFF; background: #245E9B; font-size: 22rpx; font-weight: 750; box-sizing: border-box; }
+.add-file.disabled { opacity: .55; }
 .files-title { color: #17231E; font-size: 46rpx; line-height: 1.2; font-weight: 750; }
 .files-subtitle { margin-top: 8rpx; color: #66746E; font-size: 23rpx; line-height: 1.5; }
 .files-count { flex: 0 0 auto; color: #245E9B; font-size: 23rpx; font-weight: 700; }
@@ -22,6 +25,7 @@
 .files-main { flex: 1; min-width: 0; }
 .files-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #17231E; font-size: 27rpx; font-weight: 700; }
 .files-meta { margin-top: 6rpx; color: #6F7D76; font-size: 22rpx; line-height: 1.45; }
+.files-relation { margin-top: 5rpx; color: #245E9B; font-size: 21rpx; line-height: 1.4; }
 .files-foot { margin-top: 10rpx; display: flex; align-items: center; gap: 12rpx; color: #8A958F; font-size: 20rpx; }
 .files-status { padding: 3rpx 10rpx; border-radius: 8rpx; font-size: 19rpx; font-weight: 700; }
 .files-status.success { color: #216846; background: #E2F2E9; }

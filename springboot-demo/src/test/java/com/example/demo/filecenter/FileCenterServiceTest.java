@@ -8,14 +8,24 @@ import com.example.demo.excel.entity.ExcelTaskOutput;
 import com.example.demo.excel.repository.ExcelTaskOutputRepository;
 import com.example.demo.excel.repository.ExcelTaskRepository;
 import com.example.demo.filecenter.dto.FileCenterView;
+import com.example.demo.filecenter.dto.FileCenterDetail;
+import com.example.demo.filecenter.dto.FileCenterUpdateRequest;
+import com.example.demo.filecenter.entity.FileCenterActivity;
+import com.example.demo.filecenter.entity.FileCenterMetadata;
+import com.example.demo.filecenter.repository.FileCenterActivityRepository;
+import com.example.demo.filecenter.repository.FileCenterMetadataRepository;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
 
 class FileCenterServiceTest {
     @Test
@@ -23,6 +33,8 @@ class FileCenterServiceTest {
         AgentAttachmentRepository attachmentRepository = mock(AgentAttachmentRepository.class);
         ExcelTaskRepository taskRepository = mock(ExcelTaskRepository.class);
         ExcelTaskOutputRepository outputRepository = mock(ExcelTaskOutputRepository.class);
+        FileCenterMetadataRepository metadataRepository = mock(FileCenterMetadataRepository.class);
+        FileCenterActivityRepository activityRepository = mock(FileCenterActivityRepository.class);
         LocalDateTime now = LocalDateTime.of(2026, 10, 13, 10, 0);
 
         AgentAttachment attachment = new AgentAttachment();
@@ -55,8 +67,10 @@ class FileCenterServiceTest {
         when(taskRepository.findByOperatorIdOrderByUpdateTimeDesc(9L)).thenReturn(List.of(task));
         when(outputRepository.findByOperatorIdAndSourceTypeOrderByCreateTimeDesc(9L,
                 AgentOutputService.AGENT_SOURCE_TYPE)).thenReturn(List.of(output));
+        when(metadataRepository.findByOperatorId(9L)).thenReturn(List.of());
 
-        FileCenterService service = new FileCenterService(attachmentRepository, taskRepository, outputRepository);
+        FileCenterService service = new FileCenterService(attachmentRepository, taskRepository, outputRepository,
+                metadataRepository, activityRepository);
         FileCenterView all = service.list(9L, null, null);
         assertThat(all.total()).isEqualTo(3);
         assertThat(all.pending()).isEqualTo(1);
@@ -68,6 +82,65 @@ class FileCenterServiceTest {
         assertThat(filtered.items()).singleElement().satisfies(item -> {
             assertThat(item.kind()).isEqualTo("TASK");
             assertThat(item.purpose()).isEqualTo("供应商价格表");
+            assertThat(item.organized()).isFalse();
         });
+    }
+
+    @Test
+    void organizesManualFileAndBuildsTimeline() {
+        AgentAttachmentRepository attachmentRepository = mock(AgentAttachmentRepository.class);
+        ExcelTaskRepository taskRepository = mock(ExcelTaskRepository.class);
+        ExcelTaskOutputRepository outputRepository = mock(ExcelTaskOutputRepository.class);
+        FileCenterMetadataRepository metadataRepository = mock(FileCenterMetadataRepository.class);
+        FileCenterActivityRepository activityRepository = mock(FileCenterActivityRepository.class);
+        AgentAttachment attachment = new AgentAttachment();
+        attachment.setId(7L);
+        attachment.setOperatorId(9L);
+        attachment.setOriginalName("客户送货单.jpg");
+        attachment.setMimeType("image/jpeg");
+        attachment.setParseStatus("PARSED");
+        attachment.setExtractedText("送货单 单号：SH-20261014 日期 2026年10月14日 合计：￥1,280.50 已收：500");
+        attachment.setConversationId(10L);
+        attachment.setCreateTime(LocalDateTime.of(2026, 10, 14, 9, 0));
+        attachment.setUpdateTime(attachment.getCreateTime());
+        when(attachmentRepository.findByIdAndOperatorId(7L, 9L)).thenReturn(Optional.of(attachment));
+
+        AtomicReference<FileCenterMetadata> stored = new AtomicReference<>();
+        List<FileCenterActivity> activities = new ArrayList<>();
+        when(metadataRepository.findByOperatorIdAndSourceKindAndSourceId(9L, "ATTACHMENT", 7L))
+                .thenAnswer(ignored -> Optional.ofNullable(stored.get()));
+        when(metadataRepository.save(any(FileCenterMetadata.class))).thenAnswer(invocation -> {
+            FileCenterMetadata metadata = invocation.getArgument(0);
+            metadata.setId(3L);
+            stored.set(metadata);
+            return metadata;
+        });
+        when(activityRepository.save(any(FileCenterActivity.class))).thenAnswer(invocation -> {
+            FileCenterActivity activity = invocation.getArgument(0);
+            activities.add(activity);
+            return activity;
+        });
+        when(activityRepository.findByMetadataIdOrderByCreateTimeDesc(3L)).thenAnswer(ignored -> activities);
+
+        FileCenterService service = new FileCenterService(attachmentRepository, taskRepository, outputRepository,
+                metadataRepository, activityRepository);
+        FileCenterUpdateRequest request = new FileCenterUpdateRequest();
+        request.setPurposeCode("CUSTOMER_RECEIPT");
+        request.setRelatedType("CUSTOMER");
+        request.setRelatedId(18L);
+        request.setRelatedName("张师傅");
+        request.setNote("尚欠 300 元");
+        request.setManualUpload(true);
+
+        FileCenterDetail detail = service.update(9L, "attachment", 7L, request);
+        assertThat(detail.organized()).isTrue();
+        assertThat(detail.manualUpload()).isTrue();
+        assertThat(detail.item().purpose()).isEqualTo("客户单据");
+        assertThat(detail.item().relatedName()).isEqualTo("张师傅");
+        assertThat(detail.accountDraft().documentNumber()).isEqualTo("SH-20261014");
+        assertThat(detail.accountDraft().totalAmount()).isEqualByComparingTo("1280.50");
+        assertThat(detail.accountDraft().settledAmount()).isEqualByComparingTo("500");
+        assertThat(detail.accountDraft().reviewFields()).isEmpty();
+        assertThat(detail.activities()).extracting(item -> item.type()).contains("UPLOADED", "CREATED");
     }
 }

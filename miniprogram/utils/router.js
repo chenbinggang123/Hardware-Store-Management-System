@@ -1,7 +1,7 @@
 const TAB_PAGES = new Set([
   '/pages/agent/index',
   '/pages/agent-files/index',
-  '/pages/finance/index',
+  '/pages/finance-ledger/index',
   '/pages/products/index',
   '/pages/settings/index'
 ])

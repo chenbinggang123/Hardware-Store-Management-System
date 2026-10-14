@@ -1,6 +1,7 @@
 package com.example.demo.service.impl;
 
 import com.example.demo.dto.PaymentRequest;
+import com.example.demo.finance.OrderAccountSyncService;
 import com.example.demo.entity.Customer;
 import com.example.demo.entity.Inventory;
 import com.example.demo.entity.InventoryLog;
@@ -16,6 +17,7 @@ import com.example.demo.repository.ProductRepository;
 import com.example.demo.repository.SalesOrderRepository;
 import com.example.demo.service.SalesOrderService;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -42,6 +44,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     private final CustomerRepository customerRepository;
     private final InventoryLogRepository inventoryLogRepository;
     private final OperationLogRepository operationLogRepository;
+    private final OrderAccountSyncService accountSyncService;
 
     public SalesOrderServiceImpl(
             SalesOrderRepository salesOrderRepository,
@@ -50,12 +53,26 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             CustomerRepository customerRepository,
             InventoryLogRepository inventoryLogRepository,
             OperationLogRepository operationLogRepository) {
+        this(salesOrderRepository, productRepository, inventoryRepository, customerRepository,
+                inventoryLogRepository, operationLogRepository, null);
+    }
+
+    @Autowired
+    public SalesOrderServiceImpl(
+            SalesOrderRepository salesOrderRepository,
+            ProductRepository productRepository,
+            InventoryRepository inventoryRepository,
+            CustomerRepository customerRepository,
+            InventoryLogRepository inventoryLogRepository,
+            OperationLogRepository operationLogRepository,
+            OrderAccountSyncService accountSyncService) {
         this.salesOrderRepository = salesOrderRepository;
         this.productRepository = productRepository;
         this.inventoryRepository = inventoryRepository;
         this.customerRepository = customerRepository;
         this.inventoryLogRepository = inventoryLogRepository;
         this.operationLogRepository = operationLogRepository;
+        this.accountSyncService = accountSyncService;
     }
 
     @Override
@@ -64,6 +81,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         SalesOrder saved = salesOrderRepository.save(salesOrder);
         recalculateCustomerDebt(saved.getCustomerId());
         saveOperationLog("SALES", "CREATE", "新建销售单：" + saved.getOrderNumber(), saved.getOperatorId());
+        syncAccount(saved);
         return saved;
     }
 
@@ -87,6 +105,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             recalculateCustomerDebt(previousCustomerId);
         }
         saveOperationLog("SALES", "UPDATE", "更新销售单：" + saved.getOrderNumber(), saved.getOperatorId());
+        syncAccount(saved);
         return saved;
     }
 
@@ -192,7 +211,12 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         recalculateCustomerDebt(saved.getCustomerId());
         saveOperationLog("SALES", "PAYMENT",
                 "销售单收款：" + saved.getOrderNumber() + "，方式：" + paymentRequest.getPaymentMethod(), saved.getOperatorId());
+        syncAccount(saved);
         return saved;
+    }
+
+    private void syncAccount(SalesOrder order) {
+        if (accountSyncService != null) accountSyncService.syncSalesOrder(order);
     }
 
     private void normalizeSalesOrder(SalesOrder salesOrder, boolean keepOrderNumber) {

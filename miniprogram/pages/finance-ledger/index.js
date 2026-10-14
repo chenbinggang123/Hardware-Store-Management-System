@@ -1,0 +1,21 @@
+const api = require('../../utils/api')
+const { openPage, showToast } = require('../../utils/router')
+const month = () => new Date().toISOString().slice(0, 7)
+const money = value => Number(value || 0).toFixed(2)
+const view = item => { const today = new Date().toISOString().slice(0, 10); const age = Math.max(0, Math.floor((Date.now() - new Date(`${item.documentDate}T00:00:00`).getTime()) / 86400000)); const overdue = item.status !== 'SETTLED' && item.dueDate && item.dueDate < today; return { ...item, mark: item.direction === 'RECEIVABLE' ? '收' : '付', directionText: item.direction === 'RECEIVABLE' ? '应收' : '应付', totalText: money(item.totalAmount), settledText: money(item.settledAmount), outstandingText: money(item.outstandingAmount), statusText: overdue ? '已逾期' : ({ UNPAID: '未收付', PARTIAL: '部分收付', SETTLED: '已结清' })[item.status], numberText: item.documentNumber || '无单号', agingText: item.status === 'SETTLED' ? '已结清' : `账龄 ${age} 天`, overdue } }
+Page({
+  data: { month: month(), direction: '', status: 'OPEN', keyword: '', documents: [], aging: [], summary: { receivable: '0.00', payable: '0.00', occurred: '0.00', settled: '0.00', overdue: '0.00', overdueCount: 0, count: 0 }, loading: true, syncing: false, loadError: '' },
+  onShow() { this.load() },
+  onPullDownRefresh() { this.load(true) },
+  load(stop) { const params = { month: this.data.month, status: this.data.status, keyword: this.data.keyword.trim(), ...(this.data.direction ? { direction: this.data.direction } : {}) }; this.setData({ loading: true, loadError: '' }); return api.getFinanceOverview(params).then(result => this.setData({ documents: (result.documents || []).map(view), aging: (result.agingBuckets || []).map(item => ({ ...item, amountText: money(item.amount) })), summary: { receivable: money(result.receivableOutstanding), payable: money(result.payableOutstanding), occurred: money(result.monthOccurred), settled: money(result.monthSettled), overdue: money(result.overdueAmount), overdueCount: result.overdueDocumentCount || 0, count: result.openDocumentCount || 0 } })).catch(error => this.setData({ documents: [], loadError: (error && (error.message || error.errMsg)) || '往来账加载失败' })).finally(() => { this.setData({ loading: false }); if (stop) wx.stopPullDownRefresh() }) },
+  selectDirection(e) { this.setData({ direction: e.currentTarget.dataset.value }, () => this.load()) },
+  selectStatus(e) { this.setData({ status: e.currentTarget.dataset.value }, () => this.load()) },
+  inputKeyword(e) { this.setData({ keyword: e.detail.value }) }, search() { this.load() },
+  changeMonth(e) { this.setData({ month: e.detail.value }, () => this.load()) }, retry() { this.load() },
+  add() { wx.showActionSheet({ itemList: ['记客户欠款（应收）', '记欠厂商款（应付）'] }).then(result => openPage('/pages/account-form/index', { direction: result.tapIndex ? 'PAYABLE' : 'RECEIVABLE' })).catch(error => { if (!String((error && error.errMsg) || '').includes('cancel')) showToast('暂时无法打开') }) },
+  addPayment() { wx.showActionSheet({ itemList: ['收到客户货款', '付给厂商货款'] }).then(result => openPage('/pages/payment-form/index', { direction: result.tapIndex ? 'PAYABLE' : 'RECEIVABLE' })).catch(error => { if (!String((error && error.errMsg) || '').includes('cancel')) showToast('暂时无法打开') }) },
+  exportStatement() { openPage('/pages/statement-export/index') },
+  syncOrders() { if (this.data.syncing) return; this.setData({ syncing: true }); api.getAccountSyncPreview().then(preview => { const sales = Number(preview.salesOrderCount || 0); const purchases = Number(preview.purchaseOrderCount || 0); const synced = Number(preview.alreadySyncedCount || 0); return wx.showModal({ title: '同步订单到往来账', content: `共找到 ${sales} 张销售单、${purchases} 张采购单，其中 ${synced} 张已同步。\n\n已同步单据只更新，不会重复入账。`, confirmText: '开始同步' }).then(result => result.confirm ? api.syncOrderAccounts() : Promise.reject({ cancelled: true })) }).then(() => { showToast('订单账款已同步', 'success'); return this.load() }).catch(error => { if (!error.cancelled) showToast((error && (error.message || error.errMsg)) || '同步失败') }).finally(() => this.setData({ syncing: false })) },
+  open(e) { openPage('/pages/account-detail/index', { id: e.currentTarget.dataset.id }) },
+  openAgent() { openPage('/pages/agent/index') }
+})

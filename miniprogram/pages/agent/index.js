@@ -463,7 +463,7 @@ Page({
     const id = event.currentTarget.dataset.id
     if (id) openPage('/pages/product-detail/index', { id })
   },
-  openWorkbench() { openPage('/pages/finance/index') },
+  openWorkbench() { openPage('/pages/finance-ledger/index') },
   openMyFiles() {
     this.setData({ historyOpen: false })
     openPage('/pages/agent-files/index')

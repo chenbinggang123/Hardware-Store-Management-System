@@ -1,6 +1,7 @@
 package com.example.demo.service.impl;
 
 import com.example.demo.entity.Inventory;
+import com.example.demo.finance.OrderAccountSyncService;
 import com.example.demo.entity.InventoryLog;
 import com.example.demo.entity.OperationLog;
 import com.example.demo.entity.Product;
@@ -41,6 +42,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     private final InventoryLogRepository inventoryLogRepository;
     private final OperationLogRepository operationLogRepository;
     private final ProductPriceHistoryService priceHistoryService;
+    private final OrderAccountSyncService accountSyncService;
 
     public PurchaseOrderServiceImpl(
             PurchaseOrderRepository purchaseOrderRepository,
@@ -49,7 +51,18 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             InventoryLogRepository inventoryLogRepository,
             OperationLogRepository operationLogRepository) {
         this(purchaseOrderRepository, productRepository, inventoryRepository,
-                inventoryLogRepository, operationLogRepository, null);
+                inventoryLogRepository, operationLogRepository, null, null);
+    }
+
+    public PurchaseOrderServiceImpl(
+            PurchaseOrderRepository purchaseOrderRepository,
+            ProductRepository productRepository,
+            InventoryRepository inventoryRepository,
+            InventoryLogRepository inventoryLogRepository,
+            OperationLogRepository operationLogRepository,
+            ProductPriceHistoryService priceHistoryService) {
+        this(purchaseOrderRepository, productRepository, inventoryRepository, inventoryLogRepository,
+                operationLogRepository, priceHistoryService, null);
     }
 
     @Autowired
@@ -59,13 +72,15 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             InventoryRepository inventoryRepository,
             InventoryLogRepository inventoryLogRepository,
             OperationLogRepository operationLogRepository,
-            ProductPriceHistoryService priceHistoryService) {
+            ProductPriceHistoryService priceHistoryService,
+            OrderAccountSyncService accountSyncService) {
         this.purchaseOrderRepository = purchaseOrderRepository;
         this.productRepository = productRepository;
         this.inventoryRepository = inventoryRepository;
         this.inventoryLogRepository = inventoryLogRepository;
         this.operationLogRepository = operationLogRepository;
         this.priceHistoryService = priceHistoryService;
+        this.accountSyncService = accountSyncService;
     }
 
     @Override
@@ -73,6 +88,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         normalizePurchaseOrder(purchaseOrder, false);
         PurchaseOrder saved = purchaseOrderRepository.save(purchaseOrder);
         saveOperationLog("PURCHASE", "CREATE", "新建采购单：" + saved.getOrderNumber(), saved.getOperatorId());
+        syncAccount(saved);
         return saved;
     }
 
@@ -91,7 +107,12 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         normalizePurchaseOrder(existingOrder, true);
         PurchaseOrder saved = purchaseOrderRepository.save(existingOrder);
         saveOperationLog("PURCHASE", "UPDATE", "更新采购单：" + saved.getOrderNumber(), saved.getOperatorId());
+        syncAccount(saved);
         return saved;
+    }
+
+    private void syncAccount(PurchaseOrder order) {
+        if (accountSyncService != null) accountSyncService.syncPurchaseOrder(order);
     }
 
     @Override

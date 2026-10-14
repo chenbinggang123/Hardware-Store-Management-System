@@ -1,0 +1,22 @@
+<view class="screen detail-screen">
+  <view class="loading-state" wx:if="{{loading}}">正在读取文件资料…</view>
+  <view class="error-state" wx:elif="{{loadError}}"><view class="error-title">没有加载成功</view><view>{{loadError}}</view><button class="btn btn-secondary" bindtap="retryLoad">重新加载</button></view>
+
+  <block wx:elif="{{item}}">
+    <view class="file-summary"><view class="summary-mark">{{item.kind === 'OUTPUT' ? '成' : (item.kind === 'TASK' ? '理' : '原')}}</view><view class="summary-main"><view class="summary-name">{{item.name}}</view><view class="summary-meta">{{item.purpose}} · {{item.state === 'COMPLETED' ? '已完成' : (item.state === 'FAILED' ? '失败' : '待处理')}}</view></view></view>
+
+    <view class="form-section">
+      <view class="section-title">归档资料</view>
+      <view class="field"><view class="field-label">文件用途</view><picker mode="selector" range="{{purposes}}" range-key="label" value="{{purposeIndex}}" bindchange="onPurposeChange"><view class="picker-value">{{purposes[purposeIndex].label}}<text>›</text></view></picker></view>
+      <view class="field"><view class="field-label">关联对象</view><picker mode="selector" range="{{relatedTypes}}" range-key="label" value="{{relatedTypeIndex}}" bindchange="onRelatedTypeChange"><view class="picker-value">{{relatedTypes[relatedTypeIndex].label}}<text>›</text></view></picker></view>
+      <view class="field" wx:if="{{relatedTypes[relatedTypeIndex].code !== 'NONE'}}"><view class="field-label">选择{{relatedTypes[relatedTypeIndex].label}}</view><picker mode="selector" range="{{parties}}" range-key="name" value="{{partyIndex < 0 ? 0 : partyIndex}}" bindchange="onPartyChange"><view class="picker-value {{partyIndex < 0 ? 'placeholder' : ''}}">{{partyIndex < 0 ? '请选择' : parties[partyIndex].name}}<text>›</text></view></picker><view class="field-hint" wx:if="{{!parties.length}}">还没有可关联的{{relatedTypes[relatedTypeIndex].label}}，请先在联系人中新增。</view></view>
+      <view class="field"><view class="field-label">备注</view><textarea class="note-input" maxlength="500" aria-label="文件备注" placeholder="例如：10 月送货单，款项还未结清" value="{{note}}" bindinput="onNoteInput" /></view>
+      <view class="draft-hint" wx:if="{{canCreateAccount && accountDraft}}">已从文件识别账款资料，生成前仍需核对{{accountDraft.reviewText ? '：' + accountDraft.reviewText : '全部字段'}}。</view>
+      <view class="account-link" wx:if="{{canCreateAccount}}" role="button" aria-label="从文件生成{{accountDirectionText}}账款" bindtap="createAccount">{{accountDraft ? '核对并生成' : '从这份文件生成'}}{{accountDirectionText}}账款 ›</view>
+    </view>
+
+    <view class="timeline-section"><view class="section-title">活动记录</view><view class="timeline-row" wx:for="{{activities}}" wx:key="createTime"><view class="timeline-dot"></view><view class="timeline-main"><view class="timeline-title">{{item.title}}</view><view class="timeline-detail" wx:if="{{item.detail}}">{{item.detail}}</view><view class="timeline-time">{{item.timeText}}</view></view></view></view>
+    <view class="detail-spacer"></view>
+    <view class="fixed-action"><button class="fixed-primary {{saving ? 'disabled' : ''}}" disabled="{{saving}}" bindtap="save">{{saving ? '正在保存…' : '保存文件资料'}}</button></view>
+  </block>
+</view>
