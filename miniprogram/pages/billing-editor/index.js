@@ -25,15 +25,36 @@ function money(value) {
   return Number.isFinite(number) ? number.toFixed(2) : '0.00'
 }
 
+function validUnit(value) {
+  const unit = String(value || '').trim()
+  return Boolean(unit) && !/^(?:1|￥|¥|元|[.·,，、-])$/.test(unit)
+}
+
+function sourceAmountNumber(value) {
+  const matches = String(value || '').replace(/,/g, '').match(/-?\d+(?:\.\d+)?/g)
+  if (!matches || !matches.length) return null
+  const number = Number(matches[matches.length - 1])
+  return Number.isFinite(number) ? number : null
+}
+
 function lineView(line, index) {
   const quantity = line.quantity === null || line.quantity === undefined ? '' : String(line.quantity)
   const price = line.price === null || line.price === undefined ? '' : String(line.price)
   const q = decimal(quantity)
   const p = decimal(price)
+  const sourceAmount = sourceAmountNumber(line.sourceAmount)
+  const calculated = q === null || p === null ? null : q * p
+  const amountMismatch = sourceAmount !== null && calculated !== null && Math.abs(sourceAmount - calculated) > 0.009
+  const caution = `${line.referenceCaution || ''} ${line.remark || ''}`
   return {
     ...blankLine(), ...line, quantity, price, index: index + 1,
-    amountText: q === null || p === null ? '—' : money(q * p),
-    unitChoices: (line.unitCandidates || []).slice(0, 4)
+    amountText: calculated === null ? '—' : money(calculated),
+    unitChoices: (line.unitCandidates || []).slice(0, 4),
+    nameUncertain: !String(line.name || '').trim() || /名称.*(?:疑|截断|待确认)/.test(caution),
+    unitUncertain: !validUnit(line.unit) || /单位.*(?:未识别|待确认|疑)/.test(caution),
+    quantityUncertain: q === null || q <= 0,
+    priceUncertain: p === null || p < 0 || amountMismatch,
+    amountMismatch
   }
 }
 
@@ -64,7 +85,8 @@ Page({
   data: {
     loading: true, error: '', busy: false, mode: 'preview', dirty: false,
     documentId: null, document: null, form: formView(), lines: [lineView(blankLine(), 0)],
-    totalText: '0.00', incompleteCount: 1, searchKeyword: '', candidates: [], searching: false,
+    totalText: '0.00', incompleteCount: 1, reviewCount: 4, searchKeyword: '', candidates: [], searching: false,
+    candidateTitle: '最近常用', activeLineIndex: null, evidenceOpen: false,
     statusText: '', generatedFile: null
   },
 
@@ -72,7 +94,10 @@ Page({
     const id = Number(options.id)
     if (id) this.loadDocument(id)
     else this.setData({ loading: false, mode: 'edit' }, () => this.recalculate())
+    this.searchProducts('')
   },
+
+  onUnload() { clearTimeout(this.searchTimer) },
 
   loadDocument(id) {
     this.setData({ loading: true, error: '' })
@@ -104,6 +129,7 @@ Page({
       return wx.showToast({ title: '已保存单据不能直接修改', icon: 'none' })
     }
     this.setData({ mode })
+    if (mode === 'edit' && !this.data.searchKeyword) this.searchProducts('')
   },
 
   changeForm(event) {
@@ -119,14 +145,49 @@ Page({
     const index = Number(event.currentTarget.dataset.index)
     const field = event.currentTarget.dataset.field
     const lines = this.data.lines.slice()
-    lines[index] = { ...lines[index], [field]: event.detail.value }
+    const learnIdentity = ['name', 'specification', 'unit'].includes(field) && String(event.detail.value || '').trim()
+    lines[index] = { ...lines[index], [field]: event.detail.value, remember: learnIdentity ? true : lines[index].remember }
     this.setData({ lines, dirty: true, statusText: '有修改尚未保存' }, () => this.recalculate())
+    if (field === 'name') {
+      this.setData({ activeLineIndex: index, searchKeyword: event.detail.value || '' })
+      clearTimeout(this.searchTimer)
+      this.searchTimer = setTimeout(() => this.searchProducts(), 220)
+    }
+  },
+
+  focusLineName(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    const keyword = (this.data.lines[index] && this.data.lines[index].name) || ''
+    this.setData({ activeLineIndex: index, searchKeyword: keyword }, () => this.searchProducts())
+  },
+
+  focusGlobalSearch() {
+    this.setData({ activeLineIndex: null }, () => this.searchProducts())
+  },
+
+  focusLineField(index, field) {
+    const lines = this.data.lines.map((line, lineIndex) => ({
+      ...line,
+      nameFocus: lineIndex === index && field === 'name',
+      quantityFocus: lineIndex === index && field === 'quantity',
+      priceFocus: lineIndex === index && field === 'price'
+    }))
+    this.setData({ lines })
+  },
+
+  confirmLineField(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    const field = event.currentTarget.dataset.field
+    if (field === 'quantity') return this.focusLineField(index, 'price')
+    if (field !== 'price') return
+    if (index < this.data.lines.length - 1) return this.focusLineField(index + 1, 'name')
+    this.addLine()
   },
 
   chooseUnit(event) {
     const index = Number(event.currentTarget.dataset.index)
     const lines = this.data.lines.slice()
-    lines[index] = { ...lines[index], unit: event.currentTarget.dataset.unit }
+    lines[index] = { ...lines[index], unit: event.currentTarget.dataset.unit, remember: true }
     this.setData({ lines, dirty: true, statusText: '有修改尚未保存' }, () => this.recalculate())
   },
 
@@ -138,7 +199,24 @@ Page({
   },
 
   addLine() {
-    this.setData({ lines: this.data.lines.concat(lineView(blankLine(), this.data.lines.length)), dirty: true }, () => this.recalculate())
+    const index = this.data.lines.length
+    this.setData({ lines: this.data.lines.concat(lineView(blankLine(), index)), dirty: true }, () => {
+      this.recalculate()
+      this.focusLineField(index, 'name')
+    })
+  },
+
+  duplicateLine(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    const source = this.data.lines[index]
+    if (!source) return
+    const copy = lineView({ ...source, quantity: '1', remark: '', sourceAmount: '', amountMismatch: false, remember: true }, index + 1)
+    const lines = this.data.lines.slice()
+    lines.splice(index + 1, 0, copy)
+    this.setData({ lines: lines.map(lineView), dirty: true, statusText: '已复制商品，请填写数量' }, () => {
+      this.recalculate()
+      this.focusLineField(index + 1, 'quantity')
+    })
   },
 
   removeLine(event) {
@@ -150,15 +228,17 @@ Page({
   recalculate() {
     let total = 0
     let incompleteCount = 0
+    let reviewCount = 0
     const lines = this.data.lines.map((line, index) => {
       const next = lineView(line, index)
       const q = decimal(next.quantity)
       const p = decimal(next.price)
       if (q !== null && p !== null) total += q * p
-      if (!next.name.trim() || !next.unit.trim() || q === null || p === null) incompleteCount += 1
+      if (!next.name.trim() || !validUnit(next.unit) || q === null || q <= 0 || p === null || p < 0) incompleteCount += 1
+      reviewCount += [next.nameUncertain, next.unitUncertain, next.quantityUncertain, next.priceUncertain].filter(Boolean).length
       return next
     })
-    this.setData({ lines, totalText: money(total), incompleteCount })
+    this.setData({ lines, totalText: money(total), incompleteCount, reviewCount })
   },
 
   changeSearch(event) {
@@ -168,31 +248,48 @@ Page({
     this.searchTimer = setTimeout(() => this.searchProducts(), 260)
   },
 
-  searchProducts() {
+  searchProducts(keywordOverride) {
+    const keyword = typeof keywordOverride === 'string' ? keywordOverride : this.data.searchKeyword
+    const requestId = (this.searchRequestId || 0) + 1
+    this.searchRequestId = requestId
     this.setData({ searching: true })
-    api.searchBillingProducts(this.data.searchKeyword).then((candidates) => this.setData({ candidates: candidates || [] }))
-      .catch(() => this.setData({ candidates: [] }))
-      .finally(() => this.setData({ searching: false }))
+    api.searchBillingProducts(keyword).then((candidates) => {
+      if (requestId !== this.searchRequestId) return
+      this.setData({ candidates: candidates || [], candidateTitle: keyword.trim() ? '匹配商品' : '最近常用' })
+    }).catch(() => {
+      if (requestId === this.searchRequestId) this.setData({ candidates: [] })
+    }).finally(() => {
+      if (requestId === this.searchRequestId) this.setData({ searching: false })
+    })
   },
 
   chooseCandidate(event) {
     const index = Number(event.currentTarget.dataset.index)
     const candidate = this.data.candidates[index]
     if (!candidate) return
-    const target = this.data.lines.findIndex((line) => !line.name.trim())
+    const requestedTarget = this.data.activeLineIndex === null || this.data.activeLineIndex === undefined
+      ? -1 : Number(this.data.activeLineIndex)
+    const target = Number.isInteger(requestedTarget) && requestedTarget >= 0 && requestedTarget < this.data.lines.length
+      ? requestedTarget : this.data.lines.findIndex((line) => !line.name.trim())
+    const existing = target >= 0 ? this.data.lines[target] : blankLine()
     const line = lineView({
-      ...blankLine(), name: candidate.name || '', specification: candidate.specification || '',
-      unit: candidate.unit || '', price: candidate.price === null || candidate.price === undefined ? '' : candidate.price,
-      quantity: '1', alias: candidate.alias || '', candidateKey: candidate.candidateKey || '',
+      ...existing, name: candidate.name || existing.name || '', specification: candidate.specification || existing.specification || '',
+      unit: candidate.unit || existing.unit || '', price: candidate.price === null || candidate.price === undefined ? existing.price || '' : candidate.price,
+      quantity: existing.quantity || '1', alias: candidate.alias || '', candidateKey: candidate.candidateKey || '',
       referenceSource: candidate.source || '', referenceCategory: candidate.category || '',
       referenceAliases: candidate.aliases || [], unitCandidates: candidate.unitCandidates || [],
-      referenceCaution: candidate.caution || ''
+      referenceCaution: candidate.caution || '', remember: true
     }, target >= 0 ? target : this.data.lines.length)
     const lines = this.data.lines.slice()
     if (target >= 0) lines[target] = line
     else lines.push(line)
-    this.setData({ lines, searchKeyword: '', candidates: [], dirty: true, statusText: '已加入商品，请填写数量和单价' }, () => this.recalculate())
+    this.setData({ lines, searchKeyword: '', candidates: [], activeLineIndex: null, dirty: true, statusText: '商品信息已带入，请核对数量和单价' }, () => {
+      this.recalculate()
+      this.focusLineField(target >= 0 ? target : lines.length - 1, 'quantity')
+    })
   },
+
+  toggleEvidence() { this.setData({ evidenceOpen: !this.data.evidenceOpen }) },
 
   payload() {
     return {
@@ -202,6 +299,9 @@ Page({
       lines: this.data.lines.map((line) => ({
         ...line,
         index: undefined, amountText: undefined, unitChoices: undefined,
+        nameFocus: undefined, quantityFocus: undefined, priceFocus: undefined,
+        nameUncertain: undefined, unitUncertain: undefined, quantityUncertain: undefined,
+        priceUncertain: undefined, amountMismatch: undefined,
         name: line.name.trim(), specification: line.specification.trim(), unit: line.unit.trim(),
         quantity: line.quantity === '' ? null : line.quantity,
         price: line.price === '' ? null : line.price
