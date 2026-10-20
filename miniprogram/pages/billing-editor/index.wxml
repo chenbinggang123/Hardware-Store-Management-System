@@ -51,8 +51,8 @@
           </view>
           <view class="unit-choices" wx:if="{{item.unitChoices.length}}"><view wx:for="{{item.unitChoices}}" wx:for-item="unit" wx:for-index="unitIndex" wx:key="*this" data-index="{{item.index - 1}}" data-unit="{{unit}}" bindtap="chooseUnit">{{unit}}</view></view>
           <view class="field-grid triple">
-            <view class="field {{item.quantityUncertain ? 'needs-review' : ''}}"><text>数量</text><input type="digit" value="{{item.quantity}}" focus="{{item.quantityFocus}}" confirm-type="next" data-index="{{index}}" data-field="quantity" bindinput="changeLine" bindconfirm="confirmLineField" placeholder="必填" /></view>
-            <view class="field {{item.priceUncertain ? 'needs-review' : ''}}"><text>单价</text><input type="digit" value="{{item.price}}" focus="{{item.priceFocus}}" confirm-type="next" data-index="{{index}}" data-field="price" bindinput="changeLine" bindconfirm="confirmLineField" placeholder="必填" /></view>
+            <view class="field {{item.quantityUncertain ? 'needs-review' : ''}}"><text>数量</text><input type="digit" value="{{item.quantity}}" focus="{{item.quantityFocus}}" confirm-type="next" data-index="{{index}}" data-field="quantity" bindfocus="focusLineInput" bindinput="changeLine" bindconfirm="confirmLineField" placeholder="必填" /></view>
+            <view class="field {{item.priceUncertain ? 'needs-review' : ''}}"><text>单价</text><input type="digit" value="{{item.price}}" focus="{{item.priceFocus}}" confirm-type="next" data-index="{{index}}" data-field="price" bindfocus="focusLineInput" bindinput="changeLine" bindconfirm="confirmLineField" placeholder="必填" /></view>
             <view class="field"><text>备注</text><input value="{{item.remark}}" data-index="{{index}}" data-field="remark" bindinput="changeLine" placeholder="选填" /></view>
           </view>
           <view class="line-review-note" wx:if="{{item.amountMismatch}}">票面金额与数量 × 单价不一致，请核对单价</view>
@@ -79,12 +79,13 @@
         <view class="receipt-footer"><view><text>备注</text><text class="receipt-footer-value">{{form.remark || '无'}}</text></view><view class="receipt-notice">请当面核对商品、数量和金额；本单据仅用于打印和导出。</view></view>
       </view>
     </view>
+    <view class="action-notice" wx:if="{{actionError}}"><view><text>操作没有完成</text><text>{{actionError}}</text></view><view class="notice-retry" wx:if="{{document && document.status === 'CONFIRMED'}}" bindtap="exportExcel">重试导出</view></view>
     <view class="bottom-space"></view>
 
     <view class="billing-bar">
       <view class="billing-summary"><text>合计</text><text class="billing-summary-value">¥{{totalText}}</text><text class="billing-summary-status">{{statusText}}</text></view>
       <view class="bar-actions" wx:if="{{document && document.status === 'CONFIRMED'}}"><view class="secondary-action" wx:if="{{generatedFile}}" bindtap="openGenerated">打开 Excel</view><view class="primary-action" bindtap="exportExcel">{{busy ? '处理中…' : '重新生成'}}</view></view>
-      <view class="bar-actions" wx:else><view class="secondary-action" wx:if="{{mode === 'edit'}}" bindtap="saveDraft">保存草稿</view><view class="secondary-action" wx:else data-mode="edit" bindtap="setMode">返回修改</view><view class="primary-action" wx:if="{{mode === 'edit'}}" bindtap="previewDocument">预览单据</view><view class="primary-action" wx:else bindtap="confirmDocument">{{busy ? '处理中…' : '保存并导出'}}</view></view>
+      <view class="bar-actions" wx:else><view class="secondary-action" wx:if="{{mode === 'edit'}}" bindtap="saveDraft">保存草稿</view><view class="secondary-action" wx:else data-mode="edit" bindtap="setMode">返回修改</view><view class="primary-action" bindtap="confirmDocument">{{busy ? '处理中…' : '保存并导出'}}</view></view>
     </view>
   </block>
 </view>

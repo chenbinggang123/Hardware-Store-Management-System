@@ -87,7 +87,7 @@ Page({
     documentId: null, document: null, form: formView(), lines: [lineView(blankLine(), 0)],
     totalText: '0.00', incompleteCount: 1, reviewCount: 4, searchKeyword: '', candidates: [], searching: false,
     candidateTitle: '最近常用', activeLineIndex: null, evidenceOpen: false,
-    statusText: '', generatedFile: null
+    statusText: '', actionError: '', generatedFile: null
   },
 
   onLoad(options) {
@@ -134,11 +134,11 @@ Page({
 
   changeForm(event) {
     const field = event.currentTarget.dataset.field
-    this.setData({ [`form.${field}`]: event.detail.value, dirty: true, statusText: '有修改尚未保存' })
+    this.setData({ [`form.${field}`]: event.detail.value, dirty: true, actionError: '', statusText: '有修改尚未保存' })
   },
 
   changeDate(event) {
-    this.setData({ 'form.date': event.detail.value, dirty: true, statusText: '有修改尚未保存' })
+    this.setData({ 'form.date': event.detail.value, dirty: true, actionError: '', statusText: '有修改尚未保存' })
   },
 
   changeLine(event) {
@@ -147,7 +147,7 @@ Page({
     const lines = this.data.lines.slice()
     const learnIdentity = ['name', 'specification', 'unit'].includes(field) && String(event.detail.value || '').trim()
     lines[index] = { ...lines[index], [field]: event.detail.value, remember: learnIdentity ? true : lines[index].remember }
-    this.setData({ lines, dirty: true, statusText: '有修改尚未保存' }, () => this.recalculate())
+    this.setData({ lines, dirty: true, actionError: '', statusText: '有修改尚未保存' }, () => this.recalculate())
     if (field === 'name') {
       this.setData({ activeLineIndex: index, searchKeyword: event.detail.value || '' })
       clearTimeout(this.searchTimer)
@@ -158,7 +158,12 @@ Page({
   focusLineName(event) {
     const index = Number(event.currentTarget.dataset.index)
     const keyword = (this.data.lines[index] && this.data.lines[index].name) || ''
+    this.focusLineField(index, 'name')
     this.setData({ activeLineIndex: index, searchKeyword: keyword }, () => this.searchProducts())
+  },
+
+  focusLineInput(event) {
+    this.focusLineField(Number(event.currentTarget.dataset.index), event.currentTarget.dataset.field)
   },
 
   focusGlobalSearch() {
@@ -311,7 +316,7 @@ Page({
 
   saveDraft() {
     if (this.data.busy) return Promise.resolve(null)
-    this.setData({ busy: true, statusText: '正在保存…' })
+    this.setData({ busy: true, actionError: '', statusText: '正在保存…' })
     const task = this.data.documentId
       ? api.saveBillingDocument(this.data.documentId, this.payload())
       : api.createBillingDocument(this.payload())
@@ -320,8 +325,9 @@ Page({
       wx.showToast({ title: '草稿已保存', icon: 'success' })
       return document
     }).catch((error) => {
-      this.setData({ statusText: '保存未完成' })
-      wx.showToast({ title: errorText(error, '保存失败，请重试'), icon: 'none', duration: 3000 })
+      const message = errorText(error, '保存失败，请重试')
+      this.setData({ statusText: '保存未完成', actionError: `草稿没有保存：${message}` })
+      wx.showToast({ title: message, icon: 'none', duration: 3000 })
       return null
     }).finally(() => this.setData({ busy: false }))
   },
@@ -332,8 +338,14 @@ Page({
   },
 
   confirmDocument() {
-    if (this.data.incompleteCount) return wx.showToast({ title: `还有 ${this.data.incompleteCount} 行需要补齐`, icon: 'none' })
-    wx.showModal({
+    if (this.data.busy) return Promise.resolve()
+    if (this.data.incompleteCount) {
+      const message = `还有 ${this.data.incompleteCount} 行需要补齐名称、单位、数量和单价`
+      this.setData({ actionError: message })
+      return wx.showToast({ title: message, icon: 'none', duration: 3000 })
+    }
+    this.setData({ actionError: '' })
+    return wx.showModal({
       title: '保存这张销售单？',
       content: `共 ${this.data.lines.length} 项，合计 ¥${this.data.totalText}。保存后可生成 Excel，本阶段不会登记销售和欠款。`,
       confirmText: '保存并导出'
@@ -345,7 +357,11 @@ Page({
         return api.confirmBillingDocument(draft.id, draft.version).then((document) => {
           this.showDocument(document, true)
           return this.exportExcel(document.id)
-        }).catch((error) => wx.showToast({ title: errorText(error, '单据保存失败'), icon: 'none', duration: 3000 }))
+        }).catch((error) => {
+          const message = errorText(error, '单据保存失败')
+          this.setData({ actionError: `单据没有确认：${message}`, statusText: '正式单据保存未完成' })
+          wx.showToast({ title: message, icon: 'none', duration: 3000 })
+        })
           .finally(() => this.setData({ busy: false }))
       })
     })
@@ -355,17 +371,26 @@ Page({
     const requestedId = Number(documentId)
     const id = Number.isFinite(requestedId) && requestedId > 0 ? requestedId : Number(this.data.documentId)
     if (!id) return Promise.resolve()
-    this.setData({ busy: true, statusText: '正在生成 Excel…' })
+    this.setData({ busy: true, actionError: '', statusText: '正在生成 Excel…' })
     return api.exportBillingDocument(id).then((result) => {
       if (result.status !== 'READY' || !result.outputId) throw new Error('Excel 尚未生成成功，请重试')
-      const generatedFile = fileView({ id: result.outputId, name: result.fileName, mimeType: result.mimeType || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', status: result.status, size: result.size })
+      const generatedFile = fileView({ id: result.outputId, name: result.fileName, mimeType: result.mimeType || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', status: result.status, size: result.fileSize || result.size })
       this.setData({ generatedFile, statusText: 'Excel 已生成，可以打开或转发' })
-      return openAgentFile(generatedFile)
-    }).catch((error) => wx.showToast({ title: errorText(error, 'Excel 生成失败'), icon: 'none', duration: 3000 }))
+      return this.openGenerated()
+    }).catch((error) => {
+      const message = errorText(error, 'Excel 生成失败')
+      this.setData({ actionError: `Excel 没有生成：${message}`, statusText: 'Excel 生成未完成' })
+      wx.showToast({ title: message, icon: 'none', duration: 3000 })
+    })
       .finally(() => this.setData({ busy: false }))
   },
 
   openGenerated() {
-    if (this.data.generatedFile) openAgentFile(this.data.generatedFile)
+    if (!this.data.generatedFile) return Promise.resolve()
+    return openAgentFile(this.data.generatedFile).catch((error) => {
+      const message = errorText(error, '文件没有自动打开')
+      this.setData({ actionError: `Excel 已经保存，但没有自动打开：${message}。可以再次点击“打开 Excel”。` })
+      wx.showToast({ title: 'Excel 已保存，请重试打开', icon: 'none', duration: 3000 })
+    })
   }
 })
