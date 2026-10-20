@@ -38,25 +38,25 @@
 
       <view class="section-card lines-card">
         <view class="section-heading"><view><view class="section-title">商品明细</view><view class="section-note">金额按数量 × 单价自动计算</view></view><view class="add-line" bindtap="addLine">＋ 添加</view></view>
-        <view class="review-strip" wx:if="{{reviewCount}}"><text>{{reviewCount}} 处待核对</text><text>黄色输入框修改后会自动消除提示</text></view>
+        <view class="review-strip" wx:if="{{reviewCount}}"><text>{{reviewCount}} 处待核对</text><text>修改黄色字段即可</text></view>
         <view class="line-card" wx:for="{{lines}}" wx:key="index">
-          <view class="line-head"><view><text>第 {{index + 1}} 项</text><text class="line-amount">¥{{item.amountText}}</text></view><view class="line-actions"><view class="copy-line" data-index="{{index}}" bindtap="duplicateLine">复制</view><view class="remove-line" data-index="{{index}}" bindtap="removeLine">删除</view></view></view>
-          <view class="field {{item.nameUncertain ? 'needs-review' : ''}}"><text>商品名称</text><input value="{{item.name}}" focus="{{item.nameFocus}}" data-index="{{index}}" data-field="name" bindfocus="focusLineName" bindinput="changeLine" placeholder="输入即可搜索商品库" /></view>
+          <view class="line-head"><view><text>第 {{index + 1}} 项</text><text class="line-amount">¥{{item.amountText}}</text></view><view class="line-actions"><label class="remember-compact" aria-label="记住商品"><switch checked="{{item.remember}}" data-index="{{index}}" bindchange="toggleRemember" color="#2865D7" /><text>记住</text></label><view class="copy-line" data-index="{{index}}" bindtap="duplicateLine">复制</view><view class="remove-line" data-index="{{index}}" bindtap="removeLine">删除</view></view></view>
+          <view class="field-grid primary-grid">
+            <view class="field {{item.nameUncertain ? 'needs-review' : ''}}"><text>商品名称</text><input value="{{item.name}}" focus="{{item.nameFocus}}" data-index="{{index}}" data-field="name" bindfocus="focusLineName" bindinput="changeLine" placeholder="输入并搜索" /></view>
+            <view class="field"><text>规格型号</text><input value="{{item.specification}}" data-index="{{index}}" data-field="specification" bindinput="changeLine" placeholder="选填" /></view>
+          </view>
           <scroll-view class="inline-candidates" scroll-x wx:if="{{activeLineIndex === index && candidates.length}}" enhanced show-scrollbar="{{false}}">
             <view class="candidate-row"><view class="candidate compact" wx:for="{{candidates}}" wx:for-item="candidate" wx:for-index="candidateIndex" wx:key="candidateKey" data-index="{{candidateIndex}}" bindtap="chooseCandidate"><view class="candidate-name">{{candidate.name}}</view><view class="candidate-meta">{{candidate.specification || candidate.category || '通用商品'}}<text wx:if="{{candidate.unit}}"> · {{candidate.unit}}</text><text wx:if="{{candidate.price !== null && candidate.price !== undefined}}"> · ¥{{candidate.price}}</text></view></view></view>
           </scroll-view>
-          <view class="field-grid">
-            <view class="field"><text>规格型号</text><input value="{{item.specification}}" data-index="{{index}}" data-field="specification" bindinput="changeLine" placeholder="选填" /></view>
-            <view class="field {{item.unitUncertain ? 'needs-review' : ''}}"><text>单位</text><input value="{{item.unit}}" data-index="{{index}}" data-field="unit" bindinput="changeLine" placeholder="如 个、支、套" /></view>
-          </view>
-          <view class="unit-choices" wx:if="{{item.unitChoices.length}}"><view wx:for="{{item.unitChoices}}" wx:for-item="unit" wx:for-index="unitIndex" wx:key="*this" data-index="{{item.index - 1}}" data-unit="{{unit}}" bindtap="chooseUnit">{{unit}}</view></view>
-          <view class="field-grid triple">
+          <view class="field-grid number-grid">
+            <view class="field {{item.unitUncertain ? 'needs-review' : ''}}"><text>单位</text><input value="{{item.unit}}" data-index="{{index}}" data-field="unit" bindinput="changeLine" placeholder="个/支/套" /></view>
             <view class="field {{item.quantityUncertain ? 'needs-review' : ''}}"><text>数量</text><input type="digit" value="{{item.quantity}}" focus="{{item.quantityFocus}}" confirm-type="next" data-index="{{index}}" data-field="quantity" bindfocus="focusLineInput" bindinput="changeLine" bindconfirm="confirmLineField" placeholder="必填" /></view>
             <view class="field {{item.priceUncertain ? 'needs-review' : ''}}"><text>单价</text><input type="digit" value="{{item.price}}" focus="{{item.priceFocus}}" confirm-type="next" data-index="{{index}}" data-field="price" bindfocus="focusLineInput" bindinput="changeLine" bindconfirm="confirmLineField" placeholder="必填" /></view>
-            <view class="field"><text>备注</text><input value="{{item.remark}}" data-index="{{index}}" data-field="remark" bindinput="changeLine" placeholder="选填" /></view>
           </view>
+          <view class="unit-choices" wx:if="{{item.unitChoices.length}}"><view wx:for="{{item.unitChoices}}" wx:for-item="unit" wx:for-index="unitIndex" wx:key="*this" data-index="{{item.index - 1}}" data-unit="{{unit}}" bindtap="chooseUnit">{{unit}}</view></view>
+          <view class="line-detail-toggle" data-index="{{index}}" bindtap="toggleLineRemark">{{item.remarkToggleText}}</view>
+          <view class="field compact-remark" wx:if="{{item.remarkOpen}}"><text>备注</text><input value="{{item.remark}}" data-index="{{index}}" data-field="remark" bindinput="changeLine" placeholder="选填，例如交付说明" /></view>
           <view class="line-review-note" wx:if="{{item.amountMismatch}}">票面金额与数量 × 单价不一致，请核对单价</view>
-          <label class="remember-row"><switch checked="{{item.remember}}" data-index="{{index}}" bindchange="toggleRemember" color="#2865D7" /><view><text>记住这件商品</text><text class="remember-note">确认单据后，下次搜索会更靠前</text></view></label>
           <view class="source-note" wx:if="{{item.referenceSource || item.sourceAmount || item.referenceCaution}}"><text wx:if="{{item.referenceSource}}">{{item.referenceSource}}</text><text wx:if="{{item.sourceAmount}}">票面金额：{{item.sourceAmount}}</text><text wx:if="{{item.referenceCaution}}">{{item.referenceCaution}}</text></view>
         </view>
       </view>
@@ -91,3 +91,4 @@
     </view>
   </block>
 </view>
+
