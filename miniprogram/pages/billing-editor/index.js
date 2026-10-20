@@ -1,5 +1,6 @@
 const api = require('../../utils/api')
 const { fileView, openAgentFile } = require('../../utils/agent-files')
+const { renderAndSave } = require('../../utils/billing-image')
 
 function today() {
   const date = new Date()
@@ -87,7 +88,7 @@ Page({
     documentId: null, document: null, form: formView(), lines: [lineView(blankLine(), 0)],
     totalText: '0.00', incompleteCount: 1, reviewCount: 4, searchKeyword: '', candidates: [], searching: false,
     candidateTitle: '最近常用', activeLineIndex: null, evidenceOpen: false,
-    statusText: '', actionError: '', generatedFile: null
+    statusText: '', actionError: '', actionRetry: '', actionRetryText: '', imageBusy: false, generatedFile: null
   },
 
   onLoad(options) {
@@ -134,11 +135,11 @@ Page({
 
   changeForm(event) {
     const field = event.currentTarget.dataset.field
-    this.setData({ [`form.${field}`]: event.detail.value, dirty: true, actionError: '', statusText: '有修改尚未保存' })
+    this.setData({ [`form.${field}`]: event.detail.value, dirty: true, actionError: '', actionRetry: '', actionRetryText: '', statusText: '有修改尚未保存' })
   },
 
   changeDate(event) {
-    this.setData({ 'form.date': event.detail.value, dirty: true, actionError: '', statusText: '有修改尚未保存' })
+    this.setData({ 'form.date': event.detail.value, dirty: true, actionError: '', actionRetry: '', actionRetryText: '', statusText: '有修改尚未保存' })
   },
 
   changeLine(event) {
@@ -147,7 +148,7 @@ Page({
     const lines = this.data.lines.slice()
     const learnIdentity = ['name', 'specification', 'unit'].includes(field) && String(event.detail.value || '').trim()
     lines[index] = { ...lines[index], [field]: event.detail.value, remember: learnIdentity ? true : lines[index].remember }
-    this.setData({ lines, dirty: true, actionError: '', statusText: '有修改尚未保存' }, () => this.recalculate())
+    this.setData({ lines, dirty: true, actionError: '', actionRetry: '', actionRetryText: '', statusText: '有修改尚未保存' }, () => this.recalculate())
     if (field === 'name') {
       this.setData({ activeLineIndex: index, searchKeyword: event.detail.value || '' })
       clearTimeout(this.searchTimer)
@@ -316,7 +317,7 @@ Page({
 
   saveDraft() {
     if (this.data.busy) return Promise.resolve(null)
-    this.setData({ busy: true, actionError: '', statusText: '正在保存…' })
+    this.setData({ busy: true, actionError: '', actionRetry: '', actionRetryText: '', statusText: '正在保存…' })
     const task = this.data.documentId
       ? api.saveBillingDocument(this.data.documentId, this.payload())
       : api.createBillingDocument(this.payload())
@@ -326,7 +327,7 @@ Page({
       return document
     }).catch((error) => {
       const message = errorText(error, '保存失败，请重试')
-      this.setData({ statusText: '保存未完成', actionError: `草稿没有保存：${message}` })
+      this.setData({ statusText: '保存未完成', actionError: `草稿没有保存：${message}`, actionRetry: '', actionRetryText: '' })
       wx.showToast({ title: message, icon: 'none', duration: 3000 })
       return null
     }).finally(() => this.setData({ busy: false }))
@@ -341,10 +342,10 @@ Page({
     if (this.data.busy) return Promise.resolve()
     if (this.data.incompleteCount) {
       const message = `还有 ${this.data.incompleteCount} 行需要补齐名称、单位、数量和单价`
-      this.setData({ actionError: message })
+      this.setData({ actionError: message, actionRetry: '', actionRetryText: '' })
       return wx.showToast({ title: message, icon: 'none', duration: 3000 })
     }
-    this.setData({ actionError: '' })
+    this.setData({ actionError: '', actionRetry: '', actionRetryText: '' })
     return wx.showModal({
       title: '保存这张销售单？',
       content: `共 ${this.data.lines.length} 项，合计 ¥${this.data.totalText}。保存后可生成 Excel，本阶段不会登记销售和欠款。`,
@@ -359,7 +360,7 @@ Page({
           return this.exportExcel(document.id)
         }).catch((error) => {
           const message = errorText(error, '单据保存失败')
-          this.setData({ actionError: `单据没有确认：${message}`, statusText: '正式单据保存未完成' })
+          this.setData({ actionError: `单据没有确认：${message}`, actionRetry: '', actionRetryText: '', statusText: '正式单据保存未完成' })
           wx.showToast({ title: message, icon: 'none', duration: 3000 })
         })
           .finally(() => this.setData({ busy: false }))
@@ -371,7 +372,7 @@ Page({
     const requestedId = Number(documentId)
     const id = Number.isFinite(requestedId) && requestedId > 0 ? requestedId : Number(this.data.documentId)
     if (!id) return Promise.resolve()
-    this.setData({ busy: true, actionError: '', statusText: '正在生成 Excel…' })
+    this.setData({ busy: true, actionError: '', actionRetry: '', actionRetryText: '', statusText: '正在生成 Excel…' })
     return api.exportBillingDocument(id).then((result) => {
       if (result.status !== 'READY' || !result.outputId) throw new Error('Excel 尚未生成成功，请重试')
       const generatedFile = fileView({ id: result.outputId, name: result.fileName, mimeType: result.mimeType || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', status: result.status, size: result.fileSize || result.size })
@@ -379,7 +380,7 @@ Page({
       return this.openGenerated()
     }).catch((error) => {
       const message = errorText(error, 'Excel 生成失败')
-      this.setData({ actionError: `Excel 没有生成：${message}`, statusText: 'Excel 生成未完成' })
+      this.setData({ actionError: `Excel 没有生成：${message}`, actionRetry: 'excel', actionRetryText: '重试导出', statusText: 'Excel 生成未完成' })
       wx.showToast({ title: message, icon: 'none', duration: 3000 })
     })
       .finally(() => this.setData({ busy: false }))
@@ -389,8 +390,29 @@ Page({
     if (!this.data.generatedFile) return Promise.resolve()
     return openAgentFile(this.data.generatedFile).catch((error) => {
       const message = errorText(error, '文件没有自动打开')
-      this.setData({ actionError: `Excel 已经保存，但没有自动打开：${message}。可以再次点击“打开 Excel”。` })
+      this.setData({ actionError: `Excel 已经保存，但没有自动打开：${message}。`, actionRetry: 'openExcel', actionRetryText: '重新打开' })
       wx.showToast({ title: 'Excel 已保存，请重试打开', icon: 'none', duration: 3000 })
     })
+  },
+
+  saveAsImage() {
+    if (this.data.imageBusy) return Promise.resolve()
+    this.setData({ imageBusy: true, actionError: '', actionRetry: '', actionRetryText: '', statusText: '正在生成单据图片…' })
+    const content = { ...this.data.form, lines: this.data.lines }
+    return renderAndSave(this, content, { number: this.data.document && this.data.document.number, total: this.data.totalText })
+      .then(() => {
+        this.setData({ statusText: '单据图片已保存到手机相册' })
+        wx.showToast({ title: '图片已保存到相册', icon: 'success' })
+      }).catch((error) => {
+        const message = errorText(error, '图片保存失败')
+        this.setData({ actionError: `图片没有保存：${message}`, actionRetry: 'image', actionRetryText: '重新保存', statusText: '图片保存未完成' })
+        wx.showToast({ title: message, icon: 'none', duration: 3000 })
+      }).finally(() => this.setData({ imageBusy: false }))
+  },
+
+  retryAction() {
+    if (this.data.actionRetry === 'image') return this.saveAsImage()
+    if (this.data.actionRetry === 'openExcel') return this.openGenerated()
+    if (this.data.actionRetry === 'excel') return this.exportExcel()
   }
 })

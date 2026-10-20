@@ -92,6 +92,12 @@ page { background: #EEF2EF; color: #18231E; }
 .receipt-footer text { color: #666; }
 .receipt-footer .receipt-footer-value { color: #222; font-weight: 650; }
 .receipt-notice { margin-top: 9rpx; color: #555; line-height: 1.5; }
+.image-export-card { margin-top: 16rpx; padding: 19rpx 20rpx; display: flex; align-items: center; justify-content: space-between; gap: 18rpx; border: 1rpx solid #C8D7CF; border-radius: 15rpx; background: #FFFFFF; }
+.image-export-card > view:first-child { min-width: 0; display: flex; flex-direction: column; gap: 4rpx; }
+.image-export-card text:first-child { color: #18231E; font-size: 24rpx; font-weight: 750; }
+.image-export-card text:last-child { color: #75817B; font-size: 20rpx; }
+.image-export-action { flex: 0 0 auto; min-height: 58rpx; padding: 0 16rpx; display: flex; align-items: center; border-radius: 11rpx; color: #FFFFFF; background: #247052; font-size: 22rpx; font-weight: 700; }
+.billing-image-canvas { position: fixed; z-index: -10; top: 0; left: -2000px; width: 1120px; height: 1px; opacity: 0; pointer-events: none; }
 .action-notice { margin: 0 0 18rpx; padding: 18rpx 20rpx; display: flex; align-items: center; justify-content: space-between; gap: 18rpx; border: 1rpx solid #E5B9AD; border-left: 6rpx solid #B94C3A; border-radius: 14rpx; color: #7E352A; background: #FFF0EC; }
 .action-notice > view:first-child { min-width: 0; display: flex; flex-direction: column; gap: 5rpx; }
 .action-notice text:first-child { font-size: 23rpx; font-weight: 750; }
