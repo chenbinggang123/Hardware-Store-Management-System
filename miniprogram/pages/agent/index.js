@@ -547,7 +547,11 @@ Page({
       wx.showToast({ title: '附件尚未完成识别', icon: 'none' })
       return
     }
-    const displayContent = content || '请阅读这些附件，先概括主要内容并告诉我可以继续处理什么；不要写入业务数据。'
+    const billingAttachment = attachments.some((item) => isImageAttachment(item)
+      || /pdf/i.test(`${item.mimeType || ''} ${item.name || ''}`))
+    const displayContent = content || (billingAttachment
+      ? '请识别这份商品单据并直接创建可编辑的开单草稿。缺失内容留空，识别疑点和票面原文保留在草稿中，不要先输出待核对清单；不要登记销售、欠款或库存。'
+      : '请阅读这些附件，简要说明内容和可以继续处理的事项；不要写入业务数据。')
     const saveImages = attachments.filter((item) => isImageAttachment(item) && (item.savedToFiles || explicitlyRequestsImageSaving(displayContent)))
     const savedIds = new Set(saveImages.map((item) => Number(item.id)))
     const transientAttachments = attachments.filter((item) => !savedIds.has(Number(item.id)))
@@ -734,6 +738,24 @@ Page({
     if (run.status === 'WAITING_APPROVAL') {
       wx.setStorageSync(ACTIVE_RUN_KEY, run.runId)
       this.removeStreamingMessage()
+      if (run.pendingAction && run.pendingAction.toolName === 'prepare_billing_document'
+        && this.autoBillingApprovalRunId !== run.runId) {
+        this.autoBillingApprovalRunId = run.runId
+        this.setData({ run, conversationId, sending: true, streaming: false, resolving: true })
+        api.resolveAgentApproval(run.runId, true).then((approved) => {
+          this.syncRun(approved)
+          const action = billingDocumentAction(approved)
+          if (!action) {
+            wx.showToast({ title: '草稿已建立，请从结果中打开', icon: 'none' })
+            return
+          }
+          openPage('/pages/billing-editor/index', action.params)
+        }).catch((error) => {
+          this.setData({ run, conversationId, sending: false, streaming: false })
+          wx.showToast({ title: errorMessage(error, '开单预览生成失败，请重试'), icon: 'none', duration: 3000 })
+        }).finally(() => this.setData({ resolving: false }))
+        return
+      }
       this.setData({ run, conversationId, sending: false, streaming: false }, () => this.scrollToBottom())
       this.loadConversations()
       return
