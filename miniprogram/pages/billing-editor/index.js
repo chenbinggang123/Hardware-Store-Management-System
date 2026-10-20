@@ -12,7 +12,7 @@ function blankLine() {
   return {
     name: '', specification: '', unit: '', quantity: '', price: '', remark: '', alias: '',
     candidateKey: '', referenceSource: '', referenceCategory: '', referenceAliases: [],
-    unitCandidates: [], referenceCaution: '', remember: false, sourceAmount: ''
+    unitCandidates: [], referenceCaution: '', remember: false, sourceAmount: '', remarkOpen: false
   }
 }
 
@@ -49,6 +49,8 @@ function lineView(line, index) {
   const caution = `${line.referenceCaution || ''} ${line.remark || ''}`
   return {
     ...blankLine(), ...line, quantity, price, index: index + 1,
+    remarkOpen: line.remarkOpen === undefined ? Boolean(line.remark) : Boolean(line.remarkOpen),
+    remarkToggleText: line.remarkOpen === undefined ? (line.remark ? '收起备注' : '＋ 添加备注') : (line.remarkOpen ? '收起备注' : (line.remark ? '查看备注' : '＋ 添加备注')),
     amountText: calculated === null ? '—' : money(calculated),
     unitChoices: (line.unitCandidates || []).slice(0, 4),
     nameUncertain: !String(line.name || '').trim() || /名称.*(?:疑|截断|待确认)/.test(caution),
@@ -204,6 +206,13 @@ Page({
     this.setData({ lines, dirty: true, statusText: '有修改尚未保存' })
   },
 
+  toggleLineRemark(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    const lines = this.data.lines.slice()
+    lines[index] = { ...lines[index], remarkOpen: !lines[index].remarkOpen }
+    this.setData({ lines })
+  },
+
   addLine() {
     const index = this.data.lines.length
     this.setData({ lines: this.data.lines.concat(lineView(blankLine(), index)), dirty: true }, () => {
@@ -216,7 +225,7 @@ Page({
     const index = Number(event.currentTarget.dataset.index)
     const source = this.data.lines[index]
     if (!source) return
-    const copy = lineView({ ...source, quantity: '1', remark: '', sourceAmount: '', amountMismatch: false, remember: true }, index + 1)
+    const copy = lineView({ ...source, quantity: '1', remark: '', remarkOpen: false, sourceAmount: '', amountMismatch: false, remember: true }, index + 1)
     const lines = this.data.lines.slice()
     lines.splice(index + 1, 0, copy)
     this.setData({ lines: lines.map(lineView), dirty: true, statusText: '已复制商品，请填写数量' }, () => {
@@ -307,7 +316,7 @@ Page({
         index: undefined, amountText: undefined, unitChoices: undefined,
         nameFocus: undefined, quantityFocus: undefined, priceFocus: undefined,
         nameUncertain: undefined, unitUncertain: undefined, quantityUncertain: undefined,
-        priceUncertain: undefined, amountMismatch: undefined,
+        priceUncertain: undefined, amountMismatch: undefined, remarkOpen: undefined, remarkToggleText: undefined,
         name: line.name.trim(), specification: line.specification.trim(), unit: line.unit.trim(),
         quantity: line.quantity === '' ? null : line.quantity,
         price: line.price === '' ? null : line.price
@@ -416,3 +425,4 @@ Page({
     if (this.data.actionRetry === 'excel') return this.exportExcel()
   }
 })
+
