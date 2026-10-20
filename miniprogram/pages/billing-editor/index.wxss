@@ -92,6 +92,11 @@ page { background: #EEF2EF; color: #18231E; }
 .receipt-footer text { color: #666; }
 .receipt-footer .receipt-footer-value { color: #222; font-weight: 650; }
 .receipt-notice { margin-top: 9rpx; color: #555; line-height: 1.5; }
+.action-notice { margin: 0 0 18rpx; padding: 18rpx 20rpx; display: flex; align-items: center; justify-content: space-between; gap: 18rpx; border: 1rpx solid #E5B9AD; border-left: 6rpx solid #B94C3A; border-radius: 14rpx; color: #7E352A; background: #FFF0EC; }
+.action-notice > view:first-child { min-width: 0; display: flex; flex-direction: column; gap: 5rpx; }
+.action-notice text:first-child { font-size: 23rpx; font-weight: 750; }
+.action-notice text:last-child { font-size: 20rpx; line-height: 1.5; }
+.notice-retry { flex: 0 0 auto; min-height: 54rpx; padding: 0 14rpx; display: flex; align-items: center; border-radius: 10rpx; color: #8D392E; background: #FFFFFF; font-size: 21rpx; font-weight: 700; }
 .bottom-space { height: 166rpx; }
 .billing-bar { position: fixed; z-index: 9; right: 0; bottom: 0; left: 0; min-height: 108rpx; padding: 14rpx 22rpx calc(14rpx + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 16rpx; border-top: 1rpx solid #D4DDD8; background: rgba(255,255,255,.97); box-sizing: border-box; }
 .billing-summary { min-width: 0; flex: 1; display: grid; grid-template-columns: auto 1fr; align-items: baseline; column-gap: 8rpx; }
