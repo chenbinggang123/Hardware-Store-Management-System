@@ -78,8 +78,10 @@
         </view>
         <view class="receipt-footer"><view><text>备注</text><text class="receipt-footer-value">{{form.remark || '无'}}</text></view><view class="receipt-notice">请当面核对商品、数量和金额；本单据仅用于打印和导出。</view></view>
       </view>
+      <view class="image-export-card"><view><text>保存为图片</text><text>生成清晰长图，可直接发微信或打印</text></view><view class="image-export-action" bindtap="saveAsImage">{{imageBusy ? '生成中…' : '保存到相册'}}</view></view>
     </view>
-    <view class="action-notice" wx:if="{{actionError}}"><view><text>操作没有完成</text><text>{{actionError}}</text></view><view class="notice-retry" wx:if="{{document && document.status === 'CONFIRMED'}}" bindtap="exportExcel">重试导出</view></view>
+    <canvas type="2d" id="billingImageCanvas" class="billing-image-canvas"></canvas>
+    <view class="action-notice" wx:if="{{actionError}}"><view><text>操作没有完成</text><text>{{actionError}}</text></view><view class="notice-retry" wx:if="{{actionRetry}}" bindtap="retryAction">{{actionRetryText}}</view></view>
     <view class="bottom-space"></view>
 
     <view class="billing-bar">
