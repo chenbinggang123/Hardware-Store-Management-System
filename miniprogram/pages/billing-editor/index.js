@@ -244,15 +244,16 @@ Page({
         this.setData({ busy: true, statusText: '正在保存正式单据…' })
         return api.confirmBillingDocument(draft.id, draft.version).then((document) => {
           this.showDocument(document, true)
-          return this.exportExcel()
+          return this.exportExcel(document.id)
         }).catch((error) => wx.showToast({ title: errorText(error, '单据保存失败'), icon: 'none', duration: 3000 }))
           .finally(() => this.setData({ busy: false }))
       })
     })
   },
 
-  exportExcel() {
-    const id = this.data.documentId
+  exportExcel(documentId) {
+    const requestedId = Number(documentId)
+    const id = Number.isFinite(requestedId) && requestedId > 0 ? requestedId : Number(this.data.documentId)
     if (!id) return Promise.resolve()
     this.setData({ busy: true, statusText: '正在生成 Excel…' })
     return api.exportBillingDocument(id).then((result) => {
