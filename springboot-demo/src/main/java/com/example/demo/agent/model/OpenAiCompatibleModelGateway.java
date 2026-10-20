@@ -49,6 +49,7 @@ public class OpenAiCompatibleModelGateway implements AgentModelGateway {
             只有用户意图明确时才可请求把草稿提交为正式销售单；正式提交还需要第二次用户确认。
             正式销售单会更新客户欠款，但不会自动出库。当前不得收款、删除商品或删除业务数据。
             用户要求开单、销售单或将商品单据先预览修改再导出 Excel 时，优先调用 prepare_billing_document，送到开单页供用户修改、核对、确认后统一生成 Excel；这只是文档草稿，不是销售记账。缺少单位、数量、单价留空，票面金额原文放 sourceAmount，原单号、来源、识别疑点和其他票面信息完整放 sourceNote。OCR 中的 √、✓、✔、勾选框、装饰星号和项目圆点不写入商品名称或备注；小数点、正负号、斜杠、乘号、直径符号、货币符号、百分号及括号等会改变规格或金额含义的符号必须保留。不得勾选长期商品记忆或根据常识补造数值。含折扣、税费、运费或开单页无法表示的额外列、多工作表时不要送入简易开单页，应保留原结构使用普通 Excel 工具。
+            当附件已经包含商品单据，或用户说“生成开单预览”“做成开单预览”“进入开单页”时，直接调用 prepare_billing_document；不要先输出待核对清单，不要再次询问是否继续。所有缺失项和疑点留在可编辑草稿中，由用户在开单页修改。
             用户要求把一般查询结果、任意表格内容做成 Excel、表格文件或清单文件时，先用 Markdown 表格展示将写入文件的全部内容，再调用 generate_excel_workbook 工具；工具参数中的表头和行必须与展示的表格一致，不得新增、省略或改写数据。
             生成 Excel 时，数量、单价、金额列必须分别标注 QUANTITY、UNIT_PRICE、AMOUNT 角色并填写原始数字，由系统验算金额；票面金额未识别时保留空值，不得伪造或把计算值当作原文，系统会另列“核算金额”公式；折扣、优惠或附加费用规则不明确时先询问。单号、条码、规格、电话等必须使用 TEXT 类型保留原文；开票方、单号、日期、票面合计原文等单据级信息放入 info；内容来自附件时填写 attachmentId。文件标题使用简短业务名称，不带图片哈希、随机名或重复时间戳；公司和单号仅在来源或用户已明确时填写，不能复制样例公司的数据。
             按横向纸质收款收据样式导出时设置 layout=RECEIPT，首张明细含项目、单位、数量、单价、票面金额；公司名称、单号、日期、客户名称、电话、地址放入 info，未知值留空。系统生成收据版式页（序号/商品/规格/单位/数量/单价/金额/备注，无折扣，底部合计与签收）并关联明细。修改已有文件时沿用 read_generated_file 返回的 layout。普通清单设置 TABLE。
@@ -102,22 +103,29 @@ public class OpenAiCompatibleModelGateway implements AgentModelGateway {
             AgentModelStreamListener listener) {
         Map<String, Object> body = requestBody(context, tools);
         body.put("stream", true);
-        return restClient.post()
-                .uri("/chat/completions")
-                .contentType(MediaType.APPLICATION_JSON)
-                .header("Authorization", "Bearer " + properties.getApiKey())
-                .body(body)
-                .exchange((request, response) -> {
-                    if (response.getStatusCode().isError()) {
-                        throw new IllegalStateException("模型流式请求失败：HTTP " + response.getStatusCode().value());
-                    }
-                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(
-                            response.getBody(), StandardCharsets.UTF_8))) {
-                        return parseStreamingResponse(reader, listener == null ? AgentModelStreamListener.NONE : listener);
-                    } catch (IOException exception) {
-                        throw new IllegalStateException("读取模型流式响应失败", exception);
-                    }
-                });
+        try {
+            return restClient.post()
+                    .uri("/chat/completions")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header("Authorization", "Bearer " + properties.getApiKey())
+                    .body(body)
+                    .exchange((request, response) -> {
+                        if (response.getStatusCode().isError()) {
+                            throw new IllegalStateException("模型流式请求失败：HTTP " + response.getStatusCode().value());
+                        }
+                        try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+                                response.getBody(), StandardCharsets.UTF_8))) {
+                            return parseStreamingResponse(reader, listener == null ? AgentModelStreamListener.NONE : listener);
+                        } catch (IOException exception) {
+                            throw new IllegalStateException("读取模型流式响应失败", exception);
+                        }
+                    });
+        } catch (IllegalArgumentException exception) {
+            if (!"模型工具参数不是有效 JSON".equals(exception.getMessage())) throw exception;
+            // Some OpenAI-compatible providers occasionally truncate streamed tool arguments.
+            // Retry once without streaming so the provider returns one complete JSON payload.
+            return respond(context, tools);
+        }
     }
 
     private Map<String, Object> requestBody(

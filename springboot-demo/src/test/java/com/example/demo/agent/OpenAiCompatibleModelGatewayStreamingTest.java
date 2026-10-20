@@ -16,6 +16,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -70,6 +71,33 @@ class OpenAiCompatibleModelGatewayStreamingTest {
         assertEquals(12, result.getToolCalls().get(0).getArguments().get("productId"));
     }
 
+    @Test
+    void retriesOnceWithoutStreamingWhenStreamedToolArgumentsAreTruncated() throws Exception {
+        AtomicInteger requests = new AtomicInteger();
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/v1/chat/completions", exchange -> {
+            if (requests.incrementAndGet() == 1) {
+                exchange.getResponseHeaders().set("Content-Type", "text/event-stream; charset=utf-8");
+                respond(exchange, "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_1\",\"function\":{\"name\":\"check_inventory\",\"arguments\":\"{\\\"productId\\\":\"}}]}}]}\n\ndata: [DONE]\n\n");
+                return;
+            }
+            exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
+            respond(exchange, "{\"choices\":[{\"message\":{\"tool_calls\":[{\"id\":\"call_2\",\"function\":{\"name\":\"check_inventory\",\"arguments\":\"{\\\"productId\\\":12}\"}}]}}]}");
+        });
+        server.start();
+        AgentModelProperties properties = new AgentModelProperties();
+        properties.setBaseUrl("http://127.0.0.1:" + server.getAddress().getPort() + "/v1");
+        properties.setApiKey("test-key");
+        properties.setModel("test-model");
+        OpenAiCompatibleModelGateway gateway = new OpenAiCompatibleModelGateway(properties, new ObjectMapper(), RestClient.builder());
+
+        AgentModelResponse result = gateway.respondStreaming(
+                new AgentRunContext(1L, 7L, "查库存"), List.of(), ignored -> { });
+
+        assertEquals(2, requests.get());
+        assertEquals(12, result.getToolCalls().get(0).getArguments().get("productId"));
+    }
+
     private OpenAiCompatibleModelGateway gatewayReturning(String sseBody) throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/v1/chat/completions", exchange -> respond(exchange, sseBody));
@@ -84,7 +112,9 @@ class OpenAiCompatibleModelGatewayStreamingTest {
 
     private void respond(HttpExchange exchange, String body) throws IOException {
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
-        exchange.getResponseHeaders().set("Content-Type", "text/event-stream; charset=utf-8");
+        if (!exchange.getResponseHeaders().containsKey("Content-Type")) {
+            exchange.getResponseHeaders().set("Content-Type", "text/event-stream; charset=utf-8");
+        }
         exchange.sendResponseHeaders(200, 0);
         exchange.getResponseBody().write(bytes);
         exchange.close();
