@@ -1,0 +1,84 @@
+<view class="billing-screen">
+  <view class="state-card" wx:if="{{loading}}">正在读取单据…</view>
+  <view class="state-card error" wx:elif="{{error}}"><view>{{error}}</view><button bindtap="retry">重新加载</button></view>
+
+  <block wx:else>
+    <view class="billing-head">
+      <view><view class="eyebrow">快捷开单</view><view class="page-title">{{document && document.status === 'CONFIRMED' ? '已保存销售单' : '编辑销售单'}}</view><view class="page-subtitle">先修改内容，再按正式版式预览</view></view>
+      <view class="document-state {{document && document.status === 'CONFIRMED' ? 'confirmed' : ''}}">{{document && document.status === 'CONFIRMED' ? '已保存' : '草稿'}}</view>
+    </view>
+
+    <view class="view-switch">
+      <view class="{{mode === 'edit' ? 'active' : ''}}" data-mode="edit" bindtap="setMode">编辑明细</view>
+      <view class="{{mode === 'preview' ? 'active' : ''}}" data-mode="preview" bindtap="setMode">单据预览</view>
+    </view>
+
+    <view class="editor" wx:if="{{mode === 'edit'}}">
+      <view class="section-card product-search">
+        <view class="section-heading"><view><view class="section-title">快速添加商品</view><view class="section-note">常用商品排在前面，也可搜索商品库和百科</view></view></view>
+        <view class="search-row"><text>⌕</text><input value="{{searchKeyword}}" placeholder="输入商品名称或规格" bindinput="changeSearch" bindfocus="searchProducts" /></view>
+        <scroll-view class="candidate-list" scroll-x wx:if="{{candidates.length}}" enhanced show-scrollbar="{{false}}">
+          <view class="candidate-row"><view class="candidate" wx:for="{{candidates}}" wx:key="candidateKey" data-index="{{index}}" bindtap="chooseCandidate"><view class="candidate-name">{{item.name}}</view><view class="candidate-meta">{{item.specification || item.category || '通用商品'}}<text wx:if="{{item.unit}}"> · {{item.unit}}</text><text wx:if="{{item.price !== null && item.price !== undefined}}"> · ¥{{item.price}}</text></view><view class="candidate-source">{{item.source}}</view></view></view>
+        </scroll-view>
+      </view>
+
+      <view class="section-card">
+        <view class="section-heading"><view><view class="section-title">单据信息</view><view class="section-note">表头与底部核心信息</view></view></view>
+        <view class="field"><text>开票方</text><input value="{{form.companyName}}" data-field="companyName" bindinput="changeForm" placeholder="店铺或公司名称" /></view>
+        <view class="field-grid">
+          <view class="field"><text>客户名称</text><input value="{{form.customerName}}" data-field="customerName" bindinput="changeForm" placeholder="可暂不填写" /></view>
+          <view class="field"><text>开单日期</text><picker mode="date" value="{{form.date}}" bindchange="changeDate"><view class="picker-field">{{form.date}}</view></picker></view>
+        </view>
+        <view class="field-grid">
+          <view class="field"><text>联系电话</text><input value="{{form.phone}}" data-field="phone" bindinput="changeForm" placeholder="可暂不填写" /></view>
+          <view class="field"><text>整单备注</text><input value="{{form.remark}}" data-field="remark" bindinput="changeForm" placeholder="交付、收款等说明" /></view>
+        </view>
+      </view>
+
+      <view class="section-card lines-card">
+        <view class="section-heading"><view><view class="section-title">商品明细</view><view class="section-note">金额按数量 × 单价自动计算</view></view><view class="add-line" bindtap="addLine">＋ 添加</view></view>
+        <view class="line-card" wx:for="{{lines}}" wx:key="index">
+          <view class="line-head"><view><text>第 {{index + 1}} 项</text><text class="line-amount">¥{{item.amountText}}</text></view><view class="remove-line" data-index="{{index}}" bindtap="removeLine">删除</view></view>
+          <view class="field"><text>商品名称</text><input value="{{item.name}}" data-index="{{index}}" data-field="name" bindinput="changeLine" placeholder="必填" /></view>
+          <view class="field-grid">
+            <view class="field"><text>规格型号</text><input value="{{item.specification}}" data-index="{{index}}" data-field="specification" bindinput="changeLine" placeholder="选填" /></view>
+            <view class="field"><text>单位</text><input value="{{item.unit}}" data-index="{{index}}" data-field="unit" bindinput="changeLine" placeholder="必填" /></view>
+          </view>
+          <view class="unit-choices" wx:if="{{item.unitChoices.length}}"><view wx:for="{{item.unitChoices}}" wx:for-item="unit" wx:for-index="unitIndex" wx:key="*this" data-index="{{item.index - 1}}" data-unit="{{unit}}" bindtap="chooseUnit">{{unit}}</view></view>
+          <view class="field-grid triple">
+            <view class="field"><text>数量</text><input type="digit" value="{{item.quantity}}" data-index="{{index}}" data-field="quantity" bindinput="changeLine" placeholder="必填" /></view>
+            <view class="field"><text>单价</text><input type="digit" value="{{item.price}}" data-index="{{index}}" data-field="price" bindinput="changeLine" placeholder="必填" /></view>
+            <view class="field"><text>备注</text><input value="{{item.remark}}" data-index="{{index}}" data-field="remark" bindinput="changeLine" placeholder="选填" /></view>
+          </view>
+          <label class="remember-row"><switch checked="{{item.remember}}" data-index="{{index}}" bindchange="toggleRemember" color="#2865D7" /><view><text>记住这件商品</text><text class="remember-note">确认单据后，下次搜索会更靠前</text></view></label>
+          <view class="source-note" wx:if="{{item.referenceSource || item.sourceAmount}}"><text>{{item.referenceSource}}</text><text wx:if="{{item.sourceAmount}}">票面金额：{{item.sourceAmount}}</text></view>
+        </view>
+      </view>
+      <view class="source-evidence" wx:if="{{form.sourceNote}}"><view class="section-title">识别来源与待核对项</view><view>{{form.sourceNote}}</view></view>
+    </view>
+
+    <view class="preview-wrap" wx:else>
+      <view class="preview-hint"><text>{{document && document.status === 'CONFIRMED' ? '这是已保存版本' : '预览会随编辑内容同步更新'}}</text><view wx:if="{{incompleteCount}}">{{incompleteCount}} 行待补齐</view></view>
+      <view class="receipt-paper">
+        <view class="receipt-company">{{form.companyName || '恒迪模具五金'}}</view>
+        <view class="receipt-title">销 售 单</view>
+        <view class="receipt-number">{{document && document.number ? document.number : '草稿 · 确认后生成单号'}}</view>
+        <view class="receipt-rule"></view>
+        <view class="receipt-info"><view><text>客户</text><text class="receipt-info-value">{{form.customerName || '未填写'}}</text></view><view><text>日期</text><text class="receipt-info-value">{{form.date}}</text></view><view><text>电话</text><text class="receipt-info-value">{{form.phone || '未填写'}}</text></view></view>
+        <view class="receipt-table">
+          <view class="receipt-row receipt-header"><text class="col-no">序</text><text class="col-name">商品名称</text><text class="col-spec">规格</text><text class="col-unit">单位</text><text class="col-qty">数量</text><text class="col-price">单价</text><text class="col-amount">金额</text></view>
+          <view class="receipt-row" wx:for="{{lines}}" wx:key="index"><text class="col-no">{{index + 1}}</text><text class="col-name">{{item.name || '待填写'}}</text><text class="col-spec">{{item.specification || '—'}}</text><text class="col-unit">{{item.unit || '—'}}</text><text class="col-qty">{{item.quantity || '—'}}</text><text class="col-price">{{item.price || '—'}}</text><text class="col-amount">{{item.amountText}}</text></view>
+          <view class="receipt-total"><text>合计</text><text class="receipt-total-value">¥{{totalText}}</text></view>
+        </view>
+        <view class="receipt-footer"><view><text>备注</text><text class="receipt-footer-value">{{form.remark || '无'}}</text></view><view class="receipt-notice">请当面核对商品、数量和金额；本单据仅用于打印和导出。</view></view>
+      </view>
+    </view>
+    <view class="bottom-space"></view>
+
+    <view class="billing-bar">
+      <view class="billing-summary"><text>合计</text><text class="billing-summary-value">¥{{totalText}}</text><text class="billing-summary-status">{{statusText}}</text></view>
+      <view class="bar-actions" wx:if="{{document && document.status === 'CONFIRMED'}}"><view class="secondary-action" wx:if="{{generatedFile}}" bindtap="openGenerated">打开 Excel</view><view class="primary-action" bindtap="exportExcel">{{busy ? '处理中…' : '重新生成'}}</view></view>
+      <view class="bar-actions" wx:else><view class="secondary-action" wx:if="{{mode === 'edit'}}" bindtap="saveDraft">保存草稿</view><view class="secondary-action" wx:else data-mode="edit" bindtap="setMode">返回修改</view><view class="primary-action" wx:if="{{mode === 'edit'}}" bindtap="previewDocument">预览单据</view><view class="primary-action" wx:else bindtap="confirmDocument">{{busy ? '处理中…' : '保存并导出'}}</view></view>
+    </view>
+  </block>
+</view>

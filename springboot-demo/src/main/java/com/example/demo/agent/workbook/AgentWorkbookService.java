@@ -24,6 +24,11 @@ import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
+import org.apache.poi.ss.usermodel.VerticalAlignment;
+import org.apache.poi.ss.usermodel.BorderStyle;
+import org.apache.poi.ss.usermodel.PrintSetup;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.ss.util.CellReference;
 import org.apache.poi.xssf.usermodel.XSSFFormulaEvaluator;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -80,7 +85,8 @@ public class AgentWorkbookService {
     private static final String RETENTION = "永久保存，可在“我的文件”中随时删除";
     private static final String EFFECT = "只生成一份可编辑的 Excel 文件，不修改商品、库存、价格、订单或账本";
     private static final BigDecimal AMOUNT_TOLERANCE = new BigDecimal("0.005");
-    private static final DateTimeFormatter FILE_STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmm");
+    private static final DateTimeFormatter FILE_STAMP = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
+    private static final String RENDER_REVISION = "receipt-v2-simple";
     private static final DateTimeFormatter MONTH_STAMP = DateTimeFormatter.ofPattern("yyyyMM");
     private static final DateTimeFormatter TIME_STAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final List<DateTimeFormatter> DATE_FORMATS = List.of(
@@ -125,7 +131,7 @@ public class AgentWorkbookService {
     public Map<String, Object> generate(Long runId, Long operatorId, AgentWorkbookSpec spec) {
         Prepared prepared = prepare(runId, operatorId, spec);
         String digest = digest(spec);
-        String idempotencyKey = "agent-xlsx-" + runId + "-" + digest.substring(0, 16);
+        String idempotencyKey = "agent-xlsx-" + runId + "-" + RENDER_REVISION + "-" + digest.substring(0, 16);
         Optional<ExcelTaskOutput> prior = outputRepository.findByOperatorIdAndIdempotencyKey(operatorId, idempotencyKey);
         if (prior.isPresent()) {
             if (!digest.equals(prior.get().getRequestDigest())) {
@@ -160,6 +166,9 @@ public class AgentWorkbookService {
                 + "-" + UUID.randomUUID().toString().substring(0, 8) + ".xlsx";
         try {
             storage.put(objectKey, bytes, WorkbookRenderSupport.XLSX_MIME);
+            if (storage.stat(objectKey).size() != bytes.length) {
+                throw new IllegalStateException("保存后的 Excel 文件大小校验失败");
+            }
         } catch (RuntimeException exception) {
             output.setStatus("FAILED");
             output.setErrorMessage(WorkbookRenderSupport.limit(exception.getMessage(), 1000));
@@ -186,7 +195,9 @@ public class AgentWorkbookService {
         if (sheetSpecs.isEmpty()) throw new IllegalArgumentException("至少需要一个带表头和数据行的工作表");
         if (sheetSpecs.size() > MAX_SHEETS) throw new IllegalArgumentException("工作表不能超过 " + MAX_SHEETS + " 个");
 
-        Set<String> usedNames = new HashSet<>(List.of(INFO_SHEET, SOURCE_SHEET, ABOUT_SHEET));
+        String layout = StringUtils.hasText(spec.getLayout()) ? spec.getLayout().trim().toUpperCase(Locale.ROOT) : "TABLE";
+        if (!Set.of("TABLE", "RECEIPT").contains(layout)) throw new IllegalArgumentException("不支持的单据版式：" + layout);
+        Set<String> usedNames = new HashSet<>(List.of(INFO_SHEET, SOURCE_SHEET, ABOUT_SHEET, AgentWorkbookSheets.RECEIPT));
         List<PreparedSheet> sheets = new ArrayList<>();
         int totalRows = 0;
         int mismatches = 0;
@@ -201,6 +212,7 @@ public class AgentWorkbookService {
             sheets.add(sheet);
         }
         if (totalRows == 0) throw new IllegalArgumentException("没有可写入的数据行，请先整理出表格内容");
+        if (layout.equals("RECEIPT")) ReceiptWorkbookRenderer.validate(sheets.get(0));
 
         Long conversationId = conversationService == null || runId == null ? null
                 : conversationService.conversationIdForRun(runId);
@@ -209,7 +221,36 @@ public class AgentWorkbookService {
         boolean includeSource = wantsSource && attachment != null && StringUtils.hasText(attachment.getExtractedText());
         if (wantsSource && !includeSource) warnings.add("没有可附带的附件识别原文，已跳过“附件原文”工作表");
         List<InfoEntry> info = cleanInfo(spec.getInfo(), warnings);
-        return new Prepared(title, sheets, info, attachment, conversationId, includeSource,
+        if (title.equals("单据明细")) {
+            String party = infoValue(info, "开票方", "供货单位", "供应商", "公司名称");
+            String number = infoValue(info, "单号", "订单号", "单据编号", "票号");
+            if (!party.equals("未提供")) title = cleanTitle(truncate(party, 28) + "_单据明细");
+            if (!number.equals("未提供")) title = cleanTitle(title + "_" + number);
+        }
+        for (PreparedSheet sheet : sheets) {
+            int calculated = indexOfRole(sheet.columns, ColumnRole.CALCULATED_AMOUNT);
+            if (calculated >= 0 && sheet.rows.stream().anyMatch(row -> row.get(calculated).number == null))
+                warnings.add("工作表“" + sheet.name + "”有行缺少可核算数据；核算合计仅汇总可计算行，不代表完整票面总额");
+        }
+        if (sheets.size() == 1) {
+            PreparedSheet sheet = sheets.get(0);
+            int calculated = indexOfRole(sheet.columns, ColumnRole.CALCULATED_AMOUNT);
+            if (calculated >= 0 && sheet.rows.stream().allMatch(row -> row.get(calculated).number != null)) {
+                BigDecimal sum = sheet.rows.stream().map(row -> row.get(calculated).number).reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_UP);
+                for (InfoEntry entry : info) {
+                    if (!entry.getLabel().matches(".*(票面合计|票面总额|票面总计).*")) continue;
+                    BigDecimal printed = parseNumber(entry.getValue());
+                    if (printed == null && entry.getValue() != null) {
+                        var matcher = java.util.regex.Pattern.compile("[￥¥]\\s*[:：]?\\s*([0-9,]+(?:\\.[0-9]+)?)").matcher(entry.getValue());
+                        if (matcher.find()) printed = parseNumber(matcher.group(1));
+                    }
+                    if (printed != null && printed.subtract(sum).abs().compareTo(AMOUNT_TOLERANCE) > 0)
+                        warnings.add("生成时核算合计 " + sum.toPlainString() + "；票面合计原文中的数值 " + printed.setScale(2, RoundingMode.HALF_UP).toPlainString()
+                                + "；相差 " + printed.subtract(sum).abs().setScale(2, RoundingMode.HALF_UP).toPlainString() + "，请核对原单，系统未调整任何源数据");
+                }
+            }
+        }
+        return new Prepared(title, layout, sheets, info, attachment, conversationId, includeSource,
                 cleanNote(spec.getNote()), warnings, totalRows, mismatches);
     }
 
@@ -230,12 +271,29 @@ public class AgentWorkbookService {
             int suffix = 2;
             while (!headerNames.add(header)) header = base + "-" + suffix++;
             ColumnRole role = ColumnRole.parse(columnSpec.getRole());
-            columns.add(new PreparedColumn(header, ColumnType.parse(columnSpec.getType(), role, header), role));
+            if (header.matches(".*(核算金额|计算金额).*")) role = ColumnRole.CALCULATED_AMOUNT;
+            else if (role == ColumnRole.NONE && header.matches("^(数量|件数|数目)$")) role = ColumnRole.QUANTITY;
+            else if (role == ColumnRole.NONE && header.matches("^(单价|折前单价|含税单价)$")) role = ColumnRole.UNIT_PRICE;
+            else if (role == ColumnRole.NONE && header.matches("^(金额|票面金额|折后金额|小计)$")) role = ColumnRole.AMOUNT;
+            columns.add(new PreparedColumn(header, role == ColumnRole.CALCULATED_AMOUNT ? ColumnType.MONEY : ColumnType.parse(columnSpec.getType(), role, header), role));
         }
         int quantityIndex = indexOfRole(columns, ColumnRole.QUANTITY);
         int unitPriceIndex = indexOfRole(columns, ColumnRole.UNIT_PRICE);
         int amountIndex = indexOfRole(columns, ColumnRole.AMOUNT);
-        boolean verify = quantityIndex >= 0 && unitPriceIndex >= 0 && amountIndex >= 0;
+        boolean verify = quantityIndex >= 0 && unitPriceIndex >= 0;
+        boolean addLineNumber = verify && columns.stream().noneMatch(column -> column.header.matches("^(行号|序号)$"));
+        if (addLineNumber) {
+            if (columns.size() >= MAX_COLUMNS - 1) throw new IllegalArgumentException("请为序号及核算金额预留两列");
+            columns.add(0, new PreparedColumn("序号", ColumnType.INTEGER, ColumnRole.NONE));
+            quantityIndex++; unitPriceIndex++; if (amountIndex >= 0) amountIndex++;
+        }
+        int calculatedIndex = indexOfRole(columns, ColumnRole.CALCULATED_AMOUNT);
+        if (verify && calculatedIndex < 0) {
+            if (columns.size() >= MAX_COLUMNS) throw new IllegalArgumentException("需要为核算金额预留一列，原始字段不能超过 " + (MAX_COLUMNS - 1) + " 列");
+            calculatedIndex = columns.size();
+            columns.add(new PreparedColumn("核算金额", ColumnType.MONEY, ColumnRole.CALCULATED_AMOUNT));
+        }
+        boolean hasPricingAdjustments = columns.stream().anyMatch(column -> column.header.matches(".*(折扣|优惠|税率|运费).*"));
 
         List<Object> rawRows = spec.getRows() == null ? List.of() : spec.getRows();
         if (rawRows.size() > MAX_ROWS_PER_SHEET) {
@@ -249,6 +307,10 @@ public class AgentWorkbookService {
         for (Object raw : rawRows) {
             List<Object> values = rowValues(raw, columns);
             if (values.stream().allMatch(value -> value == null || !StringUtils.hasText(String.valueOf(value)))) continue;
+            if (addLineNumber) {
+                if (raw instanceof List<?>) values.add(0, rows.size() + 1);
+                else if (!values.isEmpty()) values.set(0, rows.size() + 1);
+            }
             List<PreparedCell> cells = new ArrayList<>();
             List<String> notes = new ArrayList<>();
             for (int column = 0; column < columns.size(); column++) {
@@ -263,20 +325,27 @@ public class AgentWorkbookService {
             if (verify) {
                 BigDecimal quantity = cells.get(quantityIndex).number;
                 BigDecimal unitPrice = cells.get(unitPriceIndex).number;
-                PreparedCell amount = cells.get(amountIndex);
-                if (quantity != null && unitPrice != null) {
+                PreparedCell amount = amountIndex >= 0 ? cells.get(amountIndex) : PreparedCell.empty();
+                if (hasPricingAdjustments) {
+                    cells.set(calculatedIndex, PreparedCell.empty());
+                    notes.add("含折扣、优惠或附加费用字段，计价规则需确认，未自动核算");
+                } else if (quantity != null && unitPrice != null) {
                     BigDecimal expected = quantity.multiply(unitPrice).setScale(2, RoundingMode.HALF_UP);
+                    cells.set(calculatedIndex, PreparedCell.number(expected, false));
                     if (amount.number == null && !StringUtils.hasText(amount.text)) {
-                        cells.set(amountIndex, PreparedCell.number(expected, false));
-                        notes.add("金额按数量×单价补算为 " + expected.toPlainString());
+                        notes.add("票面金额未提供；仅计算核算金额，不代表原单金额");
                     } else if (amount.number != null && amount.number.subtract(expected).abs().compareTo(AMOUNT_TOLERANCE) > 0) {
                         cells.set(amountIndex, PreparedCell.number(amount.number, true));
                         mismatchCount++;
-                        notes.add("金额验算：" + plain(quantity) + "×" + plain(unitPrice) + "=" + expected.toPlainString()
+                        notes.add("生成时金额验算：" + plain(quantity) + "×" + plain(unitPrice) + "=" + expected.toPlainString()
                                 + "，与填写值 " + plain(amount.number) + " 不一致，请核对");
                     }
                 } else if (amount.number != null) {
+                    cells.set(calculatedIndex, PreparedCell.empty());
                     notes.add("数量或单价缺失，金额未验算");
+                } else {
+                    cells.set(calculatedIndex, PreparedCell.empty());
+                    notes.add("数量或单价缺失，核算金额留空，需人工核对");
                 }
             }
             rows.add(cells);
@@ -294,6 +363,7 @@ public class AgentWorkbookService {
             else totals.add(found);
         }
         if (amountIndex >= 0 && columns.get(amountIndex).type.numeric()) totals.add(amountIndex);
+        if (calculatedIndex >= 0) totals.add(calculatedIndex);
         boolean hasNotes = rowNotes.stream().anyMatch(StringUtils::hasText);
         return new PreparedSheet(name, columns, rows, rowNotes, hasNotes, new ArrayList<>(totals), mismatchCount,
                 cleanNote(spec.getNote()));
@@ -373,7 +443,8 @@ public class AgentWorkbookService {
     byte[] render(Prepared prepared, LocalDateTime now, Long operatorId, Long runId) {
         try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream buffer = new ByteArrayOutputStream()) {
             Styles styles = new Styles(workbook);
-            for (PreparedSheet sheet : prepared.sheets) renderSheet(workbook, styles, sheet);
+            for (PreparedSheet sheet : prepared.sheets) renderSheet(workbook, styles, sheet, prepared);
+            if (prepared.layout.equals("RECEIPT")) ReceiptWorkbookRenderer.render(workbook, prepared);
             if (!prepared.info.isEmpty()) renderInfo(workbook, styles, prepared.info);
             if (prepared.includeSourceText) renderSource(workbook, styles, prepared.attachment);
             renderAbout(workbook, styles, prepared, now, operatorId, runId);
@@ -385,13 +456,23 @@ public class AgentWorkbookService {
         }
     }
 
-    private void renderSheet(Workbook workbook, Styles styles, PreparedSheet prepared) {
+    private void renderSheet(Workbook workbook, Styles styles, PreparedSheet prepared, Prepared document) {
         Sheet sheet = workbook.createSheet(prepared.name);
         int columnCount = prepared.columns.size() + (prepared.hasNotes ? 1 : 0);
-        Row header = sheet.createRow(0);
+        boolean order = indexOfRole(prepared.columns, ColumnRole.QUANTITY) >= 0 && indexOfRole(prepared.columns, ColumnRole.UNIT_PRICE) >= 0;
+        int headerIndex = order ? 3 : 0;
+        if (order) {
+            mergedLine(sheet, 0, columnCount, document.title.replace('_', ' '), styles.title, 34);
+            mergedLine(sheet, 1, columnCount, "单据编号：" + infoValue(document.info, "单号", "订单号", "单据编号", "票号")
+                    + "                 单据日期：" + infoValue(document.info, "日期", "单据日期", "开票日期", "订单日期"), styles.meta, 24);
+            mergedLine(sheet, 2, columnCount, "供货单位：" + infoValue(document.info, "开票方", "供货单位", "供应商", "公司名称")
+                    + "                 购货单位：" + infoValue(document.info, "购货单位", "客户", "客户名称", "购买单位"), styles.meta, 26);
+        }
+        Row header = sheet.createRow(headerIndex);
+        header.setHeightInPoints(27);
         for (int column = 0; column < prepared.columns.size(); column++) {
             Cell cell = header.createCell(column);
-            cell.setCellValue(WorkbookRenderSupport.safeText(prepared.columns.get(column).header));
+            cell.setCellValue(WorkbookRenderSupport.safeText(displayHeader(prepared.columns.get(column))));
             cell.setCellStyle(styles.header);
         }
         if (prepared.hasNotes) {
@@ -399,23 +480,35 @@ public class AgentWorkbookService {
             cell.setCellValue(NOTE_COLUMN);
             cell.setCellStyle(styles.header);
         }
-        int rowIndex = 1;
+        int rowIndex = headerIndex + 1;
+        int quantityIndex = indexOfRole(prepared.columns, ColumnRole.QUANTITY);
+        int priceIndex = indexOfRole(prepared.columns, ColumnRole.UNIT_PRICE);
+        boolean adjusted = prepared.columns.stream().anyMatch(column -> column.header.matches(".*(折扣|优惠|税率|运费).*"));
         for (int row = 0; row < prepared.rows.size(); row++) {
             Row target = sheet.createRow(rowIndex++);
+            target.setHeightInPoints(prepared.hasNotes ? 42 : 24);
             List<PreparedCell> cells = prepared.rows.get(row);
             for (int column = 0; column < prepared.columns.size(); column++) {
-                writeCell(target.createCell(column), cells.get(column), prepared.columns.get(column), styles);
+                Cell cell = target.createCell(column);
+                if (prepared.columns.get(column).role == ColumnRole.CALCULATED_AMOUNT && quantityIndex >= 0 && priceIndex >= 0 && !adjusted) {
+                    String q = CellReference.convertNumToColString(quantityIndex) + rowIndex;
+                    String p = CellReference.convertNumToColString(priceIndex) + rowIndex;
+                    cell.setCellFormula("IF(AND(ISNUMBER(" + q + "),ISNUMBER(" + p + ")),ROUND(" + q + "*" + p + ",2),\"\")");
+                    cell.setCellStyle(styles.number(ColumnType.MONEY, false));
+                } else writeCell(cell, cells.get(column), prepared.columns.get(column), styles);
             }
             if (prepared.hasNotes) {
                 String note = prepared.rowNotes.get(row);
                 Cell cell = target.createCell(prepared.columns.size());
                 cell.setCellValue(WorkbookRenderSupport.safeText(note));
-                if (StringUtils.hasText(note)) cell.setCellStyle(styles.flaggedText);
+                cell.setCellStyle(StringUtils.hasText(note) ? styles.flaggedText : styles.text);
             }
         }
         int lastDataRow = rowIndex - 1;
         if (!prepared.totalColumns.isEmpty() && !prepared.rows.isEmpty()) {
             Row total = sheet.createRow(rowIndex++);
+            total.setHeightInPoints(26);
+            for (int col = 0; col < columnCount; col++) total.createCell(col).setCellStyle(styles.totalText);
             if (!prepared.totalColumns.contains(0)) {
                 Cell label = total.createCell(0);
                 label.setCellValue(AgentWorkbookSheets.TOTAL_LABEL);
@@ -424,15 +517,57 @@ public class AgentWorkbookService {
             for (int column : prepared.totalColumns) {
                 String letter = CellReference.convertNumToColString(column);
                 Cell cell = total.createCell(column);
-                cell.setCellFormula("SUM(" + letter + "2:" + letter + (lastDataRow + 1) + ")");
+                String range = letter + (headerIndex + 2) + ":" + letter + (lastDataRow + 1);
+                cell.setCellFormula("IF(COUNT(" + range + ")=0,\"\",SUM(" + range + "))");
                 cell.setCellStyle(styles.total(prepared.columns.get(column).type));
             }
         }
         if (StringUtils.hasText(prepared.note)) {
-            Row note = sheet.createRow(rowIndex + 1);
-            note.createCell(0).setCellValue(WorkbookRenderSupport.safeText("说明：" + prepared.note));
+            mergedLine(sheet, rowIndex++, columnCount, "说明：" + prepared.note, styles.meta, 30);
+        }
+        if (order) {
+            mergedLine(sheet, rowIndex++, columnCount, adjusted ? "说明：计价调整规则待确认，核算金额留空；票面金额按原文保留。"
+                    : "说明：核算金额随数量、单价修改自动重算；票面金额按原文保留。核对说明为生成时记录，改动后需重新核对。", styles.meta, 30);
+            for (InfoEntry entry : document.info) {
+                if (entry.getLabel().contains("合计") || entry.getLabel().contains("识别说明"))
+                    mergedLine(sheet, rowIndex++, columnCount, "说明：" + entry.getLabel() + "：" + entry.getValue(), styles.meta, 28);
+            }
+            for (String warning : document.warnings) mergedLine(sheet, rowIndex++, columnCount, "说明：待核对：" + warning, styles.meta, 30);
         }
         WorkbookRenderSupport.finishSheet(sheet, columnCount, lastDataRow);
+        for (int col = 0; col < columnCount; col++) {
+            String label = col < prepared.columns.size() ? prepared.columns.get(col).header : NOTE_COLUMN;
+            if (label.contains("说明") || label.contains("备注")) sheet.setColumnWidth(col, 11000);
+            else if (label.matches(".*(项目|商品|名称|品名).*")) sheet.setColumnWidth(col, 6500);
+            else if (label.contains("单位")) sheet.setColumnWidth(col, 2600);
+            else if (label.contains("金额") || label.contains("单价")) sheet.setColumnWidth(col, 3600);
+        }
+        sheet.setDisplayGridlines(false);
+        sheet.createFreezePane(0, headerIndex + 1);
+        sheet.setAutoFilter(new CellRangeAddress(headerIndex, Math.max(headerIndex, lastDataRow), 0, columnCount - 1));
+        sheet.setRepeatingRows(new CellRangeAddress(0, headerIndex, -1, -1));
+        sheet.setFitToPage(true); sheet.setAutobreaks(true);
+        sheet.getPrintSetup().setLandscape(true); sheet.getPrintSetup().setPaperSize(PrintSetup.A4_PAPERSIZE);
+        sheet.getPrintSetup().setFitWidth((short) 1); sheet.getPrintSetup().setFitHeight((short) 0);
+        sheet.setMargin(Sheet.LeftMargin, 0.25); sheet.setMargin(Sheet.RightMargin, 0.25);
+        sheet.setMargin(Sheet.TopMargin, 0.35); sheet.setMargin(Sheet.BottomMargin, 0.35);
+        workbook.setPrintArea(workbook.getSheetIndex(sheet), 0, columnCount - 1, 0, sheet.getLastRowNum());
+    }
+
+    private static String displayHeader(PreparedColumn column) {
+        return column.role == ColumnRole.AMOUNT && column.header.equals("金额") ? "票面金额" : column.header;
+    }
+
+    private static String infoValue(List<InfoEntry> info, String... labels) {
+        for (String label : labels) for (InfoEntry item : info)
+            if (label.equals(item.getLabel()) && StringUtils.hasText(item.getValue())) return item.getValue();
+        return "未提供";
+    }
+
+    private void mergedLine(Sheet sheet, int index, int columns, String value, CellStyle style, float height) {
+        Row row = sheet.createRow(index); row.setHeightInPoints(height);
+        Cell cell = row.createCell(0); cell.setCellValue(WorkbookRenderSupport.safeText(value)); cell.setCellStyle(style);
+        if (columns > 1) sheet.addMergedRegion(new CellRangeAddress(index, index, 0, columns - 1));
     }
 
     private void writeCell(Cell cell, PreparedCell value, PreparedColumn column, Styles styles) {
@@ -446,8 +581,9 @@ public class AgentWorkbookService {
             cell.setCellStyle(styles.date(value.flagged));
             return;
         }
-        cell.setCellValue(WorkbookRenderSupport.safeText(value.text == null ? "" : value.text));
-        if (value.flagged || value.nonNumeric) cell.setCellStyle(styles.flaggedText);
+        if (value.text == null || value.text.isEmpty()) cell.setBlank();
+        else cell.setCellValue(WorkbookRenderSupport.safeText(value.text));
+        cell.setCellStyle(value.flagged || value.nonNumeric ? styles.flaggedText : styles.text);
     }
 
     private void renderInfo(Workbook workbook, Styles styles, List<InfoEntry> info) {
@@ -460,8 +596,12 @@ public class AgentWorkbookService {
             Row row = sheet.createRow(rowIndex++);
             row.createCell(0).setCellValue(WorkbookRenderSupport.safeText(entry.getLabel()));
             row.createCell(1).setCellValue(WorkbookRenderSupport.safeText(entry.getValue()));
+            if (entry.getValue().isEmpty()) row.getCell(1).setBlank();
+            row.getCell(0).setCellStyle(styles.text); row.getCell(1).setCellStyle(styles.longText);
+            row.setHeightInPoints(Math.max(28, Math.min(140, 14 * (float)Math.ceil(entry.getValue().length() / 32.0) + 8)));
         }
         WorkbookRenderSupport.finishSheet(sheet, 2, rowIndex - 1);
+        sheet.setColumnWidth(0, 6000); sheet.setColumnWidth(1, 19000);
     }
 
     private void renderSource(Workbook workbook, Styles styles, AgentAttachment attachment) {
@@ -490,7 +630,7 @@ public class AgentWorkbookService {
         List<String[]> lines = new ArrayList<>();
         lines.add(new String[] {"文件标题", prepared.title});
         lines.add(new String[] {"生成时间", now.format(TIME_STAMP)});
-        lines.add(new String[] {"生成方式", "小五根据对话中整理并经用户确认的内容生成"});
+        lines.add(new String[] {"生成方式", "按对话中整理的内容生成；待核对项以明细及说明为准"});
         lines.add(new String[] {"操作人 ID", String.valueOf(operatorId)});
         lines.add(new String[] {"Agent 任务 ID", runId == null ? "" : String.valueOf(runId)});
         if (prepared.attachment != null) {
@@ -501,7 +641,7 @@ public class AgentWorkbookService {
         lines.add(new String[] {"工作表", prepared.sheets.stream().map(item -> item.name + "（" + item.rows.size() + " 行）")
                 .reduce((left, right) -> left + "、" + right).orElse("")});
         lines.add(new String[] {"数据行数", String.valueOf(prepared.totalRows)});
-        lines.add(new String[] {"金额验算差异", String.valueOf(prepared.mismatchCount) + " 行"});
+        lines.add(new String[] {"金额验算差异", String.valueOf(prepared.mismatchCount) + " 行（仅统计可逐行核对的票面金额；金额缺失不代表一致）"});
         if (!prepared.warnings.isEmpty()) lines.add(new String[] {"提示", String.join("；", prepared.warnings)});
         if (StringUtils.hasText(prepared.note)) lines.add(new String[] {"补充说明", prepared.note});
         lines.add(new String[] {"声明", "数量×单价的验算差异已在“" + NOTE_COLUMN + "”列标出；本文件不代表已写入商品、库存、价格或订单，数据请以原始单据为准。"});
@@ -510,8 +650,12 @@ public class AgentWorkbookService {
             Row row = sheet.createRow(rowIndex++);
             row.createCell(0).setCellValue(WorkbookRenderSupport.safeText(line[0]));
             row.createCell(1).setCellValue(WorkbookRenderSupport.safeText(line[1]));
+            if (line[1].isEmpty()) row.getCell(1).setBlank();
+            row.getCell(0).setCellStyle(styles.text); row.getCell(1).setCellStyle(styles.longText);
+            row.setHeightInPoints(Math.max(28, Math.min(140, 14 * (float)Math.ceil(line[1].length() / 32.0) + 8)));
         }
         WorkbookRenderSupport.finishSheet(sheet, 2, rowIndex - 1);
+        sheet.setColumnWidth(0, 6000); sheet.setColumnWidth(1, 19000);
     }
 
     private void writeHeader(Row row, int column, String text, Styles styles) {
@@ -526,6 +670,7 @@ public class AgentWorkbookService {
         Map<String, Object> view = new LinkedHashMap<>();
         view.put("kind", "EXCEL_WORKBOOK");
         view.put("title", prepared.title);
+        view.put("layout", prepared.layout);
         view.put("fileName", prepared.fileName(LocalDateTime.now()));
         view.put("sheetCount", prepared.sheets.size());
         view.put("rowCount", prepared.totalRows);
@@ -533,7 +678,7 @@ public class AgentWorkbookService {
         List<Map<String, Object>> sheets = new ArrayList<>();
         for (PreparedSheet sheet : prepared.sheets) {
             Map<String, Object> item = sheetSummary(sheet);
-            item.put("columns", sheet.columns.stream().map(column -> column.header).toList());
+            item.put("columns", sheet.columns.stream().map(AgentWorkbookService::displayHeader).toList());
             item.put("totalColumns", sheet.totalColumns.stream().map(index -> sheet.columns.get(index).header).toList());
             item.put("sampleRows", sampleRows(sheet));
             sheets.add(item);
@@ -561,6 +706,7 @@ public class AgentWorkbookService {
         result.put("fileName", output.getOriginalName());
         result.put("fileSize", output.getFileSize());
         result.put("status", output.getStatus());
+        result.put("layout", prepared.layout);
         result.put("downloadPath", "/agent/outputs/" + output.getId() + "/download");
         result.put("sheets", prepared.sheets.stream().map(this::sheetSummary).toList());
         result.put("rowCount", prepared.totalRows);
@@ -574,6 +720,7 @@ public class AgentWorkbookService {
     private Map<String, Object> summary(Prepared prepared) {
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("title", prepared.title);
+        summary.put("layout", prepared.layout);
         summary.put("sheets", prepared.sheets.stream().map(this::sheetSummary).toList());
         summary.put("rowCount", prepared.totalRows);
         summary.put("mismatchCount", prepared.mismatchCount);
@@ -615,7 +762,13 @@ public class AgentWorkbookService {
     private String cleanTitle(String value) {
         String title = StringUtils.hasText(value) ? value.replaceAll("[\\\\/:*?\"<>|\\r\\n\\t]", " ").replaceAll("\\s+", " ").trim() : "";
         if (title.toLowerCase(Locale.ROOT).endsWith(".xlsx")) title = title.substring(0, title.length() - 5).trim();
-        if (title.isEmpty()) title = "小五生成表格";
+        title = title.replaceAll("(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", "")
+                .replaceAll("(?i)(?<![0-9a-f])[0-9a-f]{32}(?![0-9a-f])", "")
+                .replaceAll("(?i)\\.(png|jpe?g|webp)$", "")
+                .replaceAll("[-_]20\\d{6}[-_]\\d{4,6}$", "")
+                .replaceAll("[_\\s-]+$", "").replaceAll("^[_\\s-]+", "");
+        if (title.matches("(单据|收据)?识别明细")) title = "单据明细";
+        if (title.isEmpty()) title = "单据明细";
         return truncate(title, MAX_TITLE_CHARS);
     }
 
@@ -715,7 +868,7 @@ public class AgentWorkbookService {
     // ---------------------------------------------------------------- internal model
 
     enum ColumnRole {
-        NONE, QUANTITY, UNIT_PRICE, AMOUNT;
+        NONE, QUANTITY, UNIT_PRICE, AMOUNT, CALCULATED_AMOUNT;
 
         static ColumnRole parse(String value) {
             if (!StringUtils.hasText(value)) return NONE;
@@ -743,7 +896,7 @@ public class AgentWorkbookService {
                 }
             }
             if (role == ColumnRole.QUANTITY) return NUMBER;
-            if (role == ColumnRole.UNIT_PRICE || role == ColumnRole.AMOUNT) return MONEY;
+            if (role == ColumnRole.UNIT_PRICE || role == ColumnRole.AMOUNT || role == ColumnRole.CALCULATED_AMOUNT) return MONEY;
             String compact = header == null ? "" : header.replaceAll("\\s+", "");
             if (compact.matches(".*(单价|价格|金额|合计|小计|成本|售价|总价|总额).*")) return MONEY;
             if (WorkbookRenderSupport.isNumericHeader(compact)) return NUMBER;
@@ -798,11 +951,11 @@ public class AgentWorkbookService {
                          boolean hasNotes, List<Integer> totalColumns, int mismatchCount, String note) {
     }
 
-    record Prepared(String title, List<PreparedSheet> sheets, List<InfoEntry> info, AgentAttachment attachment,
+    record Prepared(String title, String layout, List<PreparedSheet> sheets, List<InfoEntry> info, AgentAttachment attachment,
                     Long conversationId, boolean includeSourceText, String note, List<String> warnings,
                     int totalRows, int mismatchCount) {
         String fileName(LocalDateTime now) {
-            return title + "-" + now.format(FILE_STAMP) + ".xlsx";
+            return title + "_" + now.format(FILE_STAMP) + ".xlsx";
         }
     }
 
@@ -811,26 +964,47 @@ public class AgentWorkbookService {
         final CellStyle header;
         final CellStyle flaggedText;
         final CellStyle totalText;
+        final CellStyle text;
+        final CellStyle title;
+        final CellStyle meta;
+        final CellStyle longText;
         private final Workbook workbook;
         private final DataFormat format;
+        private final Font bodyFont;
         private final Map<String, CellStyle> cache = new HashMap<>();
 
         Styles(Workbook workbook) {
             this.workbook = workbook;
             this.format = workbook.createDataFormat();
-            this.header = WorkbookRenderSupport.headerStyle(workbook);
-            this.flaggedText = workbook.createCellStyle();
+            this.bodyFont = workbook.createFont(); bodyFont.setFontName("宋体"); bodyFont.setFontHeightInPoints((short) 10);
+            this.text = base();
+            this.longText = base(); longText.setAlignment(HorizontalAlignment.LEFT);
+            this.header = base();
+            Font heading = workbook.createFont(); heading.setFontName("宋体"); heading.setFontHeightInPoints((short) 10); heading.setBold(true); header.setFont(heading);
+            this.title = workbook.createCellStyle();
+            Font titleFont = workbook.createFont(); titleFont.setFontName("微软雅黑"); titleFont.setFontHeightInPoints((short) 16); titleFont.setBold(true);
+            title.setFont(titleFont); title.setAlignment(HorizontalAlignment.CENTER); title.setVerticalAlignment(VerticalAlignment.CENTER);
+            this.meta = workbook.createCellStyle(); meta.setFont(bodyFont); meta.setWrapText(true); meta.setVerticalAlignment(VerticalAlignment.CENTER);
+            this.flaggedText = base(); flaggedText.setAlignment(HorizontalAlignment.LEFT);
             flaggedText.setFillForegroundColor(IndexedColors.LIGHT_YELLOW.getIndex());
             flaggedText.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-            this.totalText = workbook.createCellStyle();
+            this.totalText = base();
             Font bold = workbook.createFont();
             bold.setBold(true);
             totalText.setFont(bold);
         }
 
+        private CellStyle base() {
+            CellStyle style = workbook.createCellStyle(); style.setFont(bodyFont); style.setAlignment(HorizontalAlignment.CENTER);
+            style.setVerticalAlignment(VerticalAlignment.CENTER); style.setWrapText(true);
+            style.setBorderTop(BorderStyle.THIN); style.setBorderBottom(BorderStyle.THIN);
+            style.setBorderLeft(BorderStyle.THIN); style.setBorderRight(BorderStyle.THIN);
+            return style;
+        }
+
         CellStyle number(ColumnType type, boolean flagged) {
             return cache.computeIfAbsent("number:" + type + ":" + flagged, ignored -> {
-                CellStyle style = workbook.createCellStyle();
+                CellStyle style = base();
                 style.setDataFormat(format.getFormat(type == ColumnType.MONEY ? "#,##0.00" : "General"));
                 if (flagged) {
                     style.setFillForegroundColor(IndexedColors.LIGHT_YELLOW.getIndex());
@@ -842,7 +1016,7 @@ public class AgentWorkbookService {
 
         CellStyle date(boolean flagged) {
             return cache.computeIfAbsent("date:" + flagged, ignored -> {
-                CellStyle style = workbook.createCellStyle();
+                CellStyle style = base();
                 style.setDataFormat(format.getFormat("yyyy-mm-dd"));
                 if (flagged) {
                     style.setFillForegroundColor(IndexedColors.LIGHT_YELLOW.getIndex());
@@ -854,7 +1028,7 @@ public class AgentWorkbookService {
 
         CellStyle total(ColumnType type) {
             return cache.computeIfAbsent("total:" + type, ignored -> {
-                CellStyle style = workbook.createCellStyle();
+                CellStyle style = base();
                 style.setDataFormat(format.getFormat(type == ColumnType.MONEY ? "#,##0.00" : "General"));
                 Font bold = workbook.createFont();
                 bold.setBold(true);

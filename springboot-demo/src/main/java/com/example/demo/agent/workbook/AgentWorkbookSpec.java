@@ -15,6 +15,8 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class AgentWorkbookSpec {
     private String title;
+    /** TABLE (default) or RECEIPT: paper receipt plus a linked, editable detail sheet. */
+    private String layout;
     private Long attachmentId;
     private List<SheetSpec> sheets = new ArrayList<>();
     private List<InfoEntry> info = new ArrayList<>();

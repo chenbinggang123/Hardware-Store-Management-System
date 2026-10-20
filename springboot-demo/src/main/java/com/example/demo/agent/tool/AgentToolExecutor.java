@@ -8,6 +8,7 @@ import com.example.demo.agent.policy.AgentPolicyEngine;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Set;
 
 @Component
 public class AgentToolExecutor {
@@ -35,8 +36,24 @@ public class AgentToolExecutor {
         return prepare(runId, operatorId, call, true);
     }
 
+    public AgentPreparedTool prepare(Long runId, Long operatorId, AgentToolCall call, Set<String> allowedTools) {
+        assertAllowed(call, allowedTools);
+        return prepare(runId, operatorId, call, true);
+    }
+
     public AgentPreparedTool prepareApproved(Long runId, Long operatorId, AgentToolCall call) {
         return prepare(runId, operatorId, call, false);
+    }
+
+    public AgentPreparedTool prepareApproved(Long runId, Long operatorId, AgentToolCall call, Set<String> allowedTools) {
+        assertAllowed(call, allowedTools);
+        return prepare(runId, operatorId, call, false);
+    }
+
+    private void assertAllowed(AgentToolCall call, Set<String> allowedTools) {
+        if (allowedTools == null || !allowedTools.contains(call.getName())) {
+            throw new IllegalArgumentException("工具不在本轮 Agent 执行计划允许范围内：" + call.getName());
+        }
     }
 
     private AgentPreparedTool prepare(

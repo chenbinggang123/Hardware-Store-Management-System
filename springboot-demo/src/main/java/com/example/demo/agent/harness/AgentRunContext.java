@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Getter
 public class AgentRunContext {
@@ -16,6 +17,9 @@ public class AgentRunContext {
     private final String userInput;
     private final List<AgentChatMessage> conversationHistory;
     private final List<Map<String, Object>> toolResults = new ArrayList<>();
+    private Set<String> allowedTools = Set.of();
+    private String executionInstructions = "";
+    private boolean routedPlan;
 
     public AgentRunContext(Long runId, Long operatorId, String userInput) {
         this(runId, operatorId, userInput, List.of());
@@ -39,5 +43,11 @@ public class AgentRunContext {
         entry.put("arguments", arguments);
         entry.put("result", result);
         toolResults.add(entry);
+    }
+
+    public void setExecutionPlan(Set<String> tools, String instructions, boolean routed) {
+        this.allowedTools = tools == null ? Set.of() : Set.copyOf(tools);
+        this.executionInstructions = instructions == null ? "" : instructions;
+        this.routedPlan = routed;
     }
 }

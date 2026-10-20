@@ -24,6 +24,7 @@
     "pages/payment-form/index",
     "pages/statement-export/index",
     "pages/workbook-editor/index",
+    "pages/billing-editor/index",
     "pages/products/index",
     "pages/product-detail/index",
     "pages/product-form/index",
@@ -61,44 +62,6 @@
     "navigationBarTextStyle": "black",
     "backgroundColor": "#F3F5F2",
     "backgroundTextStyle": "dark"
-  },
-  "tabBar": {
-    "color": "#66716D",
-    "selectedColor": "#245E9B",
-    "backgroundColor": "#FFFFFF",
-    "borderStyle": "black",
-    "list": [
-      {
-        "pagePath": "pages/agent/index",
-        "text": "小五",
-        "iconPath": "assets/tabbar/agent.png",
-        "selectedIconPath": "assets/tabbar/agent-active.png"
-      },
-      {
-        "pagePath": "pages/agent-files/index",
-        "text": "文件",
-        "iconPath": "assets/tabbar/files.png",
-        "selectedIconPath": "assets/tabbar/files-active.png"
-      },
-      {
-        "pagePath": "pages/finance-ledger/index",
-        "text": "财务",
-        "iconPath": "assets/tabbar/home.png",
-        "selectedIconPath": "assets/tabbar/home-active.png"
-      },
-      {
-        "pagePath": "pages/products/index",
-        "text": "商品",
-        "iconPath": "assets/tabbar/products.png",
-        "selectedIconPath": "assets/tabbar/products-active.png"
-      },
-      {
-        "pagePath": "pages/settings/index",
-        "text": "我的",
-        "iconPath": "assets/tabbar/inventory.png",
-        "selectedIconPath": "assets/tabbar/inventory-active.png"
-      }
-    ]
   },
   "style": "v2",
   "sitemapLocation": "sitemap.json"

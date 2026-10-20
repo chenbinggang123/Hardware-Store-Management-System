@@ -1,5 +1,5 @@
 <view class="agent-screen">
-  <view class="agent-header">
+  <view class="agent-header" style="padding-top: {{statusBarHeight}}px; padding-right: {{capsuleReserve}}px; min-height: {{navigationHeight}}px;">
     <view class="icon-button menu-button" role="button" aria-label="打开会话列表" bindtap="openHistory">
       <view class="menu-line"></view><view class="menu-line"></view><view class="menu-line short"></view>
     </view>
@@ -7,9 +7,6 @@
       <view class="agent-title">{{currentTitle}}</view>
       <view class="agent-subtitle" wx:if="{{streaming}}"><text class="stream-dot"></text>小五正在回复</view>
       <view class="agent-subtitle" wx:else>小五 · 经营助手</view>
-    </view>
-    <view class="icon-button files-button" role="button" aria-label="查看小五生成的文件" bindtap="openMyFiles">
-      <view class="files-glyph"></view><text class="files-button-text">文件</text>
     </view>
     <view class="icon-button compose-button" role="button" aria-label="开始新对话" bindtap="startNew">
       <view class="compose-square"></view><view class="compose-stroke"></view>
@@ -20,27 +17,59 @@
   <view class="history-drawer {{historyOpen ? 'open' : ''}}" catchtap="preventClose">
     <view class="history-head">
       <view class="drawer-brand"><view class="drawer-mark">小</view><view><view class="history-title">小五</view><view class="history-subtitle">经营助手</view></view></view>
-      <view class="history-close" role="button" aria-label="关闭会话列表" bindtap="closeHistory">×</view>
+      <view class="history-close" role="button" aria-label="关闭会话列表" bindtap="closeHistory"><view></view><view></view></view>
     </view>
-    <view class="history-new" role="button" aria-label="开始新对话" bindtap="startNew"><text class="history-new-icon">＋</text><text>新对话</text></view>
-    <view class="history-files" role="button" aria-label="查看小五生成的文件" bindtap="openMyFiles"><text>小五生成的文件</text><text class="history-files-arrow">›</text></view>
-    <view class="history-section-label">最近会话</view>
-    <scroll-view class="history-list" scroll-y>
-      <view class="history-loading" wx:if="{{loadingHistory}}">正在读取历史…</view>
-      <view class="history-empty" wx:elif="{{!conversations.length}}">还没有历史会话<br/><text>发送第一条消息后会自动保存在这里</text></view>
-      <view class="history-entry {{item.id === conversationId ? 'active' : ''}}" wx:for="{{conversations}}" wx:key="id" data-id="{{item.id}}" bindtap="chooseConversation">
-        <view class="history-entry-body">
-          <view class="history-entry-top">
-            <text class="history-entry-title">{{item.title}}</text>
-            <text class="history-entry-time">{{item.timeText}}</text>
-          </view>
-          <view class="history-entry-preview">{{item.preview}}</view>
-        </view>
-        <view class="history-entry-actions">
-          <view class="history-entry-action" role="button" aria-label="修改会话标题" data-id="{{item.id}}" catchtap="renameConversation">✎</view>
-          <view class="history-entry-action delete" role="button" aria-label="删除会话" data-id="{{item.id}}" catchtap="deleteConversation">{{deletingConversationId === item.id ? '…' : '×'}}</view>
-        </view>
+    <view class="history-new" role="button" aria-label="开始新对话" bindtap="startNew"><view class="history-new-icon"><view></view><view></view></view><text>新对话</text></view>
+    <scroll-view class="drawer-scroll" scroll-y>
+      <view class="history-section-head"><view><view class="history-section-label">最近会话</view><view class="history-section-note">滚动查看更多</view></view><view class="history-count">{{allConversations.length}}</view></view>
+      <view class="history-search">
+        <view class="history-search-icon"></view>
+        <input aria-label="搜索最近会话" value="{{historyQuery}}" bindinput="searchHistory" placeholder="搜索标题或内容" confirm-type="search" />
+        <view class="history-search-clear" wx:if="{{historyQuery}}" role="button" aria-label="清空搜索" bindtap="clearHistorySearch"><view></view><view></view></view>
       </view>
+      <view class="history-loading" wx:if="{{loadingHistory}}">正在读取历史…</view>
+      <view class="history-empty" wx:elif="{{!conversations.length}}">{{historyQuery ? '没有找到相关会话' : '还没有历史会话'}}<br/><text>{{historyQuery ? '换个关键词试试' : '发送第一条消息后会自动保存在这里'}}</text></view>
+      <scroll-view class="history-list-scroll" wx:else scroll-y enhanced show-scrollbar="{{true}}">
+        <view class="history-entry {{item.id === conversationId ? 'active' : ''}}" wx:for="{{conversations}}" wx:key="id" data-id="{{item.id}}" bindtap="chooseConversation">
+          <view class="history-entry-body">
+            <view class="history-entry-top">
+              <text class="history-entry-title">{{item.title}}</text>
+              <text class="history-entry-time">{{item.timeText}}</text>
+            </view>
+            <view class="history-entry-preview">{{item.preview}}</view>
+          </view>
+          <view class="history-entry-more" role="button" aria-label="会话操作" data-id="{{item.id}}" catchtap="conversationActions"><view></view><view></view><view></view></view>
+        </view>
+      </scroll-view>
+
+      <view class="drawer-divider"></view>
+      <view class="history-section-head nav-heading"><view><view class="history-section-label">常用功能</view><view class="history-section-note">直接进入任务</view></view></view>
+      <view class="drawer-feature-panel">
+        <view class="drawer-feature" role="button" data-action="billing" bindtap="useCoreAction"><view class="drawer-feature-symbol receipt"><view></view></view><view class="drawer-feature-copy"><view class="drawer-feature-title">快捷开单</view><view class="drawer-feature-desc">录商品、预览并导出单据</view></view><view class="drawer-chevron"></view></view>
+        <view class="drawer-feature" role="button" bindtap="openMyFiles"><view class="drawer-feature-symbol file"><view></view></view><view class="drawer-feature-copy"><view class="drawer-feature-title">小五生成的文件</view><view class="drawer-feature-desc">打开、修改或转发文件</view></view><view class="drawer-chevron"></view></view>
+      </view>
+
+      <view class="history-section-head nav-heading"><view><view class="history-section-label">功能导航</view><view class="history-section-note">按业务分类查找</view></view></view>
+      <view class="drawer-nav-panel"><view class="drawer-group">
+        <view class="drawer-group-head" role="button" data-section="businessExpanded" bindtap="toggleDrawerSection"><view class="drawer-group-copy"><text>经营</text><text>销售 · 采购 · 库存</text></view><view class="drawer-chevron {{businessExpanded ? 'open' : ''}}"></view></view>
+        <view class="drawer-group-body" wx:if="{{businessExpanded}}"><view data-route="sales" bindtap="openDrawerPage">销售单</view><view data-route="purchases" bindtap="openDrawerPage">采购单</view><view data-route="inventory" bindtap="openDrawerPage">库存盘点</view></view>
+      </view>
+      <view class="drawer-group">
+        <view class="drawer-group-head" role="button" data-section="contactsExpanded" bindtap="toggleDrawerSection"><view class="drawer-group-copy"><text>往来与财务</text><text>客户 · 供应商 · 账本</text></view><view class="drawer-chevron {{contactsExpanded ? 'open' : ''}}"></view></view>
+        <view class="drawer-group-body" wx:if="{{contactsExpanded}}"><view data-route="finance" bindtap="openDrawerPage">往来账</view><view data-route="customers" bindtap="openDrawerPage">客户</view><view data-route="suppliers" bindtap="openDrawerPage">供应商</view><view data-route="factories" bindtap="openDrawerPage">工厂账本</view></view>
+      </view>
+      <view class="drawer-group">
+        <view class="drawer-group-head" role="button" data-section="catalogExpanded" bindtap="toggleDrawerSection"><view class="drawer-group-copy"><text>商品</text><text>商品库 · 价格 · 映射</text></view><view class="drawer-chevron {{catalogExpanded ? 'open' : ''}}"></view></view>
+        <view class="drawer-group-body" wx:if="{{catalogExpanded}}"><view data-route="products" bindtap="openDrawerPage">商品库</view><view data-route="prices" bindtap="openDrawerPage">价格记录</view><view data-route="mappings" bindtap="openDrawerPage">商品映射</view></view>
+      </view>
+      <view class="drawer-group">
+        <view class="drawer-group-head" role="button" data-section="filesExpanded" bindtap="toggleDrawerSection"><view class="drawer-group-copy"><text>文件与报表</text><text>文件任务 · 报表中心</text></view><view class="drawer-chevron {{filesExpanded ? 'open' : ''}}"></view></view>
+        <view class="drawer-group-body" wx:if="{{filesExpanded}}"><view data-route="files" bindtap="openDrawerPage">我的文件</view><view data-route="excel" bindtap="openDrawerPage">文件任务</view><view data-route="reports" bindtap="openDrawerPage">报表中心</view></view>
+      </view>
+      <view class="drawer-group">
+        <view class="drawer-group-head" role="button" data-section="settingsExpanded" bindtap="toggleDrawerSection"><view class="drawer-group-copy"><text>设置与帮助</text><text>账号 · 系统设置</text></view><view class="drawer-chevron {{settingsExpanded ? 'open' : ''}}"></view></view>
+        <view class="drawer-group-body" wx:if="{{settingsExpanded}}"><view data-route="settings" bindtap="openDrawerPage">账号与系统设置</view></view>
+      </view></view>
     </scroll-view>
     <view class="drawer-foot">正式业务操作始终需要你确认</view>
   </view>
@@ -48,14 +77,12 @@
   <scroll-view class="conversation-scroll" scroll-y scroll-into-view="{{scrollTarget}}" enhanced show-scrollbar="{{false}}">
 
   <view class="welcome" wx:if="{{!messages.length && !run}}">
-    <view class="welcome-mark">小</view>
-    <view class="welcome-title">直接告诉小五要做什么</view>
-    <view class="welcome-subtitle">输入问题，或点下方＋添加照片和文件。已有 Excel 也可以交给小五修改并生成新版本。</view>
-
-    <view class="suggestions">
-      <view class="suggestion-title">试试这样说</view>
-      <view class="suggestion-chips">
-        <view class="suggestion-chip" role="button" wx:for="{{suggestions}}" wx:key="*this" data-text="{{item}}" bindtap="useSuggestion">{{item}}</view>
+    <view class="welcome-title">今天想做什么？</view>
+    <view class="welcome-subtitle">直接说，或者拍一张单据给小五。</view>
+    <view class="core-actions" aria-label="常用功能">
+      <view class="core-action" role="button" wx:for="{{coreActions}}" wx:key="key" data-action="{{item.key}}" bindtap="useCoreAction">
+        <view class="core-action-icon core-action-{{item.key}}"><view></view><view></view></view>
+        <view class="core-action-copy"><view class="core-action-title">{{item.title}}</view><view class="core-action-desc">{{item.description}}</view></view>
       </view>
     </view>
   </view>
@@ -70,6 +97,8 @@
             <block wx:elif="{{item.blocks && item.blocks.length}}">
               <block wx:for="{{item.blocks}}" wx:for-item="block" wx:key="*this">
                 <view class="answer-paragraph" wx:if="{{block.type === 'text'}}">{{block.text}}</view>
+                <view class="answer-heading" wx:elif="{{block.type === 'heading'}}">{{block.text}}</view>
+                <view class="answer-list" wx:elif="{{block.type === 'list'}}"><text class="answer-list-marker">{{block.marker}}</text><text>{{block.text}}</text></view>
                 <view class="answer-field" wx:elif="{{block.type === 'field'}}">
                   <text class="answer-field-label">{{block.label}}</text>
                   <text class="answer-field-value">{{block.value}}</text>
@@ -94,13 +123,14 @@
                   <view class="file-card-error" wx:if="{{file.errorMessage}}">{{file.errorMessage}}</view>
                   <view class="file-card-actions">
                     <view class="file-card-action" wx:if="{{file.ready}}" role="button" aria-label="打开文件" data-id="{{file.id}}" catchtap="openGeneratedFile">{{openingFileId === file.id ? '打开中…' : '打开'}}</view>
-                    <view class="file-card-action secondary" wx:if="{{file.ready && file.fileType === 'xlsx'}}" role="button" aria-label="快速修改这个表格" data-id="{{file.id}}" catchtap="quickEditGeneratedFile">快速修改</view>
+                    <view class="file-card-action secondary" wx:if="{{file.ready && file.fileType === 'xlsx'}}" role="button" aria-label="编辑这个表格" data-id="{{file.id}}" catchtap="quickEditGeneratedFile">编辑表格</view>
                     <view class="file-card-action secondary" wx:if="{{file.ready}}" role="button" aria-label="让小五修改这个文件" data-id="{{file.id}}" catchtap="modifyGeneratedFile">小五修改</view>
                     <view class="file-card-action danger" role="button" aria-label="删除文件" data-id="{{file.id}}" catchtap="deleteGeneratedFile">{{deletingFileId === file.id ? '删除中…' : '删除'}}</view>
                   </view>
                 </view>
               </view>
             </view>
+            <view class="billing-message-action" wx:if="{{item.billingDocumentId}}" data-id="{{item.billingDocumentId}}" bindtap="openBillingDocument"><text>编辑并预览销售单</text><text>›</text></view>
             <view class="message-retry" wx:if="{{item.role === 'error'}}" bindtap="retryLastMessage">重新输入并重试</view>
           </view>
         </view>
@@ -148,6 +178,25 @@
       </view>
       <view class="workbook-warning" wx:for="{{run.pendingAction.preview.warnings}}" wx:for-index="warningIndex" wx:key="warningIndex">{{item}}</view>
     </view>
+    <view class="billing-draft-preview" wx:if="{{run.pendingAction.preview.kind === 'BILLING_DRAFT'}}">
+      <view class="billing-draft-head">
+        <view><view class="billing-draft-kicker">可编辑销售单</view><view class="billing-draft-title">{{run.pendingAction.preview.billingTitle}}</view></view>
+        <view class="billing-draft-total"><text>当前合计</text><text class="billing-draft-total-value">¥{{run.pendingAction.preview.billingTotal}}</text></view>
+      </view>
+      <view class="billing-draft-meta">
+        <text>{{run.pendingAction.preview.content.date || '日期待填写'}}</text>
+        <text>{{run.pendingAction.preview.billingLines.length}} 项商品</text>
+        <text wx:if="{{run.pendingAction.preview.billingIncompleteCount}}">{{run.pendingAction.preview.billingIncompleteCount}} 项待补充</text>
+      </view>
+      <view class="billing-draft-lines">
+        <view class="billing-draft-line" wx:for="{{run.pendingAction.preview.billingLines}}" wx:key="index">
+          <view class="billing-line-index">{{item.index}}</view>
+          <view class="billing-line-main"><view class="billing-line-name">{{item.name || '商品名称待填写'}}</view><view class="billing-line-meta">{{item.meta}} · {{item.quantityText}} × ¥{{item.priceText}}</view></view>
+          <view class="billing-line-amount">¥{{item.amountText}}</view>
+        </view>
+      </view>
+      <view class="billing-draft-tip">确认后进入开单页逐项修改，并按正式单据版式预览；此时不会登记销售、欠款或库存。</view>
+    </view>
     <view class="customer-line" wx:if="{{run.pendingAction.preview.customerName}}"><text>客户</text><text class="customer-name">{{run.pendingAction.preview.customerName}}</text></view>
     <view class="operation-preview" wx:if="{{run.pendingAction.preview.productName}}">
       <view class="operation-row"><text>商品</text><text class="operation-value">{{run.pendingAction.preview.productName}}</text></view>
@@ -178,7 +227,7 @@
     <view class="stock-warning" wx:if="{{run.pendingAction.preview.inventorySufficient === false}}">库存不足，不能继续</view>
     <view class="approval-actions">
       <button class="approval-button cancel" bindtap="reject" disabled="{{resolving}}">取消</button>
-      <button class="approval-button confirm" bindtap="approve" disabled="{{resolving || run.pendingAction.preview.inventorySufficient === false}}">{{resolving ? '处理中…' : run.pendingAction.preview.kind === 'EXCEL_WORKBOOK' ? '生成文件' : '确认执行'}}</button>
+      <button class="approval-button confirm" bindtap="approve" disabled="{{resolving || run.pendingAction.preview.inventorySufficient === false}}">{{resolving ? '处理中…' : run.pendingAction.preview.kind === 'EXCEL_WORKBOOK' ? '生成文件' : run.pendingAction.preview.kind === 'BILLING_DRAFT' ? '进入开单页' : '确认执行'}}</button>
     </view>
   </view>
 
@@ -190,31 +239,37 @@
   <view id="conversation-end" class="conversation-end"></view>
   </scroll-view>
 
+  <scroll-view class="compact-actions" scroll-x wx:if="{{messages.length}}" enhanced show-scrollbar="{{false}}">
+    <view class="compact-actions-row"><view class="compact-action" wx:for="{{coreActions}}" wx:key="key" role="button" data-action="{{item.key}}" bindtap="useCoreAction">{{item.title}}</view></view>
+  </scroll-view>
+
   <view class="attachment-backdrop" wx:if="{{attachmentMenuOpen}}" bindtap="closeAttachmentMenu"></view>
   <view class="composer">
     <view class="attachment-menu" wx:if="{{attachmentMenuOpen}}" catchtap="preventClose">
       <view class="attachment-menu-title">添加到当前对话</view>
       <view class="attachment-menu-grid">
-        <view class="attachment-option" role="button" aria-label="拍照" bindtap="chooseCamera"><view class="attachment-option-icon">拍</view><text>拍照</text></view>
-        <view class="attachment-option" role="button" aria-label="从相册选择图片" bindtap="chooseAlbum"><view class="attachment-option-icon">图</view><text>相册</text></view>
-        <view class="attachment-option" role="button" aria-label="从微信选择表格 Word 或 PDF" bindtap="chooseDocument"><view class="attachment-option-icon">件</view><text>微信文件</text></view>
-        <view class="attachment-option" role="button" aria-label="选择小五生成过的 Excel 继续修改" bindtap="chooseGeneratedExcel"><view class="attachment-option-icon excel">改</view><text>修改 Excel</text></view>
+        <view class="attachment-option" role="button" aria-label="拍照" bindtap="chooseCamera"><view class="attachment-option-icon camera"><view></view></view><text>拍照</text></view>
+        <view class="attachment-option" role="button" aria-label="从相册选择图片" bindtap="chooseAlbum"><view class="attachment-option-icon album"><view></view></view><text>相册</text></view>
+        <view class="attachment-option" role="button" aria-label="从微信选择表格 Word 或 PDF" bindtap="chooseDocument"><view class="attachment-option-icon document"><view></view></view><text>微信文件</text></view>
+        <view class="attachment-option" role="button" aria-label="选择小五生成过的 Excel 继续修改" bindtap="chooseGeneratedExcel"><view class="attachment-option-icon excel"><view></view></view><text>修改 Excel</text></view>
       </view>
-      <view class="attachment-menu-note">Excel 在微信里只能预览；交给小五修改后会生成一份新文件，原件不会被覆盖。</view>
+      <view class="attachment-menu-note">图片会先识别，确认后再使用。修改 Excel 会生成新文件，不覆盖原件。</view>
     </view>
     <view class="composer-attachments" wx:if="{{pendingAttachments.length || uploading}}">
       <view class="attachment-card" wx:for="{{pendingAttachments}}" wx:key="id">
         <view class="attachment-icon">{{item.typeMark}}</view>
         <view class="attachment-copy"><view class="attachment-name">{{item.originalName}}</view><view class="attachment-meta {{item.ready ? '' : 'waiting'}}">{{item.typeText}} · {{item.sizeText}} · {{item.parseText}}</view></view>
-        <view class="attachment-remove" role="button" aria-label="移除附件" data-id="{{item.id}}" bindtap="removeAttachment">×</view>
+        <view class="attachment-actions">
+          <view class="attachment-save" wx:if="{{item.typeText === '图片'}}" role="button" aria-label="保存原图到我的文件" data-id="{{item.id}}" catchtap="savePendingAttachment">{{item.savedToFiles ? '已保存' : savingAttachmentId === item.id ? '保存中…' : '保存到文件'}}</view>
+          <view class="attachment-remove" role="button" aria-label="移除附件" data-id="{{item.id}}" catchtap="removeAttachment">×</view>
+        </view>
       </view>
       <view class="uploading-line" wx:if="{{uploading}}">正在上传并识别附件…</view>
     </view>
     <view class="composer-row">
-      <view class="attach-button {{attachmentMenuOpen ? 'active' : ''}}" role="button" aria-label="添加照片或文件" aria-expanded="{{attachmentMenuOpen}}" bindtap="toggleAttachmentMenu">＋</view>
-      <textarea class="composer-input" aria-label="给小五发送消息" value="{{input}}" focus="{{inputFocus}}" bindblur="blurQuestion" bindinput="updateInput" auto-height maxlength="500" placeholder="说一件事，或先加附件" disabled="{{sending || resolving || uploading || (run && run.status === 'WAITING_APPROVAL')}}" />
-      <button class="send-button" aria-label="发送消息" bindtap="send" disabled="{{(!input && !pendingAttachments.length) || sending || resolving || uploading || (run && run.status === 'WAITING_APPROVAL')}}">发送</button>
+      <view class="attach-button {{attachmentMenuOpen ? 'active' : ''}}" role="button" aria-label="添加照片或文件" aria-expanded="{{attachmentMenuOpen}}" bindtap="toggleAttachmentMenu"><view></view><view></view></view>
+      <textarea class="composer-input" aria-label="给小五发送消息" value="{{input}}" focus="{{inputFocus}}" bindblur="blurQuestion" bindinput="updateInput" auto-height maxlength="500" placeholder="说一件事，或先加附件" disabled="{{sending || resolving || uploading || savingAttachmentId || (run && run.status === 'WAITING_APPROVAL')}}" />
+      <view class="send-hit" role="button" aria-label="发送消息" aria-disabled="{{(!input && !pendingAttachments.length) || sending || resolving || uploading || savingAttachmentId || (run && run.status === 'WAITING_APPROVAL')}}" bindtap="send"><view class="send-button {{(!input && !pendingAttachments.length) || sending || resolving || uploading || savingAttachmentId || (run && run.status === 'WAITING_APPROVAL') ? 'disabled' : ''}}"><view class="send-glyph"></view></view></view>
     </view>
-    <view class="composer-hint">附件先读取再处理；修改文件会生成新版本。</view>
   </view>
 </view>

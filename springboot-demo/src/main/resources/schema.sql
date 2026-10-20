@@ -178,6 +178,7 @@ CREATE TABLE IF NOT EXISTS agent_run (
     input_text LONGTEXT,
     output_text LONGTEXT,
     context_json LONGTEXT,
+    execution_plan_json LONGTEXT,
     pending_tool_call_id VARCHAR(100),
     pending_tool_name VARCHAR(64),
     pending_arguments_json LONGTEXT,
@@ -368,6 +369,17 @@ CREATE TABLE IF NOT EXISTS payment_allocation (
     KEY idx_payment_allocation_document (document_id, create_time),
     KEY idx_payment_allocation_payment (payment_id)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+SET @add_agent_execution_plan = (
+    SELECT IF(COUNT(*) = 0,
+              'ALTER TABLE agent_run ADD COLUMN execution_plan_json LONGTEXT NULL AFTER context_json',
+              'SELECT 1')
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'agent_run' AND column_name = 'execution_plan_json'
+);
+PREPARE add_agent_execution_plan_stmt FROM @add_agent_execution_plan;
+EXECUTE add_agent_execution_plan_stmt;
+DEALLOCATE PREPARE add_agent_execution_plan_stmt;
 
 -- 兼容旧库的 MySQL utf8（最多 3 字节）。Agent 输入、输出与工具结果可能包含 Emoji，必须升级为 utf8mb4。
 SET @convert_agent_conversation_utf8mb4 = (
@@ -803,6 +815,46 @@ CREATE TABLE IF NOT EXISTS inventory_log (
     related_order_id BIGINT,
     remark VARCHAR(255),
     create_time DATETIME NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS billing_document (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    operator_id BIGINT NOT NULL,
+    request_key VARCHAR(80),
+    version BIGINT NOT NULL DEFAULT 0,
+    status VARCHAR(32) NOT NULL,
+    document_number VARCHAR(100),
+    content_json LONGTEXT NOT NULL,
+    total_amount DECIMAL(18,2),
+    create_time DATETIME NOT NULL,
+    update_time DATETIME NOT NULL,
+    INDEX idx_billing_owner_updated (operator_id, update_time),
+    UNIQUE KEY uq_billing_document_request (operator_id, request_key)
+);
+
+CREATE TABLE IF NOT EXISTS billing_product_memory (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    operator_id BIGINT NOT NULL,
+    product_id BIGINT,
+    fingerprint VARCHAR(64) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    specification VARCHAR(255),
+    unit VARCHAR(255),
+    alias VARCHAR(255),
+    last_price DECIMAL(18,4),
+    update_time DATETIME NOT NULL,
+    UNIQUE KEY uq_billing_memory (operator_id, fingerprint),
+    INDEX idx_billing_memory_owner (operator_id, update_time)
+);
+
+CREATE TABLE IF NOT EXISTS billing_product_usage (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    operator_id BIGINT NOT NULL,
+    candidate_key VARCHAR(255) NOT NULL,
+    use_count BIGINT NOT NULL DEFAULT 0,
+    last_used_time DATETIME NOT NULL,
+    UNIQUE KEY uq_billing_product_usage (operator_id, candidate_key),
+    INDEX idx_billing_product_usage_rank (operator_id, use_count, last_used_time)
 );
 
 CREATE TABLE IF NOT EXISTS operation_log (

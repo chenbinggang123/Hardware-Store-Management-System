@@ -153,11 +153,13 @@ public class AgentOutputService {
         String wanted = StringUtils.hasText(sheetName) ? sheetName.trim() : null;
         List<Map<String, Object>> sheets = new ArrayList<>();
         List<Map<String, String>> info = new ArrayList<>();
+        boolean receiptLayout = false;
         try (InputStream input = storage.openStream(output.getObjectKey()); Workbook workbook = WorkbookFactory.create(input)) {
             DataFormatter formatter = new DataFormatter(Locale.CHINA);
             FormulaEvaluator evaluator = workbook.getCreationHelper().createFormulaEvaluator();
             for (Sheet sheet : workbook) {
                 String name = sheet.getSheetName();
+                if (AgentWorkbookSheets.RECEIPT.equals(name)) receiptLayout = true;
                 if (AgentWorkbookSheets.SYSTEM_SHEETS.contains(name)) continue;
                 if (AgentWorkbookSheets.INFO.equals(name)) {
                     for (Row row : sheet) {
@@ -216,9 +218,81 @@ public class AgentOutputService {
         result.put("outputId", output.getId());
         result.put("fileName", output.getOriginalName());
         result.put("sheets", sheets);
+        result.put("layout", receiptLayout ? "RECEIPT" : "TABLE");
         result.put("info", info);
         result.put("note", "修改时把改动应用到这些行，再调用 generate_excel_workbook 生成新文件；数量、单价、金额列仍需标注角色，原文件会保留");
         return result;
+    }
+
+    /** Read-only view of the stored file, including system sheets, notes and totals. */
+    @Transactional
+    public Map<String, Object> previewWorkbook(Long outputId, Long operatorId, int sheetIndex, int offset, int limit) {
+        ExcelTaskOutput output = openForDownload(outputId, operatorId);
+        if (sheetIndex < 0 || offset < 0) throw new IllegalArgumentException("工作表或行位置无效");
+        int pageSize = Math.max(1, Math.min(limit, 200));
+        try (InputStream input = storage.openStream(output.getObjectKey()); Workbook workbook = WorkbookFactory.create(input)) {
+            if (sheetIndex >= workbook.getNumberOfSheets()) throw new IllegalArgumentException("工作表不存在");
+            List<Map<String, Object>> sheets = new ArrayList<>();
+            for (int index = 0; index < workbook.getNumberOfSheets(); index++) {
+                Sheet item = workbook.getSheetAt(index);
+                sheets.add(Map.of("index", index, "name", item.getSheetName(),
+                        "rowCount", item.getPhysicalNumberOfRows() == 0 ? 0 : item.getLastRowNum() + 1));
+            }
+            Sheet sheet = workbook.getSheetAt(sheetIndex);
+            int totalRows = sheet.getPhysicalNumberOfRows() == 0 ? 0 : sheet.getLastRowNum() + 1;
+            if (offset > 0 && offset >= totalRows) throw new IllegalArgumentException("行位置超出工作表范围");
+            int columnCount = 0;
+            for (Row row : sheet) columnCount = Math.max(columnCount, row.getLastCellNum());
+            for (var merged : sheet.getMergedRegions()) columnCount = Math.max(columnCount, merged.getLastColumn() + 1);
+            int shownColumns = Math.min(columnCount, 80);
+            DataFormatter formatter = new DataFormatter(Locale.CHINA);
+            FormulaEvaluator evaluator = workbook.getCreationHelper().createFormulaEvaluator();
+            List<List<String>> rows = new ArrayList<>();
+            int end = (int) Math.min(totalRows, (long) offset + pageSize);
+            List<Map<String, Object>> formats = new ArrayList<>();
+            for (int index = offset; index < end; index++) {
+                Row source = sheet.getRow(index);
+                List<String> values = new ArrayList<>();
+                for (int col = 0; col < shownColumns; col++) {
+                    values.add(text(source, col, formatter, evaluator));
+                    Cell cell = source == null ? null : source.getCell(col);
+                    if (cell != null) {
+                        var style = cell.getCellStyle();
+                        boolean bold = workbook.getFontAt(style.getFontIndexAsInt()).getBold();
+                        if (bold || style.getAlignment() != org.apache.poi.ss.usermodel.HorizontalAlignment.GENERAL || cell.getCellType() == org.apache.poi.ss.usermodel.CellType.NUMERIC
+                                || cell.getCellType() == org.apache.poi.ss.usermodel.CellType.FORMULA) {
+                            formats.add(Map.of("row", index, "column", col, "bold", bold,
+                                    "numeric", cell.getCellType() == org.apache.poi.ss.usermodel.CellType.NUMERIC
+                                            || cell.getCellType() == org.apache.poi.ss.usermodel.CellType.FORMULA,
+                                    "alignment", style.getAlignment().name(), "fontSize", workbook.getFontAt(style.getFontIndexAsInt()).getFontHeightInPoints(),
+                                    "warning", style.getFillForegroundColor() == org.apache.poi.ss.usermodel.IndexedColors.LIGHT_YELLOW.getIndex()));
+                        }
+                    }
+                }
+                rows.add(values);
+            }
+            List<Map<String, Object>> merges = new ArrayList<>();
+            for (var range : sheet.getMergedRegions()) {
+                if (range.getLastRow() < offset || range.getFirstRow() >= end || range.getFirstColumn() >= shownColumns) continue;
+                merges.add(Map.of("firstRow", range.getFirstRow(), "lastRow", range.getLastRow(),
+                        "firstColumn", range.getFirstColumn(), "lastColumn", range.getLastColumn(),
+                        "text", text(sheet.getRow(range.getFirstRow()), range.getFirstColumn(), formatter, evaluator)));
+            }
+            List<Integer> widths = new ArrayList<>();
+            boolean receipt = AgentWorkbookSheets.RECEIPT.equals(sheet.getSheetName());
+            for (int col = 0; col < shownColumns; col++) widths.add(Math.max(receipt ? 28 : 80, Math.min(340, (int) sheet.getColumnWidthInPixels(col))));
+            Map<String, Object> view = new LinkedHashMap<>();
+            view.put("outputId", output.getId()); view.put("fileName", output.getOriginalName()); view.put("sheets", sheets);
+            view.put("sheetIndex", sheetIndex); view.put("sheetName", sheet.getSheetName());
+            view.put("offset", offset); view.put("limit", pageSize); view.put("totalRows", totalRows);
+            view.put("columnCount", columnCount); view.put("shownColumns", shownColumns); view.put("columnWidths", widths);
+            view.put("columnsTruncated", shownColumns < columnCount); view.put("hasMore", end < totalRows);
+            view.put("rows", rows); view.put("merges", merges); view.put("formats", formats);
+            view.put("presentation", receipt ? "RECEIPT" : "TABLE");
+            return view;
+        } catch (IOException exception) {
+            throw new IllegalArgumentException("文件预览读取失败，请尝试下载原文件", exception);
+        }
     }
 
     /** Finds the densest row near the top, so title rows in statements are not mistaken for headers. */

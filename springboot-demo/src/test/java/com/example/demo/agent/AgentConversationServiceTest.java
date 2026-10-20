@@ -47,11 +47,11 @@ class AgentConversationServiceTest {
         });
 
         AgentConversation conversation = service.resolve(null, 7L,
-                "  给陈师傅创建一个包含东成充电电钻、德力西空气开关和绝缘胶布并且记录已收金额的销售草稿  ");
+                "  给测试客户创建一个包含甲型充电电钻、乙型空气开关和绝缘胶布并记录已收金额的销售草稿  ");
 
         assertEquals(12L, conversation.getId());
         assertEquals(7L, conversation.getOperatorId());
-        assertEquals(31, conversation.getTitle().length());
+        assertEquals(true, conversation.getTitle().matches("\\d{2}-\\d{2} \\d{2}:\\d{2} · .+"));
         assertEquals(true, conversation.getTitle().endsWith("…"));
     }
 
@@ -60,6 +60,22 @@ class AgentConversationServiceTest {
         when(conversationRepository.findByIdAndOperatorId(9L, 7L)).thenReturn(Optional.empty());
 
         assertThrows(IllegalArgumentException.class, () -> service.resolve(9L, 7L, "继续"));
+    }
+
+    @Test
+    void replacesProvisionalAttachmentTitleWhenFirstInstructionIsSent() {
+        AgentConversation conversation = new AgentConversation();
+        conversation.setId(9L);
+        conversation.setOperatorId(7L);
+        conversation.setTitle("新对话");
+        when(conversationRepository.findByIdAndOperatorId(9L, 7L)).thenReturn(Optional.of(conversation));
+        when(linkRepository.findByConversationIdOrderByCreateTimeAsc(9L)).thenReturn(List.of());
+        when(conversationRepository.save(any(AgentConversation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AgentConversation resolved = service.resolve(9L, 7L, "请识别附件中的订单信息并生成销售草稿");
+
+        assertEquals(true, resolved.getTitle().matches("\\d{2}-\\d{2} \\d{2}:\\d{2} · 识别附件并开单"));
+        verify(conversationRepository).save(conversation);
     }
 
     @Test
@@ -121,6 +137,7 @@ class AgentConversationServiceTest {
         conversation.setId(3L);
         conversation.setOperatorId(7L);
         conversation.setTitle("库存查询");
+        conversation.setCreateTime(LocalDateTime.of(2026, 10, 20, 9, 30));
         when(conversationRepository.findByIdAndOperatorId(3L, 7L)).thenReturn(Optional.of(conversation));
 
         AgentConversationRun link = new AgentConversationRun();
@@ -137,7 +154,7 @@ class AgentConversationServiceTest {
 
         var detail = service.detail(3L, 7L);
 
-        assertEquals("库存查询", detail.getTitle());
+        assertEquals("10-20 09:30 · 库存查询", detail.getTitle());
         assertEquals(2, detail.getMessages().size());
         assertEquals("user", detail.getMessages().get(0).getRole());
         assertEquals("assistant", detail.getMessages().get(1).getRole());

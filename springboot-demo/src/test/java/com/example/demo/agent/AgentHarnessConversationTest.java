@@ -13,10 +13,12 @@ import com.example.demo.agent.service.AgentConversationService;
 import com.example.demo.agent.tool.AgentToolRegistry;
 import com.example.demo.agent.trace.AgentTraceRecorder;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.BeanUtils;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
@@ -28,10 +30,17 @@ class AgentHarnessConversationTest {
     @Test
     void continuingConversationPassesHistoryToModel() {
         AgentRunRepository runRepository = mock(AgentRunRepository.class);
+        AtomicLong persistedVersion = new AtomicLong(-1L);
         when(runRepository.save(any(AgentRun.class))).thenAnswer(invocation -> {
-            AgentRun run = invocation.getArgument(0);
-            if (run.getId() == null) run.setId(88L);
-            return run;
+            AgentRun submitted = invocation.getArgument(0);
+            if (submitted.getId() != null && submitted.getVersion() != persistedVersion.get()) {
+                throw new org.springframework.orm.ObjectOptimisticLockingFailureException(AgentRun.class, submitted.getId());
+            }
+            AgentRun saved = new AgentRun();
+            BeanUtils.copyProperties(submitted, saved);
+            if (saved.getId() == null) saved.setId(88L);
+            saved.setVersion(persistedVersion.incrementAndGet());
+            return saved;
         });
         AgentToolRegistry toolRegistry = mock(AgentToolRegistry.class);
         when(toolRegistry.definitions()).thenReturn(List.of());

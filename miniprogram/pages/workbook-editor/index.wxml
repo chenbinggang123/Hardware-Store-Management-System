@@ -5,24 +5,58 @@
     <view class="editor-head">
       <view class="head-label">新版本名称</view>
       <input class="title-input" aria-label="新版本名称" value="{{title}}" maxlength="80" bindinput="inputTitle" />
-      <view class="head-note">直接修改下方内容。保存后会生成新的 Excel，原文件不会被覆盖。</view>
+      <view class="head-note">点击下方单元格直接修改。保存后生成新 Excel，不覆盖原文件。</view>
     </view>
 
     <scroll-view class="sheet-tabs" scroll-x wx:if="{{sheets.length > 1}}">
       <view class="sheet-tab {{index === sheetIndex ? 'active' : ''}}" role="button" aria-label="打开工作表 {{item.name}}" wx:for="{{sheets}}" wx:key="name" data-index="{{index}}" bindtap="selectSheet">{{item.name}}</view>
     </scroll-view>
 
-    <view class="sheet-summary"><view><text>{{activeSheet.name}}</text><text>{{activeSheet.rows.length}} 行 · {{activeSheet.columns.length}} 列</text></view><view class="add-row" role="button" aria-label="新增一行" bindtap="addRow">＋ 新增一行</view></view>
-    <view class="truncated-note" wx:if="{{activeSheet.truncated}}">当前只载入前 200 行。请先用小五处理更大的表格，避免遗漏。</view>
+    <view class="sheet-summary"><view><text>{{activeSheet.name}}</text><text>{{activeSheet.rows.length}} 行 · {{activeSheet.columns.length}} 列</text></view><view class="summary-actions"><button class="history-button" disabled="{{!canUndo}}" bindtap="undo">撤销</button><button class="history-button" disabled="{{!canRedo}}" bindtap="redo">恢复</button><button class="add-row" bindtap="addRow">＋ 新增行</button></view></view>
+    <view class="truncated-note" wx:if="{{activeSheet.truncated}}">当前只载入前 200 行。请勿用快速编辑保存超大表格，避免未载入的行丢失。</view>
 
-    <view class="row-card" wx:for="{{activeSheet.rows}}" wx:key="key" wx:for-index="rowIndex" wx:for-item="row">
-      <view class="row-head"><text>第 {{rowIndex + 1}} 行</text><view class="row-actions"><text role="button" aria-label="复制第 {{rowIndex + 1}} 行" data-row="{{rowIndex}}" bindtap="duplicateRow">复制</text><text class="danger" role="button" aria-label="删除第 {{rowIndex + 1}} 行" data-row="{{rowIndex}}" bindtap="deleteRow">删除</text></view></view>
-      <view class="cell-field" wx:for="{{activeSheet.columns}}" wx:key="*this" wx:for-index="columnIndex" wx:for-item="column">
-        <view class="cell-label">{{column}}</view>
-        <input class="cell-input" aria-label="第 {{rowIndex + 1}} 行 {{column}}" value="{{row.values[columnIndex]}}" data-row="{{rowIndex}}" data-column="{{columnIndex}}" bindinput="inputCell" />
+    <view class="grid-shell" wx:if="{{activeSheet.rows.length}}">
+      <view class="grid-tip">左右滑动看全部列 · 点行号可插入、复制或删除</view>
+      <scroll-view class="grid-scroll" scroll-x enhanced show-scrollbar>
+        <view class="grid-table" style="width: {{gridWidth}}rpx;" role="grid" aria-label="{{activeSheet.name}} 表格">
+          <view class="grid-row grid-header" role="row"><view class="row-number corner" role="columnheader">#</view><view class="grid-heading" role="columnheader" wx:for="{{activeSheet.columns}}" wx:key="*this">{{item}}</view></view>
+          <view class="grid-row" role="row" wx:for="{{visibleRows}}" wx:key="key" wx:for-item="row" wx:for-index="localIndex">
+            <view class="row-number" role="button" aria-label="第 {{row.rowNumber}} 行操作" data-row="{{row.rowIndex}}" bindtap="openRowMenu">{{row.rowNumber}}</view>
+            <view class="grid-cell" role="gridcell" wx:for="{{activeSheet.columns}}" wx:key="*this" wx:for-index="columnIndex" wx:for-item="column"><input class="grid-input" aria-label="第 {{row.rowNumber}} 行 {{column}}" value="{{row.values[columnIndex]}}" data-row="{{row.rowIndex}}" data-local="{{localIndex}}" data-column="{{columnIndex}}" bindfocus="beginCellEdit" bindinput="inputCell" bindblur="endCellEdit" /></view>
+          </view>
+        </view>
+      </scroll-view>
+      <view class="pagination" wx:if="{{pageCount > 1}}"><button disabled="{{pageIndex === 0}}" bindtap="previousPage">上一页</button><text>{{pageStart}}–{{pageEnd}} / {{activeSheet.rows.length}}</text><button disabled="{{pageIndex + 1 >= pageCount}}" bindtap="nextPage">下一页</button></view>
+    </view>
+    <view class="empty-sheet" wx:else>这个工作表暂时没有数据，点击“新增行”开始填写。</view>
+
+    <view class="batch-tools" wx:if="{{activeSheet.rows.length}}">
+      <view class="batch-title"><view><text>批量工具</text><text>一次修改多行，适合价格表和往来单据</text></view></view>
+      <view class="tool-switches" role="group" aria-label="批量修改方式">
+        <view class="tool-switch {{activeTool === 'fill' ? 'active' : ''}}" role="button" aria-label="批量填充一列" data-tool="fill" bindtap="toggleTool">批量填充</view>
+        <view class="tool-switch {{activeTool === 'replace' ? 'active' : ''}}" role="button" aria-label="搜索并替换内容" data-tool="replace" bindtap="toggleTool">查找替换</view>
+        <view class="tool-switch {{activeTool === 'paste' ? 'active' : ''}}" role="button" aria-label="粘贴多行多列数据" data-tool="paste" bindtap="toggleTool">批量粘贴</view>
+      </view>
+      <view class="tool-panel" wx:if="{{activeTool === 'fill'}}">
+        <view class="tool-field"><view class="tool-label">要填的列</view><picker mode="selector" range="{{columnOptions}}" value="{{fillColumnIndex}}" bindchange="changeFillColumn"><view class="tool-picker" role="button" aria-label="选择要批量填充的列">{{columnOptions[fillColumnIndex]}}<text>›</text></view></picker></view>
+        <view class="tool-field"><view class="tool-label">填写范围</view><picker mode="selector" range="{{fillScopeOptions}}" value="{{fillScopeIndex}}" bindchange="changeFillScope"><view class="tool-picker" role="button" aria-label="选择批量填写范围">{{fillScopeOptions[fillScopeIndex]}}<text>›</text></view></picker></view>
+        <view class="tool-field"><view class="tool-label">统一填写为</view><input class="tool-input" aria-label="批量填写内容" placeholder="例如：个、已付、上海仓" value="{{fillValue}}" bindinput="inputFillValue" /></view>
+        <button class="tool-apply" bindtap="applyFill">应用批量填充</button>
+      </view>
+      <view class="tool-panel" wx:if="{{activeTool === 'replace'}}">
+        <view class="tool-field"><view class="tool-label">查找范围</view><picker mode="selector" range="{{replaceColumnOptions}}" value="{{replaceColumnIndex}}" bindchange="changeReplaceColumn"><view class="tool-picker" role="button" aria-label="选择查找替换范围">{{replaceColumnOptions[replaceColumnIndex]}}<text>›</text></view></picker></view>
+        <view class="replace-grid"><view class="tool-field"><view class="tool-label">查找内容</view><input class="tool-input" aria-label="要查找的内容" placeholder="原内容" value="{{searchText}}" bindinput="inputSearchText" /></view><view class="tool-field"><view class="tool-label">替换为</view><input class="tool-input" aria-label="替换后的内容" placeholder="留空表示删除" value="{{replaceText}}" bindinput="inputReplaceText" /></view></view>
+        <view class="tool-hint">替换前会告诉你命中了多少格。</view>
+        <button class="tool-apply" bindtap="applyReplace">查找并替换</button>
+      </view>
+      <view class="tool-panel" wx:if="{{activeTool === 'paste'}}">
+        <view class="paste-start"><view class="tool-field"><view class="tool-label">从第几行开始</view><input class="tool-input" type="number" aria-label="粘贴起始行" value="{{pasteStartRow}}" bindinput="inputPasteStartRow" /></view><view class="tool-field"><view class="tool-label">从哪一列开始</view><picker mode="selector" range="{{columnOptions}}" value="{{pasteColumnIndex}}" bindchange="changePasteColumn"><view class="tool-picker" role="button" aria-label="选择粘贴起始列">{{columnOptions[pasteColumnIndex]}}<text>›</text></view></picker></view></view>
+        <view class="clipboard-head"><view><view class="tool-label">要粘贴的内容</view><view class="tool-hint">可以先在 Excel 中复制多行多列。</view></view><button class="clipboard-button" bindtap="readClipboard">读取剪贴板</button></view>
+        <textarea class="paste-input" aria-label="多行多列粘贴内容" placeholder="也可以长按这里粘贴" value="{{pasteText}}" bindinput="inputPasteText" />
+        <button class="tool-apply" bindtap="applyPaste">确认粘贴到表格</button>
       </view>
     </view>
-    <view class="empty-sheet" wx:if="{{!activeSheet.rows.length}}">这个工作表暂时没有数据，点击“新增一行”开始填写。</view>
+    <view class="action-result" role="status" aria-live="polite" wx:if="{{actionMessage}}"><text>{{actionMessage}}</text><view class="inline-history"><button wx:if="{{canUndo}}" bindtap="undo">撤销</button><button wx:if="{{canRedo}}" bindtap="redo">恢复</button></view></view>
     <view class="bottom-space"></view>
     <view class="save-bar"><view class="save-state">{{dirty ? '有修改尚未保存' : '当前内容已读取'}}</view><button class="save-button" disabled="{{saving || !dirty}}" bindtap="save">{{saving ? '正在生成…' : '保存为新版本'}}</button></view>
   </block>

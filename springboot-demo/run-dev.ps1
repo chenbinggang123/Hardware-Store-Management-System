@@ -6,11 +6,35 @@ param(
 $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$agentConfigPath = Join-Path $projectRoot "agent.local.env"
+if (Test-Path $agentConfigPath) {
+    foreach ($line in Get-Content -Path $agentConfigPath) {
+        $trimmedLine = $line.Trim()
+        if (-not $trimmedLine -or $trimmedLine.StartsWith('#')) { continue }
+        $entry = $trimmedLine -split '=', 2
+        if ($entry.Count -ne 2) { continue }
+        $name = $entry[0].Trim()
+        $value = $entry[1].Trim()
+        if ($name -notmatch '^(AGENT_(MODEL|ROUTING)_|TABLE_OCR_|TENCENT_OCR_|OCR_PROVIDER$)') { continue }
+        if (-not $value) { continue }
+        if ($value.Length -ge 2 -and (($value.StartsWith('"') -and $value.EndsWith('"')) -or ($value.StartsWith("'") -and $value.EndsWith("'")))) {
+            $value = $value.Substring(1, $value.Length - 2)
+        }
+        [Environment]::SetEnvironmentVariable($name, $value, 'Process')
+    }
+    Write-Host "Loaded local Agent settings from agent.local.env (file is excluded from Git)."
+}
+if ($env:AGENT_MODEL_ENABLED -eq 'true' -and [string]::IsNullOrWhiteSpace($env:AGENT_MODEL_API_KEY)) {
+    $env:AGENT_MODEL_ENABLED = 'false'
+    Write-Warning "AGENT_MODEL_API_KEY is empty. Model calls are disabled for this run; fill the key in agent.local.env and restart to enable them."
+}
 $sourceRoot = Join-Path $projectRoot "src\main\java"
 $resourceRoot = Join-Path $projectRoot "src\main\resources"
 $targetRoot = Join-Path $projectRoot "target"
 $classesRoot = Join-Path $targetRoot "classes"
-$argRoot = Join-Path $targetRoot "codex-run"
+# Use one argument directory per launcher process so a stale Windows process cannot
+# keep the next restart from updating javac/java argument files.
+$argRoot = Join-Path $targetRoot ("codex-run-" + $PID)
 $m2Repository = Join-Path $env:USERPROFILE ".m2\repository"
 
 if (-not (Test-Path $m2Repository)) {
@@ -39,7 +63,6 @@ $javacCommand = if ($env:JAVA_HOME) {
 
 $jarPaths = Get-ChildItem -Path $m2Repository -Recurse -Filter *.jar |
     Where-Object { $_.Name -notmatch '(-sources|-javadoc|-tests)\.jar$' } |
-    Where-Object { $_.FullName -notmatch '\\commons-io\\commons-io\\' } |
     ForEach-Object {
         try {
             $stream = [System.IO.File]::OpenRead($_.FullName)
@@ -55,7 +78,18 @@ $jarPaths = Get-ChildItem -Path $m2Repository -Recurse -Filter *.jar |
     Group-Object ArtifactPath |
     ForEach-Object {
         $_.Group |
-            Sort-Object Version -Descending |
+            # Compare numeric version components; lexical ordering incorrectly puts 4.7.2
+            # ahead of 4.13.0 and can mix incompatible ANTLR runtimes on the classpath.
+            Sort-Object {
+                $numericVersion = [regex]::Match($_.Version, '^\d+(?:\.\d+){0,3}')
+                if ($numericVersion.Success) {
+                    $components = $numericVersion.Value.Split('.')
+                    while ($components.Count -lt 4) { $components += '0' }
+                    [version]($components -join '.')
+                } else {
+                    [version]'0.0.0.0'
+                }
+            } -Descending |
             Select-Object -First 1 -ExpandProperty FullName
     }
 if (-not $jarPaths) {

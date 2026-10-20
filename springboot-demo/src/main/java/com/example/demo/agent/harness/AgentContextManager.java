@@ -46,6 +46,14 @@ public class AgentContextManager {
                 : conversationService.contextBeforeRun(run.getId());
         AgentRunContext context = new AgentRunContext(
                 run.getId(), run.getOperatorId(), run.getInputText(), history);
+        if (StringUtils.hasText(run.getExecutionPlanJson())) {
+            try {
+                AgentExecutionPlan plan = objectMapper.readValue(run.getExecutionPlanJson(), AgentExecutionPlan.class);
+                context.setExecutionPlan(Set.copyOf(plan.allowedTools()), plan.instructionSnapshot(), !plan.selections().isEmpty());
+            } catch (JsonProcessingException exception) {
+                throw new IllegalStateException("Agent 执行计划损坏", exception);
+            }
+        }
         if (!StringUtils.hasText(run.getContextJson())) {
             return context;
         }
@@ -65,6 +73,16 @@ public class AgentContextManager {
             return context;
         } catch (JsonProcessingException | ClassCastException exception) {
             throw new IllegalStateException("Agent 上下文损坏", exception);
+        }
+    }
+
+    public Set<String> allowedTools(AgentRun run) {
+        if (!StringUtils.hasText(run.getExecutionPlanJson())) return Set.of();
+        try {
+            AgentExecutionPlan plan = objectMapper.readValue(run.getExecutionPlanJson(), AgentExecutionPlan.class);
+            return Set.copyOf(plan.allowedTools());
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Agent 执行计划损坏", exception);
         }
     }
 

@@ -1,0 +1,73 @@
+[
+  {
+    "id": "excel_create_receipt",
+    "name": "识别收据并生成 Excel",
+    "userInput": "请把附件收据整理成可编辑 Excel，保留票面数字；有不确定的地方放到核对说明里。",
+    "conversationHistory": [],
+    "hasAttachments": true,
+    "expected": {
+      "status": "READY",
+      "selections": [{ "capabilityId": "excel", "operation": "create" }],
+      "allowedTools": ["generate_excel_workbook"],
+      "instructionSkills": ["agent/skills/excel/SKILL.md", "agent/skills/excel/create/SKILL.md"]
+    }
+  },
+  {
+    "id": "excel_modify_by_history",
+    "name": "依赖历史上下文修改已生成文件",
+    "userInput": "把第二行数量改成 40，其他内容和格式都不要动。",
+    "conversationHistory": [
+      { "role": "user", "content": "请把这份清单做成 Excel。" },
+      { "role": "assistant", "content": "文件已生成，文件 #7：五金清单.xlsx。" }
+    ],
+    "hasAttachments": false,
+    "expected": {
+      "status": "READY",
+      "selections": [{ "capabilityId": "excel", "operation": "modify_generated" }],
+      "allowedTools": ["read_generated_file", "generate_excel_workbook"],
+      "instructionSkills": ["agent/skills/excel/SKILL.md", "agent/skills/excel/modify-generated/SKILL.md"]
+    }
+  },
+  {
+    "id": "inventory_then_export",
+    "name": "查询库存并导出 Excel（多能力）",
+    "userInput": "查一下 示例扣件现在的库存，并把查询结果导出成 Excel。",
+    "conversationHistory": [],
+    "hasAttachments": false,
+    "expected": {
+      "status": "READY",
+      "selections": [
+        { "capabilityId": "inventory", "operation": "query" },
+        { "capabilityId": "excel", "operation": "create" }
+      ],
+      "allowedTools": ["check_inventory", "search_products", "generate_excel_workbook"],
+      "instructionSkills": ["agent/skills/inventory/SKILL.md", "agent/skills/excel/SKILL.md", "agent/skills/excel/create/SKILL.md"]
+    }
+  },
+  {
+    "id": "ambiguous_document_intent",
+    "name": "附件存在但处理意图不明确",
+    "userInput": "帮我把这张单据处理一下。",
+    "conversationHistory": [],
+    "hasAttachments": true,
+    "expected": {
+      "status": "CLARIFY",
+      "selections": [],
+      "allowedTools": [],
+      "messageMustAsk": ["生成 Excel", "登记采购或业务数据"]
+    }
+  },
+  {
+    "id": "unsupported_weather",
+    "name": "当前能力目录不支持的请求",
+    "userInput": "帮我查一下今天杭州的天气。",
+    "conversationHistory": [],
+    "hasAttachments": false,
+    "expected": {
+      "status": "UNSUPPORTED",
+      "selections": [],
+      "allowedTools": [],
+      "messageMustExplain": "当前没有天气查询能力"
+    }
+  }
+]

@@ -1,11 +1,3 @@
-const TAB_PAGES = new Set([
-  '/pages/agent/index',
-  '/pages/agent-files/index',
-  '/pages/finance-ledger/index',
-  '/pages/products/index',
-  '/pages/settings/index'
-])
-
 function buildQuery(params) {
   return Object.keys(params || {})
     .filter((key) => params[key] !== undefined && params[key] !== null && params[key] !== '')
@@ -32,16 +24,6 @@ function openPage(path, params = {}, options = {}) {
   const normalizedPath = normalizePath(path)
   if (!normalizedPath) {
     showToast('页面地址无效')
-    return
-  }
-
-  if (TAB_PAGES.has(normalizedPath)) {
-    wx.switchTab({
-      url: normalizedPath,
-      fail() {
-        showToast('页面打开失败，请重试')
-      }
-    })
     return
   }
 

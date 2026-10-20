@@ -81,8 +81,12 @@ public class FileCenterService {
         List<FileCenterItem> all = new ArrayList<>();
         Map<String, FileCenterMetadata> metadata = metadataRepository.findByOperatorId(operatorId).stream()
                 .collect(Collectors.toMap(item -> key(item.getSourceKind(), item.getSourceId()), Function.identity()));
-        attachmentRepository.findByOperatorIdOrderByUpdateTimeDesc(operatorId)
-                .forEach(item -> all.add(fromAttachment(item, metadata.get(key("ATTACHMENT", item.getId())))));
+        attachmentRepository.findByOperatorIdOrderByUpdateTimeDesc(operatorId).forEach(item -> {
+            FileCenterMetadata attachmentMetadata = metadata.get(key("ATTACHMENT", item.getId()));
+            if (attachmentMetadata != null && Boolean.TRUE.equals(attachmentMetadata.getManualUpload())) {
+                all.add(fromAttachment(item, attachmentMetadata));
+            }
+        });
         taskRepository.findByOperatorIdOrderByUpdateTimeDesc(operatorId)
                 .forEach(item -> all.add(fromTask(item, metadata.get(key("TASK", item.getId())))));
         outputRepository.findByOperatorIdAndSourceTypeOrderByCreateTimeDesc(

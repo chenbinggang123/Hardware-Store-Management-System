@@ -8,6 +8,10 @@ import java.util.List;
 public interface AgentModelGateway {
     AgentModelResponse respond(AgentRunContext context, List<AgentToolDefinition> tools);
 
+    default AgentRoutingResult route(String userInput, List<AgentChatMessage> history, String capabilityCatalog) {
+        return null;
+    }
+
     default AgentModelResponse respondStreaming(
             AgentRunContext context,
             List<AgentToolDefinition> tools,

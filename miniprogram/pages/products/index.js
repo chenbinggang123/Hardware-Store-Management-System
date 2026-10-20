@@ -91,7 +91,7 @@ Page({
     const product = this.data.products.find((item) => `${item.id}` === `${event.currentTarget.dataset.id}`)
     if (!product) return
     wx.setStorageSync(PENDING_PROMPT_KEY, `帮我给客户开单，商品是“${product.name}”，数量和客户请问我。`)
-    wx.switchTab({ url: '/pages/agent/index' })
+    wx.reLaunch({ url: '/pages/agent/index' })
   },
 
   openAdjust(event) {

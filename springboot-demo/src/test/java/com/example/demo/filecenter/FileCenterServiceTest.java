@@ -48,6 +48,17 @@ class FileCenterServiceTest {
         attachment.setCreateTime(now.minusHours(2));
         attachment.setUpdateTime(now.minusHours(1));
 
+        AgentAttachment conversationOnlyAttachment = new AgentAttachment();
+        conversationOnlyAttachment.setId(4L);
+        conversationOnlyAttachment.setOperatorId(9L);
+        conversationOnlyAttachment.setOriginalName("仅供识别.jpg");
+        conversationOnlyAttachment.setMimeType("image/jpeg");
+        conversationOnlyAttachment.setParseStatus("PARSED");
+        conversationOnlyAttachment.setConversationId(11L);
+        conversationOnlyAttachment.setRunId(12L);
+        conversationOnlyAttachment.setCreateTime(now);
+        conversationOnlyAttachment.setUpdateTime(now);
+
         ExcelTask task = new ExcelTask();
         task.setId(2L);
         task.setOriginalName("十月价格表.xlsx");
@@ -63,11 +74,17 @@ class FileCenterServiceTest {
         output.setSourceType(AgentOutputService.AGENT_SOURCE_TYPE);
         output.setCreateTime(now.minusMinutes(30));
 
-        when(attachmentRepository.findByOperatorIdOrderByUpdateTimeDesc(9L)).thenReturn(List.of(attachment));
+        when(attachmentRepository.findByOperatorIdOrderByUpdateTimeDesc(9L))
+                .thenReturn(List.of(conversationOnlyAttachment, attachment));
         when(taskRepository.findByOperatorIdOrderByUpdateTimeDesc(9L)).thenReturn(List.of(task));
         when(outputRepository.findByOperatorIdAndSourceTypeOrderByCreateTimeDesc(9L,
                 AgentOutputService.AGENT_SOURCE_TYPE)).thenReturn(List.of(output));
-        when(metadataRepository.findByOperatorId(9L)).thenReturn(List.of());
+        FileCenterMetadata manualUpload = new FileCenterMetadata();
+        manualUpload.setOperatorId(9L);
+        manualUpload.setSourceKind("ATTACHMENT");
+        manualUpload.setSourceId(1L);
+        manualUpload.setManualUpload(true);
+        when(metadataRepository.findByOperatorId(9L)).thenReturn(List.of(manualUpload));
 
         FileCenterService service = new FileCenterService(attachmentRepository, taskRepository, outputRepository,
                 metadataRepository, activityRepository);
@@ -96,10 +113,10 @@ class FileCenterServiceTest {
         AgentAttachment attachment = new AgentAttachment();
         attachment.setId(7L);
         attachment.setOperatorId(9L);
-        attachment.setOriginalName("客户送货单.jpg");
+        attachment.setOriginalName("测试业务单.jpg");
         attachment.setMimeType("image/jpeg");
         attachment.setParseStatus("PARSED");
-        attachment.setExtractedText("送货单 单号：SH-20261014 日期 2026年10月14日 合计：￥1,280.50 已收：500");
+        attachment.setExtractedText("送货单 单号：MOCK-2001 日期 2026年10月14日 合计：￥1,280.50 已收：500");
         attachment.setConversationId(10L);
         attachment.setCreateTime(LocalDateTime.of(2026, 10, 14, 9, 0));
         attachment.setUpdateTime(attachment.getCreateTime());
@@ -137,7 +154,7 @@ class FileCenterServiceTest {
         assertThat(detail.manualUpload()).isTrue();
         assertThat(detail.item().purpose()).isEqualTo("客户单据");
         assertThat(detail.item().relatedName()).isEqualTo("张师傅");
-        assertThat(detail.accountDraft().documentNumber()).isEqualTo("SH-20261014");
+        assertThat(detail.accountDraft().documentNumber()).isEqualTo("MOCK-2001");
         assertThat(detail.accountDraft().totalAmount()).isEqualByComparingTo("1280.50");
         assertThat(detail.accountDraft().settledAmount()).isEqualByComparingTo("500");
         assertThat(detail.accountDraft().reviewFields()).isEmpty();

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <title>小五 · 五金店经营助手</title>
+  <link rel="stylesheet" href="workbench/workbench.css">
+  <script src="workbench/markdown.js" defer></script>
+  <script src="workbench/presentation.js" defer></script>
+  <script src="workbench/files.js" defer></script>
+  <script src="workbench/workbench.js" defer></script>
+</head>
+<body>
+  <svg class="svg-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
+    <symbol id="i-panel" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-2 2V11.5a9.5 9.5 0 0 1 19 0Z"/><path d="M7 9h9M7 13h6"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="m9 3-1 3-3 1-2 5 2 5 3 1 1 3h6l1-3 3-1 2-5-2-5-3-1-1-3Z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-scan" viewBox="0 0 24 24"><path d="M8 3H4v4M16 3h4v4M4 17v4h4M20 17v4h-4M3 12h18M8 7h8M8 17h8"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="m6 12 6-6 6 6M12 6v14"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="m10 5-7 7 7 7M3 12h17"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9ZM14 3v6h6M8 13h8M8 17h5"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 16v4h16v-4"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-retry" viewBox="0 0 24 24"><path d="M20 7v5h-5M20 12a8 8 0 1 0-2 6"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></symbol>
+  </defs></svg>
+  <a class="skip-link" href="#chatInput">跳到消息输入</a>
+  <header class="topbar">
+    <div class="brand-group"><button id="toggleSidebar" class="icon-button" type="button" aria-label="收起会话栏" aria-controls="sidebar" aria-expanded="true"><svg><use href="#i-panel"/></svg></button><a class="brand" href="#chat"><span class="brand-mark">小五</span><span class="brand-name">五金店经营助手</span></a></div>
+    <div class="top-actions"><span id="connectionStatus" class="connection" role="status"><i></i><span>连接中</span></span><span class="top-divider"></span><button id="accountButton" type="button" class="text-button" title="账号与设置"><svg><use href="#i-user"/></svg><span id="accountName">未登录</span></button><button id="settingsButton" class="icon-button" type="button" aria-label="设置"><svg><use href="#i-settings"/></svg></button></div>
+  </header>
+  <div class="app-body" id="appBody">
+    <button id="sidebarBackdrop" class="sidebar-backdrop" aria-label="关闭会话栏" hidden></button>
+    <aside id="sidebar" class="sidebar" aria-label="会话导航">
+      <button id="newChatButton" class="new-chat" type="button" disabled><svg><use href="#i-plus"/></svg>新建对话</button>
+      <div class="list-heading"><span>最近对话</span><span id="conversationCount"></span></div>
+      <nav id="conversationList" class="conversation-list" aria-label="最近对话"><p class="list-empty">登录后，在这里继续之前的对话。</p></nav>
+      <div class="sidebar-footer"><a href="billing.html" class="nav-button"><svg><use href="#i-plus"/></svg>快捷开单</a><button id="myFilesButton" class="nav-button" type="button"><svg><use href="#i-file"/></svg>我的文件</button><button id="helpButton" class="nav-button" type="button"><svg><use href="#i-settings"/></svg>配置与帮助</button><div class="workspace-note"><span class="tiny-dot"></span>电脑端工作台</div></div>
+    </aside>
+    <main id="main" class="main">
+      <section id="chatView" class="chat-view" aria-label="对话工作区">
+        <div class="conversation-heading"><div class="conversation-heading-text"><h1 id="conversationTitle">新对话</h1><span id="conversationSubtitle">从一个问题开始，把事情理清楚。</span></div><button id="openOcr" class="secondary-button" type="button" disabled><svg><use href="#i-scan"/></svg>单据识别</button></div>
+        <div id="messageScroll" class="message-scroll" tabindex="0" aria-label="消息阅读区">
+          <section id="loginView" class="login-view" aria-labelledby="loginTitle">
+            <div class="welcome-mark" aria-hidden="true">小五</div><h2 id="loginTitle">登录，开始今天的工作</h2><p>查经营、看库存，或者一起整理一张单据。</p>
+            <form id="loginForm" class="login-form"><label for="username">账号</label><input id="username" name="username" autocomplete="username" placeholder="输入系统账号" required><label for="password">密码</label><input id="password" name="password" type="password" autocomplete="current-password" placeholder="输入密码" required><details class="advanced-settings"><summary>高级设置</summary><label for="loginApiBase">后端 API 地址</label><input id="loginApiBase" type="url" autocomplete="url" spellcheck="false"><p>仅在连接其他后端时修改。</p></details><p id="loginError" class="inline-error" role="alert" hidden></p><button id="loginButton" class="primary-button" type="submit">登录并开始对话</button><p class="login-hint">密码不保存在网页中，登录状态仅用于当前标签页。</p></form>
+          </section>
+          <section id="welcomeView" class="welcome-view" aria-labelledby="welcomeTitle" hidden><div class="welcome-mark" aria-hidden="true">小五</div><h2 id="welcomeTitle">今天，有什么要一起处理？</h2><p>经营情况、商品库存，或是手头的一张单据。</p><div class="quick-prompts"><button type="button" data-prompt="查一下今天的经营情况">查询今天经营情况<span>看看销售与欠款</span></button><button type="button" data-prompt="帮我查找商品和库存：">查找商品和库存<span>补充商品名称或条码</span></button><button type="button" data-prompt="帮我查询客户欠款，客户是：">查询客户欠款<span>补充客户名称</span></button><button id="quickOcr" type="button">识别一张单据<span>上传图片，核对识别结果</span></button></div></section>
+          <div id="chatHistory" class="chat-history" role="log" aria-label="对话记录" aria-live="polite" aria-relevant="additions"></div>
+        </div>
+        <div class="composer-area"><button id="newMessages" class="new-messages secondary-button" type="button" hidden>有新消息，回到底部<svg><use href="#i-down"/></svg></button><div id="chatNotice" class="chat-notice" role="status" hidden></div><form id="chatForm" class="composer"><div id="attachedContext" class="attached-context" hidden><button id="viewContext" class="context-label" type="button"><svg><use href="#i-file"/></svg><span id="contextName"></span></button><button id="removeContext" class="icon-button" type="button" aria-label="移除待发送的识别内容"><svg><use href="#i-close"/></svg></button></div><label for="chatInput" class="sr-only">输入消息</label><textarea id="chatInput" rows="1" placeholder="问问小五，或描述你要处理的事情…" aria-describedby="composerHint" disabled></textarea><div class="composer-toolbar"><button id="composerOcr" class="text-button" type="button" disabled><svg><use href="#i-scan"/></svg>识别单据</button><button id="chatSend" class="send-button" type="submit" aria-label="发送消息" disabled><svg><use href="#i-arrow"/></svg></button></div></form><p id="composerHint" class="composer-hint">Enter 发送 · Shift + Enter 换行<span>涉及业务登记时，会先请你确认</span></p></div>
+      </section>
+      <section id="settingsView" class="settings-view" aria-labelledby="settingsTitle" hidden><div class="settings-heading"><button id="backToChat" class="icon-button" type="button" aria-label="返回对话"><svg><use href="#i-back"/></svg></button><h1 id="settingsTitle">设置</h1></div><div class="settings-content"><h2>账号</h2><div class="settings-row"><div><strong id="settingsAccount">尚未登录</strong><p>登录状态保存在当前标签页，关闭后清除。</p></div><button id="logoutButton" class="secondary-button" type="button">登录账号</button></div><h2>连接</h2><form id="connectionForm"><label for="apiBase">后端 API 地址</label><div class="connection-form"><input id="apiBase" type="url" spellcheck="false" required><button class="secondary-button" type="submit">保存地址</button><button id="checkConnection" class="text-button" type="button">测试连接</button></div><p id="connectionDetail" class="field-hint" role="status">连接测试仅检查后端能否访问，不检测模型或 OCR 密钥。</p></form><h2>配置与帮助</h2><p class="settings-intro">以下是后端配置说明。密钥填写在服务器本地配置文件中，修改后需重启后端。</p><details class="help-section"><summary>模型服务</summary><p>在 <code>springboot-demo/agent.local.env</code> 中配置：</p><dl><dt>AGENT_MODEL_ENABLED</dt><dd>设为 true；密钥为空时，本地启动脚本会暂时关闭模型。</dd><dt>AGENT_MODEL_BASE_URL</dt><dd>模型服务的 Chat Completions 兼容接口根地址。</dd><dt>AGENT_MODEL_NAME</dt><dd>填写服务商提供的模型名称。</dd><dt>AGENT_MODEL_API_KEY</dt><dd>仅在后端填写模型密钥。</dd><dt>AGENT_MODEL_TIMEOUT_SECONDS</dt><dd>请求超时秒数。</dd></dl></details><details class="help-section"><summary>腾讯云 OCR 与单据识别</summary><dl><dt>TENCENT_OCR_SECRET_ID / SECRET_KEY</dt><dd>腾讯云 OCR 凭证，仅保存在后端配置。</dd><dt>TENCENT_OCR_REGION</dt><dd>服务地域，例如 ap-guangzhou。</dd><dt>OCR_PROVIDER / TABLE_OCR_MODE</dt><dd>腾讯云直连均可设为 tencent，分别控制对话附件与文件任务识别。</dd><dt>TENCENT_OCR_TIMEOUT_SECONDS / TABLE_OCR_TIMEOUT_SECONDS</dt><dd>识别请求超时秒数。</dd><dt>TABLE_OCR_URL</dt><dd>腾讯云直连时留空；仅使用自建 HTTP 适配服务时填写。</dd></dl><p>识别只创建待核对文件任务，不会自动登记采购或修改库存。</p></details><details class="help-section"><summary>数据库与本地启动</summary><p>电脑端页面由后端直接提供。在项目目录运行 <code>.\run-dev.ps1</code> 启动；更改配置后重启后端。</p><p>默认本地数据库为 MySQL 的 <code>hardware_store</code>。通过 <code>DB_HOST</code>、<code>DB_PORT</code>、<code>DB_NAME</code>、<code>DB_USERNAME</code> 和 <code>DB_PASSWORD</code> 覆盖连接参数。</p><p>文件任务与对话历史会保存到当前连接的后端。</p></details><details class="help-section"><summary>对话、文件与操作确认</summary><p>快捷问题只填入输入框，你可以补充条件后发送。回复中的文件可直接下载。</p><p>识别完成后点击“加入当前对话”，下一条消息才会携带该识别文本。发送前可以查看或移除；已发送的内容会保留在该对话历史中。</p><p>涉及写入业务数据时，请先核对确认卡。执行完成后会显示结果，已处理的按钮不会重复提交。</p></details></div></section>
+      <section id="filesView" class="files-view" aria-labelledby="filesTitle" hidden>
+        <header class="files-heading"><div><h1 id="filesTitle">我的文件</h1><p>小五已生成的文件，随时打开查看。</p></div><button id="refreshFiles" class="secondary-button" type="button"><svg><use href="#i-retry"/></svg>刷新</button></header>
+        <div class="files-search"><label for="fileSearch" class="sr-only">搜索文件名</label><input id="fileSearch" type="search" placeholder="搜索文件名…"><span id="fileCount" role="status"></span></div>
+        <div id="fileList" class="file-library" aria-live="polite"></div>
+      </section>
+      <section id="workbookView" class="workbook-view" aria-labelledby="workbookTitle" hidden>
+        <header class="workbook-heading"><button id="backFromWorkbook" class="icon-button" type="button" aria-label="返回文件列表"><svg><use href="#i-back"/></svg></button><div><h1 id="workbookTitle">文件预览</h1><p id="workbookSubtitle">正在读取实际文件…</p></div><a id="editWorkbook" class="secondary-button" hidden>在开单页修改</a><button id="downloadWorkbook" class="primary-button" type="button" disabled>下载 Excel</button></header>
+        <div id="workbookStatus" class="workbook-status" role="status"></div>
+        <div id="workbookGrid" class="workbook-grid" tabindex="0" aria-label="Excel 表格预览，可横向和纵向滚动"></div>
+        <div id="workbookSheets" class="workbook-sheets" role="tablist" aria-label="切换工作表"></div>
+        <footer class="workbook-footer"><span id="workbookPageInfo"></span><div><button id="previousRows" class="secondary-button" type="button" disabled>上一页</button><button id="nextRows" class="secondary-button" type="button" disabled>下一页</button></div></footer>
+      </section>
+    </main>
+    <button id="ocrBackdrop" class="ocr-backdrop" aria-label="关闭单据识别" hidden></button>
+    <aside id="ocrPanel" class="ocr-panel" aria-labelledby="ocrTitle" hidden><div class="panel-heading"><div><h2 id="ocrTitle">单据识别</h2><p>先核对，再加入对话</p></div><button id="closeOcr" class="icon-button" type="button" aria-label="关闭单据识别"><svg><use href="#i-close"/></svg></button></div><div class="panel-content"><section id="contextPreview" class="context-preview" hidden><h3>待发送的识别内容</h3><p id="contextPreviewName" class="field-hint"></p><pre id="contextPreviewText"></pre><p class="field-hint">将随下一条消息发送；发送前可在输入区移除。</p></section><label for="imageFile" id="dropZone" class="drop-zone" tabindex="0"><svg><use href="#i-upload"/></svg><strong>选择一张单据图片</strong><span>或拖到这里 · JPG、PNG、WebP · 最大 10 MB</span><input id="imageFile" type="file" accept="image/jpeg,image/png,image/webp" class="sr-only"></label><div id="selectedFile" class="selected-file" hidden><span id="fileName"></span><img id="preview" alt="所选单据预览"></div><button id="runButton" class="primary-button full-width" type="button" disabled>开始识别</button><p id="ocrNotice" class="field-hint" role="status">识别结果不会自动发送，也不会自动登记业务。</p><section id="ocrResults" class="ocr-results" hidden><div class="result-heading"><h3>识别结果</h3><span id="taskLabel"></span></div><div id="ocrTables"></div><div id="ocrWarnings" class="ocr-warnings" hidden></div><button id="attachOcr" class="primary-button full-width" type="button">加入当前对话</button><details class="diagnostics"><summary>原始响应与诊断信息</summary><pre id="rawJson"></pre></details></section></div></aside>
+  </div>
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>

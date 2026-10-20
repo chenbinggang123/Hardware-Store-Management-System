@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,6 +27,7 @@ import java.util.List;
 @Transactional
 public class AgentConversationService {
     private static final int MAX_CONTEXT_RUNS = 10;
+    private static final DateTimeFormatter TITLE_TIME = DateTimeFormatter.ofPattern("MM-dd HH:mm");
 
     private final AgentConversationRepository conversationRepository;
     private final AgentConversationRunRepository conversationRunRepository;
@@ -76,13 +78,20 @@ public class AgentConversationService {
 
     public AgentConversation resolve(Long conversationId, Long operatorId, String firstInput) {
         if (conversationId != null) {
-            return conversationRepository.findByIdAndOperatorId(conversationId, operatorId)
+            AgentConversation existing = conversationRepository.findByIdAndOperatorId(conversationId, operatorId)
                     .orElseThrow(() -> new IllegalArgumentException("会话不存在或无权访问"));
+            if (isProvisionalTitle(existing.getTitle())
+                    && StringUtils.hasText(firstInput)
+                    && conversationRunRepository.findByConversationIdOrderByCreateTimeAsc(conversationId).isEmpty()) {
+                existing.setTitle(title(firstInput, LocalDateTime.now()));
+                touch(existing);
+            }
+            return existing;
         }
         LocalDateTime now = LocalDateTime.now();
         AgentConversation conversation = new AgentConversation();
         conversation.setOperatorId(operatorId);
-        conversation.setTitle(title(firstInput));
+        conversation.setTitle(title(firstInput, now));
         conversation.setCreateTime(now);
         conversation.setUpdateTime(now);
         return conversationRepository.save(conversation);
@@ -160,7 +169,7 @@ public class AgentConversationService {
                     AgentRun latest = runs.isEmpty() ? null : runs.get(runs.size() - 1);
                     String preview = latest == null ? "暂无消息"
                             : StringUtils.hasText(latest.getOutputText()) ? latest.getOutputText() : latest.getInputText();
-                    return new AgentConversationSummary(conversation.getId(), conversation.getTitle(),
+                    return new AgentConversationSummary(conversation.getId(), displayTitle(conversation, runs),
                             abbreviate(preview, 60), conversation.getUpdateTime());
                 }).toList();
     }
@@ -170,7 +179,8 @@ public class AgentConversationService {
         AgentConversation conversation = conversationRepository.findByIdAndOperatorId(conversationId, operatorId)
                 .orElseThrow(() -> new IllegalArgumentException("会话不存在或无权访问"));
         List<AgentConversationMessage> messages = new ArrayList<>();
-        for (AgentRun run : runs(conversationId)) {
+        List<AgentRun> conversationRuns = runs(conversationId);
+        for (AgentRun run : conversationRuns) {
             if (StringUtils.hasText(run.getInputText())) {
                 var attachments = attachmentRepository == null ? List.<com.example.demo.agent.dto.AgentAttachmentResponse>of()
                         : attachmentRepository.findByRunIdOrderByCreateTimeAsc(run.getId()).stream()
@@ -186,7 +196,7 @@ public class AgentConversationService {
                         List.of(), files));
             }
         }
-        return new AgentConversationDetail(conversation.getId(), conversation.getTitle(), messages);
+        return new AgentConversationDetail(conversation.getId(), displayTitle(conversation, conversationRuns), messages);
     }
 
     public List<String> delete(Long conversationId, Long operatorId) {
@@ -230,9 +240,32 @@ public class AgentConversationService {
         conversationRepository.save(conversation);
     }
 
-    private String title(String input) {
+    private String title(String input, LocalDateTime time) {
         String normalized = StringUtils.hasText(input) ? input.trim().replaceAll("\\s+", " ") : "新对话";
-        return abbreviate(normalized, 30);
+        if ("新对话".equals(normalized)) return normalized;
+        if ("请识别附件中的订单信息并生成销售草稿".equals(normalized)) normalized = "识别附件并开单";
+        String firstSentence = normalized.split("[。！？!?\\r\\n]+", 2)[0].trim();
+        return TITLE_TIME.format(time) + " · " + abbreviate(firstSentence, 24);
+    }
+
+    private boolean isProvisionalTitle(String value) {
+        return !StringUtils.hasText(value) || "新对话".equals(value) || value.startsWith("附件：") || value.startsWith("附件:");
+    }
+
+    private String displayTitle(AgentConversation conversation, List<AgentRun> existingRuns) {
+        String current = conversation.getTitle();
+        if (StringUtils.hasText(current) && current.matches("^\\d{2}-\\d{2} \\d{2}:\\d{2} · .+")) {
+            return current;
+        }
+        LocalDateTime time = conversation.getCreateTime() != null
+                ? conversation.getCreateTime()
+                : conversation.getUpdateTime() != null ? conversation.getUpdateTime() : LocalDateTime.now();
+        if (isProvisionalTitle(current)) {
+            String firstInput = existingRuns.stream().map(AgentRun::getInputText)
+                    .filter(StringUtils::hasText).findFirst().orElse("新对话");
+            return title(firstInput, time);
+        }
+        return title(current, time);
     }
 
     private String abbreviate(String value, int maxLength) {

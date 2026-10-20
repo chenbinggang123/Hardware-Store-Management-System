@@ -64,7 +64,8 @@ public class GenerateExcelWorkbookTool implements AgentTool {
                 "type", "object",
                 "additionalProperties", false,
                 "properties", Map.of(
-                        "title", Map.of("type", "string", "description", "文件标题，用作文件名，例如 恒迪模具五金收款收据0002766"),
+                        "title", Map.of("type", "string", "description", "简短业务标题，可含已确认公司名和单号；不要图片随机名、哈希或时间戳。后端统一生成文件名"),
+                        "layout", Map.of("type", "string", "enum", List.of("TABLE", "RECEIPT"), "description", "收款收据使用 RECEIPT：纸单版式（序号/商品/规格/单位/数量/单价/金额/备注，无折扣，底部合计与签收）和关联明细页；普通表格用 TABLE。info 提供公司名称、单号、日期、客户名称、电话、地址、票面合计、票面大写原文；未知留空。明细必须包含项目、单位、数量、单价、票面金额，未识别金额留空"),
                         "attachmentId", Map.of("type", List.of("integer", "null"),
                                 "description", "内容来源的对话附件 ID；内容来自附件时必须填写，否则为 null"),
                         "sheets", Map.of("type", "array", "minItems", 1, "maxItems", 10, "items", sheetSchema),

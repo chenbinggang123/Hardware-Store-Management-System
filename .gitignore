@@ -1,5 +1,10 @@
 springboot-demo/scripts/rds/rds.config.json
+springboot-demo/agent.local.env
 .claude/settings.local.json
+.agents/
+data/
+outputs/
+tmp/
 springboot-demo/target/
 springboot-demo/.m2repo/
 springboot-demo/data/

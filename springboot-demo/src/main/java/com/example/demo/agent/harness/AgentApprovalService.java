@@ -42,8 +42,7 @@ public class AgentApprovalService {
         run.setPendingArgumentsJson(contextManager.toJson(call.getArguments()));
         run.setPendingPreviewJson(contextManager.toJson(preview));
         run.setContextJson(contextManager.toJson(context.getToolResults()));
-        run.setOutputText("即将执行“" + tool.definition().getDescription()
-                + "”，请确认。影响预览：" + contextManager.toJson(preview));
+        run.setOutputText("操作内容已准备好，请核对预览后确认。");
         AgentRun saved = runStore.save(run);
         return resultFactory.create(saved, resultFactory.pendingAction(saved, tool, preview));
     }
@@ -79,7 +78,9 @@ public class AgentApprovalService {
         Map<String, Object> arguments = contextManager.readArguments(run.getPendingArgumentsJson());
         AgentToolCall call = new AgentToolCall(
                 run.getPendingToolCallId(), run.getPendingToolName(), arguments);
-        AgentPreparedTool prepared = toolExecutor.prepareApproved(run.getId(), operatorId, call);
+        AgentPreparedTool prepared = run.getExecutionPlanJson() == null || run.getExecutionPlanJson().isBlank()
+                ? toolExecutor.prepareApproved(run.getId(), operatorId, call)
+                : toolExecutor.prepareApproved(run.getId(), operatorId, call, contextManager.allowedTools(run));
         if (prepared.decision() != AgentPolicyDecision.REQUIRE_APPROVAL) {
             throw new IllegalStateException("待确认工具的风险级别已变化，请重新发起任务");
         }

@@ -6,8 +6,25 @@ const { openPage } = require('../../utils/router')
 const ACTIVE_RUN_KEY = 'agent_active_run_id'
 const ACTIVE_CONVERSATION_KEY = 'agent_active_conversation_id'
 const PENDING_PROMPT_KEY = 'agent_pending_prompt'
+const DRAWER_STATE_KEY = 'agent_drawer_sections'
 const STREAM_POLL_INTERVAL = 320
 const MAX_STREAM_POLL_FAILURES = 4
+const DRAWER_ROUTES = Object.freeze({
+  files: '/pages/agent-files/index',
+  sales: '/pages/sales-orders/index',
+  purchases: '/pages/purchase-orders/index',
+  inventory: '/pages/inventories/index',
+  finance: '/pages/finance-ledger/index',
+  customers: '/pages/customers/index',
+  suppliers: '/pages/suppliers/index',
+  factories: '/pages/factory-ledgers/index',
+  products: '/pages/products/index',
+  prices: '/pages/price-history/index',
+  mappings: '/pages/product-mappings/index',
+  excel: '/pages/excel-tasks/index',
+  reports: '/pages/report-center/index',
+  settings: '/pages/settings/index'
+})
 
 function errorMessage(error, fallback) {
   return (error && (error.message || error.errMsg)) || fallback
@@ -25,12 +42,68 @@ function workbookPreview(preview) {
   }
 }
 
+function money(value) {
+  const number = Number(value)
+  return Number.isFinite(number) ? number.toFixed(2) : '待填写'
+}
+
+function billingPreview(preview) {
+  if (!preview || preview.kind !== 'BILLING_DRAFT') return preview
+  const content = preview.content || {}
+  const lines = (content.lines || []).map((line, index) => {
+    const quantity = line.quantity === null || line.quantity === undefined ? '' : line.quantity
+    const price = line.price === null || line.price === undefined ? '' : line.price
+    const amount = quantity !== '' && price !== '' ? Number(quantity) * Number(price) : null
+    return {
+      ...line,
+      index: index + 1,
+      quantityText: quantity === '' ? '待填' : quantity,
+      priceText: price === '' ? '待填' : money(price),
+      amountText: amount === null || !Number.isFinite(amount) ? '待核对' : money(amount),
+      meta: [line.specification, line.unit].filter(Boolean).join(' · ') || '规格、单位待补充'
+    }
+  })
+  const readyTotal = lines.reduce((sum, line) => {
+    const amount = Number(line.amountText)
+    return Number.isFinite(amount) ? sum + amount : sum
+  }, 0)
+  const incompleteCount = lines.filter((line) => !line.name || !line.unit || line.quantityText === '待填' || line.priceText === '待填').length
+  return {
+    ...preview,
+    content,
+    billingLines: lines,
+    billingTotal: money(readyTotal),
+    billingIncompleteCount: incompleteCount,
+    billingTitle: content.customerName ? `${content.customerName}的销售单` : '销售单草稿'
+  }
+}
+
+function billingDocumentId(value) {
+  const output = String((value && value.output) || value || '')
+  if (!/BILLING_DOCUMENT/.test(output)) return null
+  const matched = output.match(/["']documentId["']\s*:\s*(\d+)/)
+  return matched ? Number(matched[1]) : null
+}
+
+function billingDocumentAction(result) {
+  const id = billingDocumentId(result)
+  return id ? { label: '编辑并预览单据', target: 'BILLING_DOCUMENT', params: { id } } : null
+}
+
 function normalizeResult(result) {
   if (!result) return null
   const action = result.pendingAction
-  const preview = action && action.preview ? workbookPreview(action.preview) : null
+  const preview = action && action.preview ? billingPreview(workbookPreview(action.preview)) : null
+  const resultActions = (result.actions || []).slice()
+  const billingAction = billingDocumentAction(result)
+  if (billingAction && !resultActions.some((item) => item.target === 'BILLING_DOCUMENT')) resultActions.unshift(billingAction)
+  const displayOutput = billingAction
+    ? '开单草稿已建立。可以修改商品、数量、单位和价格，预览无误后再保存并导出 Excel。'
+    : result.output
   return {
     ...result,
+    output: displayOutput,
+    billingDocumentId: billingAction ? billingAction.params.id : null,
     files: (result.files || []).map(fileView),
     statusText: {
       WAITING_APPROVAL: '等待你确认', COMPLETED: '已完成', FAILED: '执行失败',
@@ -45,7 +118,7 @@ function normalizeResult(result) {
     canCancel: result.progress ? result.progress.canCancel !== false : result.status === 'RUNNING',
     canLeave: result.progress ? result.progress.canLeave !== false : true,
     summary: result.summary || null,
-    actions: result.actions || [],
+    actions: resultActions,
     retry: result.retry || null,
     pendingAction: action ? {
       ...action,
@@ -57,10 +130,15 @@ function normalizeResult(result) {
 }
 
 function assistantMessage(content, status, streaming = false, files = []) {
+  const documentId = billingDocumentId(content)
+  const displayContent = documentId
+    ? '开单草稿已建立。可以继续修改并预览，确认无误后再保存和导出 Excel。'
+    : (content || '')
   return {
     role: status === 'FAILED' ? 'error' : 'assistant',
-    content: content || '',
-    blocks: streaming ? [] : formatAgentContent(content || ''),
+    content: displayContent,
+    blocks: formatAgentContent(displayContent),
+    billingDocumentId: documentId,
     streaming,
     statusText: streaming ? '正在生成' : '',
     files: files || []
@@ -71,6 +149,21 @@ function historyTime(value) {
   if (!value) return ''
   const text = String(value).replace('T', ' ')
   return text.length >= 16 ? text.slice(5, 16) : text
+}
+
+function filterConversations(items, query) {
+  const keyword = String(query || '').trim().toLowerCase()
+  if (!keyword) return items
+  return items.filter((item) => `${item.title || ''} ${item.preview || ''}`.toLowerCase().includes(keyword))
+}
+
+function conversationTitle(item) {
+  const title = String((item && item.title) || '').trim()
+  if (!/^附件[:：]/.test(title)) return title || '新对话'
+  const preview = String((item && item.preview) || '')
+  if (/(开票|单据|商品明细|销售草稿|订单)/.test(preview)) return '识别并整理单据'
+  if (/(Excel|表格|文件)/i.test(preview)) return '处理文件'
+  return '识别附件内容'
 }
 
 function conversationMessage(message) {
@@ -89,6 +182,22 @@ function fileSize(value) {
 function fileExtension(name) {
   const matched = String(name || '').toLowerCase().match(/\.([a-z0-9]+)$/)
   return matched ? matched[1] : ''
+}
+
+function explicitlyRequestsImageSaving(content) {
+  const text = String(content || '')
+  if (/(不要|不必|无需|别)(保存|上传|存到)/.test(text)) return false
+  const mentionsImage = /(图片|照片|原图|这张图|这张照片)/.test(text)
+  const asksToSave = /(保存|存到|存入|上传|放到|放进|归档)/.test(text)
+  const namesFileDestination = /(我的文件|文件列表|文件中心|文件夹|文件里)/.test(text)
+  const explicitlyDirectUpload = /直接上传/.test(text)
+  const explicitlySaveImage = /保存.{0,4}(图片|照片|原图|这张图)/.test(text)
+    || /(图片|照片|原图|这张图).{0,6}保存/.test(text)
+  return mentionsImage && asksToSave && (namesFileDestination || explicitlyDirectUpload || explicitlySaveImage)
+}
+
+function isImageAttachment(item) {
+  return /^image\//i.test(String((item && item.mimeType) || '')) || /\.(jpe?g|png|webp)$/i.test(String((item && item.originalName) || ''))
 }
 
 function attachmentView(item) {
@@ -115,15 +224,37 @@ Page({
   data: {
     input: '', inputFocus: false, sending: false, streaming: false, resolving: false, loadingHistory: false,
     deletingConversationId: null, renamingConversationId: null, cancelling: false,
-    run: null, conversationId: null, currentTitle: '和小五聊聊', conversations: [], historyOpen: false, messages: [],
-    pendingAttachments: [], uploading: false, attachmentMenuOpen: false, connectionInterrupted: false, lastFailedInput: '',
+    run: null, conversationId: null, currentTitle: '小五', allConversations: [], conversations: [], historyQuery: '', historyOpen: false, messages: [],
+    pendingAttachments: [], uploading: false, savingAttachmentId: null, attachmentMenuOpen: false, connectionInterrupted: false, lastFailedInput: '',
     scrollTarget: 'conversation-end', openingFileId: '', deletingFileId: '',
-    suggestions: ['把这张收据做成 Excel', '把刚才的表格加一列备注，再生成一份', '查一下电钻还有多少库存', '给老王开两把东成电钻，先记账']
+    statusBarHeight: 24, navigationHeight: 68, capsuleReserve: 96,
+    businessExpanded: false, contactsExpanded: false, catalogExpanded: false, filesExpanded: false, settingsExpanded: false,
+    coreActions: [
+      { key: 'billing', title: '快捷开单', description: '录商品并预览销售单' },
+      { key: 'scan', title: '拍单识别', description: '拍照生成可修改草稿' },
+      { key: 'inventory', title: '查商品库存', description: '查价格、规格和数量' },
+      { key: 'ledger', title: '查客户往来', description: '查欠款、收款和历史' }
+    ]
+  },
+
+  onLoad() {
+    const windowInfo = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
+    const capsule = wx.getMenuButtonBoundingClientRect ? wx.getMenuButtonBoundingClientRect() : null
+    const statusBarHeight = Number(windowInfo.statusBarHeight || 24)
+    const barHeight = capsule ? Math.max(44, capsule.height + Math.max(6, capsule.top - statusBarHeight) * 2) : 44
+    const capsuleReserve = capsule ? Math.max(88, windowInfo.windowWidth - capsule.left + 8) : 96
+    const savedSections = wx.getStorageSync(DRAWER_STATE_KEY) || {}
+    const sectionState = {}
+    ;['businessExpanded', 'contactsExpanded', 'catalogExpanded', 'filesExpanded', 'settingsExpanded'].forEach((key) => {
+      if (typeof savedSections[key] === 'boolean') sectionState[key] = savedSections[key]
+    })
+    this.setData({ statusBarHeight, navigationHeight: statusBarHeight + barHeight, capsuleReserve, ...sectionState })
   },
 
   onShow() {
     this.consumePendingPrompt()
     this.loadConversations()
+    api.cleanupTerminalTemporaryAgentFiles().catch(() => {})
     const conversationId = wx.getStorageSync(ACTIVE_CONVERSATION_KEY)
     if (conversationId && !this.data.conversationId) {
       this.loadConversation(conversationId)
@@ -145,6 +276,37 @@ Page({
   updateInput(event) { this.setData({ input: event.detail.value }) },
   useSuggestion(event) { this.setData({ input: event.currentTarget.dataset.text || '', inputFocus: true }) },
   blurQuestion() { this.setData({ inputFocus: false }) },
+
+  useCoreAction(event) {
+    const action = event.currentTarget.dataset.action
+    this.setData({ historyOpen: false, attachmentMenuOpen: false })
+    if (action === 'scan') return this.chooseCamera()
+    if (action === 'billing') return openPage('/pages/billing-editor/index')
+    const prompts = {
+      billing: '我要快捷开单：',
+      inventory: '查商品库存：',
+      ledger: '查客户往来：'
+    }
+    const input = prompts[action]
+    if (input) this.setData({ input, inputFocus: true }, () => this.scrollToBottom())
+  },
+
+  toggleDrawerSection(event) {
+    const key = event.currentTarget.dataset.section
+    const allowed = ['businessExpanded', 'contactsExpanded', 'catalogExpanded', 'filesExpanded', 'settingsExpanded']
+    if (!allowed.includes(key)) return
+    const next = !this.data[key]
+    this.setData({ [key]: next })
+    const saved = wx.getStorageSync(DRAWER_STATE_KEY) || {}
+    wx.setStorageSync(DRAWER_STATE_KEY, { ...saved, [key]: next })
+  },
+
+  openDrawerPage(event) {
+    const path = DRAWER_ROUTES[event.currentTarget.dataset.route]
+    if (!path) return
+    this.setData({ historyOpen: false })
+    openPage(path)
+  },
 
   // The files page hands over a prompt such as “请修改文件 #7「…」：” through storage,
   // because the agent page is a tab page and cannot receive URL parameters.
@@ -220,6 +382,24 @@ Page({
     }).catch((error) => wx.showToast({ title: errorMessage(error, '附件删除失败'), icon: 'none' }))
   },
 
+  savePendingAttachment(event) {
+    const id = Number(event.currentTarget.dataset.id)
+    const attachment = this.data.pendingAttachments.find((item) => Number(item.id) === id)
+    if (!attachment || !isImageAttachment(attachment) || this.data.savingAttachmentId) return
+    if (attachment.savedToFiles) return wx.showToast({ title: '图片已保存到我的文件', icon: 'none' })
+    this.setData({ savingAttachmentId: id })
+    api.organizeFile('ATTACHMENT', id, {
+      purposeCode: 'UNCLASSIFIED', relatedType: 'NONE', manualUpload: true
+    }).then(() => {
+      this.setData({
+        pendingAttachments: this.data.pendingAttachments.map((item) => Number(item.id) === id ? { ...item, savedToFiles: true } : item)
+      })
+      wx.showToast({ title: '原图已保存到我的文件', icon: 'success' })
+    }).catch((error) => {
+      wx.showToast({ title: errorMessage(error, '保存失败，请重试'), icon: 'none', duration: 3000 })
+    }).finally(() => this.setData({ savingAttachmentId: null }))
+  },
+
   openHistory() {
     this.setData({ historyOpen: true })
     this.loadConversations()
@@ -227,14 +407,27 @@ Page({
   closeHistory() { this.setData({ historyOpen: false }) },
   preventClose() {},
 
+  searchHistory(event) {
+    const historyQuery = event.detail.value || ''
+    this.setData({
+      historyQuery,
+      conversations: filterConversations(this.data.allConversations, historyQuery)
+    })
+  },
+
+  clearHistorySearch() {
+    this.setData({ historyQuery: '', conversations: this.data.allConversations })
+  },
+
   loadConversations() {
     this.setData({ loadingHistory: true })
     return api.getAgentConversations().then((items) => {
-      const conversations = (items || []).map((item) => ({
-        ...item, timeText: historyTime(item.updateTime), active: Number(item.id) === Number(this.data.conversationId)
+      const allConversations = (items || []).map((item) => ({
+        ...item, title: conversationTitle(item), timeText: historyTime(item.updateTime), active: Number(item.id) === Number(this.data.conversationId)
       }))
-      const active = conversations.find((item) => item.active)
-      this.setData({ conversations, currentTitle: active ? active.title : this.data.currentTitle })
+      const conversations = filterConversations(allConversations, this.data.historyQuery)
+      const active = allConversations.find((item) => item.active)
+      this.setData({ allConversations, conversations, currentTitle: active ? active.title : this.data.currentTitle })
     }).catch(() => {}).finally(() => this.setData({ loadingHistory: false }))
   },
 
@@ -249,7 +442,7 @@ Page({
   renameConversation(event) {
     const conversationId = Number(event.currentTarget.dataset.id)
     if (!conversationId || this.data.renamingConversationId) return
-    const conversation = this.data.conversations.find((item) => Number(item.id) === conversationId)
+    const conversation = this.data.allConversations.find((item) => Number(item.id) === conversationId)
     if (!conversation) return
     wx.showModal({
       title: '修改会话标题',
@@ -262,9 +455,10 @@ Page({
       if (!result.confirm || !title || title === conversation.title) return null
       this.setData({ renamingConversationId: conversationId })
       return api.renameAgentConversation(conversationId, title).then(() => {
-        const conversations = this.data.conversations.map((item) => Number(item.id) === conversationId ? { ...item, title } : item)
+        const allConversations = this.data.allConversations.map((item) => Number(item.id) === conversationId ? { ...item, title } : item)
         this.setData({
-          conversations,
+          allConversations,
+          conversations: filterConversations(allConversations, this.data.historyQuery),
           currentTitle: Number(this.data.conversationId) === conversationId ? title : this.data.currentTitle
         })
         wx.showToast({ title: '标题已更新', icon: 'success' })
@@ -273,10 +467,20 @@ Page({
     }).catch(() => {})
   },
 
+  conversationActions(event) {
+    const id = Number(event.currentTarget.dataset.id)
+    if (!id) return
+    wx.showActionSheet({ itemList: ['修改标题', '删除会话'] }).then((result) => {
+      const wrapped = { currentTarget: { dataset: { id } } }
+      if (result.tapIndex === 0) this.renameConversation(wrapped)
+      if (result.tapIndex === 1) this.deleteConversation(wrapped)
+    }).catch(() => {})
+  },
+
   deleteConversation(event) {
     const conversationId = Number(event.currentTarget.dataset.id)
     if (!conversationId || this.data.deletingConversationId) return
-    const conversation = this.data.conversations.find((item) => Number(item.id) === conversationId)
+    const conversation = this.data.allConversations.find((item) => Number(item.id) === conversationId)
     wx.showModal({
       title: '删除历史会话',
       content: `确定删除“${(conversation && conversation.title) || '这条会话'}”吗？聊天记录删除后无法恢复。`,
@@ -286,15 +490,14 @@ Page({
       if (!result.confirm) return null
       this.setData({ deletingConversationId: conversationId })
       return api.deleteAgentConversation(conversationId).then(() => {
-        const update = {
-          conversations: this.data.conversations.filter((item) => Number(item.id) !== conversationId)
-        }
+        const allConversations = this.data.allConversations.filter((item) => Number(item.id) !== conversationId)
+        const update = { allConversations, conversations: filterConversations(allConversations, this.data.historyQuery) }
         if (Number(this.data.conversationId) === conversationId) {
           this.stopPolling()
           wx.removeStorageSync(ACTIVE_RUN_KEY)
           wx.removeStorageSync(ACTIVE_CONVERSATION_KEY)
           Object.assign(update, {
-            conversationId: null, currentTitle: '和小五聊聊', run: null, messages: [], input: '',
+            conversationId: null, currentTitle: '小五', run: null, messages: [], input: '',
             sending: false, streaming: false, pendingAttachments: []
           })
         }
@@ -316,7 +519,7 @@ Page({
       wx.setStorageSync(ACTIVE_CONVERSATION_KEY, detail.id)
       this.setData({
         conversationId: detail.id,
-        currentTitle: detail.title || '新对话',
+        currentTitle: conversationTitle({ title: detail.title }),
         messages,
         run: null,
         sending: Boolean(active),
@@ -338,12 +541,16 @@ Page({
   send() {
     const content = (this.data.input || '').trim()
     const attachments = this.data.pendingAttachments
-    if ((!content && !attachments.length) || this.data.sending || this.data.uploading) return
+    if ((!content && !attachments.length) || this.data.sending || this.data.resolving || this.data.uploading || this.data.savingAttachmentId
+      || (this.data.run && this.data.run.status === 'WAITING_APPROVAL')) return
     if (attachments.some((item) => !item.ready)) {
       wx.showToast({ title: '附件尚未完成识别', icon: 'none' })
       return
     }
     const displayContent = content || '请阅读这些附件，先概括主要内容并告诉我可以继续处理什么；不要写入业务数据。'
+    const saveImages = attachments.filter((item) => isImageAttachment(item) && (item.savedToFiles || explicitlyRequestsImageSaving(displayContent)))
+    const savedIds = new Set(saveImages.map((item) => Number(item.id)))
+    const transientAttachments = attachments.filter((item) => !savedIds.has(Number(item.id)))
     this.setData({
       input: '', sending: true, streaming: true, pendingAttachments: [], attachmentMenuOpen: false, connectionInterrupted: false,
       messages: this.data.messages.concat(
@@ -351,9 +558,15 @@ Page({
         assistantMessage('', 'RUNNING', true)
       )
     }, () => this.scrollToBottom())
-    api.startAgentMessageStream(displayContent, this.data.conversationId, attachments.map((item) => item.id)).then((result) => {
+    const persistRequestedImages = Promise.all(saveImages.map((item) => api.organizeFile('ATTACHMENT', item.id, {
+      purposeCode: 'UNCLASSIFIED', relatedType: 'NONE', manualUpload: true
+    })))
+    persistRequestedImages.then(() => api.startAgentMessageStream(
+      displayContent, this.data.conversationId, attachments.map((item) => item.id)
+    )).then((result) => {
       const run = normalizeResult(result)
       if (!run) throw new Error('经营助手未返回任务信息')
+      api.queueTemporaryAgentFiles(run.runId, transientAttachments)
       const conversationId = run.conversationId || this.data.conversationId
       wx.setStorageSync(ACTIVE_RUN_KEY, run.runId)
       if (conversationId) wx.setStorageSync(ACTIVE_CONVERSATION_KEY, conversationId)
@@ -470,6 +683,10 @@ Page({
       .catch((error) => wx.showToast({ title: errorMessage(error, '文件打开失败，请稍后重试'), icon: 'none', duration: 3000 }))
       .finally(() => this.setData({ openingFileId: '' }))
   },
+  openBillingDocument(event) {
+    const id = Number(event.currentTarget.dataset.id)
+    if (id) openPage('/pages/billing-editor/index', { id })
+  },
 
   deleteGeneratedFile(event) {
     const id = Number(event.currentTarget.dataset.id)
@@ -495,7 +712,7 @@ Page({
       WORKBENCH: '/pages/workbench/index', PRODUCT_LIST: '/pages/products/index', PRODUCT_DETAIL: '/pages/product-detail/index',
       INVENTORY_LIST: '/pages/inventories/index', SALES_ORDER_DETAIL: '/pages/sales-detail/index',
       PURCHASE_ORDER_DETAIL: '/pages/purchase-detail/index', EXCEL_TASK_DETAIL: '/pages/excel-task-detail/index',
-      PRICE_HISTORY: '/pages/price-history/index'
+      PRICE_HISTORY: '/pages/price-history/index', BILLING_DOCUMENT: '/pages/billing-editor/index'
     }
     const path = routes[target]
     if (!path) return wx.showToast({ title: '暂时无法打开这个结果', icon: 'none' })
@@ -521,8 +738,14 @@ Page({
       this.loadConversations()
       return
     }
+    if (!['COMPLETED', 'FAILED', 'CANCELLED', 'EXPIRED', 'PARTIAL'].includes(run.status)) {
+      wx.setStorageSync(ACTIVE_RUN_KEY, run.runId)
+      this.setData({ run, conversationId })
+      return
+    }
+    api.cleanupTemporaryAgentFiles(run.runId).catch(() => {})
     wx.removeStorageSync(ACTIVE_RUN_KEY)
-    this.finalizeStreamingMessage(run.output, run.status, run.files)
+    this.finalizeStreamingMessage(run.output, run.status, run.files, run.billingDocumentId)
     this.setData({ run, conversationId, sending: false, streaming: false }, () => this.scrollToBottom())
     this.loadConversations()
   },
@@ -548,10 +771,11 @@ Page({
     this.setData({ messages: this.data.messages.filter((item) => !item.streaming) })
   },
 
-  finalizeStreamingMessage(content, status, files) {
+  finalizeStreamingMessage(content, status, files, documentId) {
     const messages = this.data.messages.slice()
     const index = messages.map((item) => item.streaming).lastIndexOf(true)
     const finalMessage = assistantMessage(content || '任务已结束', status, false, files || [])
+    if (documentId) finalMessage.billingDocumentId = documentId
     if (index >= 0) messages[index] = finalMessage
     else if (content) messages.push(finalMessage)
     this.setData({ messages })
@@ -571,6 +795,8 @@ Page({
     api.resolveAgentApproval(run.runId, approved).then((result) => {
       this.syncRun(result)
       wx.showToast({ title: approved ? '操作已确认' : '操作已取消', icon: 'none' })
+      const billingAction = approved ? billingDocumentAction(result) : null
+      if (billingAction) setTimeout(() => openPage('/pages/billing-editor/index', billingAction.params), 350)
     }).catch((error) => {
       wx.showToast({ title: errorMessage(error, '确认处理失败'), icon: 'none' })
       return this.loadRun(run.runId)
@@ -582,7 +808,7 @@ Page({
     wx.removeStorageSync(ACTIVE_RUN_KEY)
     wx.removeStorageSync(ACTIVE_CONVERSATION_KEY)
     this.setData({
-      run: null, conversationId: null, currentTitle: '和小五聊聊', messages: [], input: '', historyOpen: false,
+      run: null, conversationId: null, currentTitle: '小五', messages: [], input: '', historyOpen: false,
       sending: false, streaming: false, pendingAttachments: []
     })
   }

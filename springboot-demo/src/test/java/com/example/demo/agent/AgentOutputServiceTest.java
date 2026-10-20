@@ -35,6 +35,46 @@ class AgentOutputServiceTest {
     }
 
     @Test
+    void filePreviewKeepsAllSheetsTotalsNotesFormattingAndPagedMerges() throws Exception {
+        byte[] bytes;
+        try (var workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook(); var buffer = new java.io.ByteArrayOutputStream()) {
+            var sheet = workbook.createSheet("明细");
+            sheet.createRow(0).createCell(0).setCellValue("单据标题");
+            sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(0, 1, 0, 0));
+            var row = sheet.createRow(1);
+            row.createCell(1).setCellValue(7.5);
+            var money = workbook.createCellStyle(); money.setDataFormat(workbook.createDataFormat().getFormat("0.00")); row.getCell(1).setCellStyle(money);
+            row.createCell(2).setCellValue("金额需要核对");
+            var total = sheet.createRow(2); total.createCell(0).setCellValue("合计"); total.createCell(1).setCellFormula("SUM(B2:B2)"); total.getCell(1).setCellStyle(money);
+            sheet.createRow(5).createCell(0).setCellValue("末行");
+            workbook.createSheet("单据信息").createRow(0).createCell(0).setCellValue("开票方");
+            workbook.createSheet("核对说明").createRow(0).createCell(0).setCellValue("逐行金额缺失");
+            workbook.write(buffer); bytes = buffer.toByteArray();
+        }
+        var file = agentFile(40L, 2L, "READY");
+        when(outputs.findByIdAndOperatorId(40L, 2L)).thenReturn(Optional.of(file));
+        when(storage.stat(file.getObjectKey())).thenReturn(new com.example.demo.agent.service.attachment.StoredObjectMetadata(bytes.length, "x"));
+        when(storage.openStream(file.getObjectKey())).thenAnswer(ignored -> new java.io.ByteArrayInputStream(bytes));
+
+        var page = service.previewWorkbook(40L, 2L, 0, 1, 1);
+        assertThat((List<?>) page.get("sheets")).hasSize(3);
+        assertThat(page).containsEntry("totalRows", 6).containsEntry("hasMore", true).containsEntry("offset", 1);
+        assertThat(page.get("rows")).isEqualTo(List.of(List.of("", "7.50", "金额需要核对")));
+        assertThat((List<?>) page.get("merges")).hasSize(1);
+        assertThat(service.previewWorkbook(40L, 2L, 0, 2, 1).get("rows")).isEqualTo(List.of(List.of("合计", "7.50", "")));
+        assertThat(service.previewWorkbook(40L, 2L, 2, 0, 100).get("rows")).isEqualTo(List.of(List.of("逐行金额缺失")));
+        assertThatThrownBy(() -> service.previewWorkbook(40L, 2L, 3, 0, 100)).hasMessageContaining("工作表不存在");
+        assertThatThrownBy(() -> service.previewWorkbook(40L, 2L, 0, 6, 100)).hasMessageContaining("超出");
+    }
+
+    @Test
+    void filePreviewCannotReadAnotherOperatorsFile() {
+        when(outputs.findByIdAndOperatorId(99L, 2L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.previewWorkbook(99L, 2L, 0, 0, 100)).isInstanceOf(IllegalArgumentException.class);
+        verify(storage, never()).openStream(anyString());
+    }
+
+    @Test
     void deleteRemovesStorageObjectAndRecordForOwner() {
         ExcelTaskOutput output = agentFile(31L, 2L, "READY");
         when(outputs.findByIdAndOperatorId(31L, 2L)).thenReturn(Optional.of(output));
@@ -124,13 +164,13 @@ class AgentOutputServiceTest {
             org.apache.poi.ss.usermodel.Row first = sheet.createRow(6);
             first.createCell(0).setCellValue("钻头 2.2"); first.createCell(1).setCellValue(10); first.createCell(2).setCellValue(15); first.createCell(3).setCellValue("");
             org.apache.poi.ss.usermodel.Row second = sheet.createRow(7);
-            second.createCell(0).setCellValue("气管 10"); second.createCell(1).setCellValue(28); second.createCell(2).setCellValue(504); second.createCell(3).setCellValue("金额验算不一致");
+            second.createCell(0).setCellValue("示例管件乙"); second.createCell(1).setCellValue(28); second.createCell(2).setCellValue(504); second.createCell(3).setCellValue("金额验算不一致");
             org.apache.poi.ss.usermodel.Row total = sheet.createRow(8);
             total.createCell(0).setCellValue("合计"); total.createCell(2).setCellFormula("SUM(C7:C8)");
             org.apache.poi.ss.usermodel.Sheet info = workbook.createSheet("单据信息");
             info.createRow(0).createCell(0).setCellValue("项目");
             org.apache.poi.ss.usermodel.Row entry = info.createRow(1);
-            entry.createCell(0).setCellValue("开票方"); entry.createCell(1).setCellValue("恒迪模具五金");
+            entry.createCell(0).setCellValue("开票方"); entry.createCell(1).setCellValue("示例五金店");
             workbook.createSheet("生成说明").createRow(0).createCell(0).setCellValue("文件标题");
             workbook.write(buffer);
             bytes = buffer.toByteArray();
@@ -147,12 +187,12 @@ class AgentOutputServiceTest {
         assertThat(sheets).hasSize(1);
         assertThat(sheets.get(0).get("name")).isEqualTo("商品明细");
         assertThat(sheets.get(0).get("columns")).isEqualTo(List.of("项目", "数量", "金额"));
-        assertThat(sheets.get(0).get("rows")).isEqualTo(List.of(List.of("钻头 2.2", "10", "15"), List.of("气管 10", "28", "504")));
+        assertThat(sheets.get(0).get("rows")).isEqualTo(List.of(List.of("钻头 2.2", "10", "15"), List.of("示例管件乙", "28", "504")));
         assertThat(sheets.get(0).get("truncated")).isEqualTo(false);
         @SuppressWarnings("unchecked")
         List<java.util.Map<String, String>> info = (List<java.util.Map<String, String>>) content.get("info");
         assertThat(info).hasSize(1);
-        assertThat(info.get(0)).containsEntry("label", "开票方").containsEntry("value", "恒迪模具五金");
+        assertThat(info.get(0)).containsEntry("label", "开票方").containsEntry("value", "示例五金店");
 
         when(storage.openStream(output.getObjectKey())).thenReturn(new java.io.ByteArrayInputStream(bytes));
         assertThatThrownBy(() -> service.readWorkbookContent(40L, 2L, "不存在", null))
@@ -183,7 +223,7 @@ class AgentOutputServiceTest {
         output.setRunId(7L);
         output.setOutputType("AGENT_XLSX");
         output.setObjectKey("agent-outputs/2/202610/" + id + "-abcd.xlsx");
-        output.setOriginalName("收据-20261012-0900.xlsx");
+        output.setOriginalName("测试输出.xlsx");
         output.setMimeType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         output.setFileSize(1234L);
         output.setStatus(status);

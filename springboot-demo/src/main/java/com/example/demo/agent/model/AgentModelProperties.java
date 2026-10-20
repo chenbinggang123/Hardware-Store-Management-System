@@ -12,5 +12,10 @@ public class AgentModelProperties {
     private String baseUrl = "https://api.openai.com/v1";
     private String apiKey;
     private String model;
+    private String routingModel;
     private int timeoutSeconds = 20;
+
+    public String getRoutingModel() {
+        return routingModel == null || routingModel.isBlank() ? model : routingModel;
+    }
 }

@@ -120,7 +120,7 @@ Page({
       if (!selection) return null
       this.setData({ uploading: true })
       let attachment = null
-      return api.uploadAgentAttachment(selection.file, null)
+      return api.uploadAgentAttachment(selection.file, null, true)
         .then((result) => {
           attachment = result
           return api.organizeFile('ATTACHMENT', result.id, {
@@ -157,7 +157,7 @@ Page({
     if (item.kind === 'TASK') return openPage(taskRoute({ status: item.sourceStatus }), { id: item.id })
     if (item.kind === 'ATTACHMENT') {
       if (item.conversationId) wx.setStorageSync(ACTIVE_CONVERSATION_KEY, item.conversationId)
-      return wx.switchTab({ url: '/pages/agent/index' })
+      return wx.reLaunch({ url: '/pages/agent/index' })
     }
     if (!item.ready) return showToast(item.failed ? '这个文件已失效或生成失败' : '文件还在生成中')
     this.setData({ openingKey: item.key })

@@ -30,7 +30,7 @@ class AgentAttachmentVideoTest {
         CloudBaseFileDownloader downloader = mock(CloudBaseFileDownloader.class);
         AgentConversation conversation = new AgentConversation();
         conversation.setId(12L);
-        when(conversationService.resolve(null, 7L, "附件：厂商订单.mp4")).thenReturn(conversation);
+        when(conversationService.resolve(null, 7L, "新对话")).thenReturn(conversation);
         when(parser.parse(eq("厂商订单.mp4"), eq("video/mp4"), any(byte[].class)))
                 .thenReturn(AttachmentParseResult.waiting("等待 OCR"));
         when(repository.save(any(AgentAttachment.class))).thenAnswer(invocation -> {

@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import org.springframework.util.StringUtils;
@@ -62,20 +63,30 @@ public class AgentOutputController {
         return ApiResponse.ok(service.readWorkbookContent(outputId, currentUserId(request), null, 200));
     }
 
+    @GetMapping("/outputs/{outputId}/preview")
+    public ApiResponse<Map<String, Object>> preview(@PathVariable Long outputId,
+                                                   @RequestParam(defaultValue = "0") int sheet,
+                                                   @RequestParam(defaultValue = "0") int offset,
+                                                   @RequestParam(defaultValue = "100") int limit,
+                                                   HttpServletRequest request) {
+        return ApiResponse.ok(service.previewWorkbook(outputId, currentUserId(request), sheet, offset, limit));
+    }
+
     @PostMapping("/outputs/{outputId}/workbook-versions")
     public ApiResponse<Map<String, Object>> saveWorkbookVersion(@PathVariable Long outputId,
                                                                  @RequestBody AgentWorkbookSpec spec,
                                                                  HttpServletRequest request) {
         Long operatorId = currentUserId(request);
         AgentFileView source = service.get(outputId, operatorId);
-        service.readWorkbookContent(outputId, operatorId, null, 1);
+        Map<String, Object> original = service.readWorkbookContent(outputId, operatorId, null, 1);
+        if (!StringUtils.hasText(spec.getLayout())) spec.setLayout(String.valueOf(original.getOrDefault("layout", "TABLE")));
         if (!StringUtils.hasText(spec.getTitle())) {
             String name = StringUtils.hasText(source.name()) ? source.name().replaceFirst("(?i)\\.xlsx$", "") : "表格";
             spec.setTitle(name + "-修改版");
         }
         spec.setAttachmentId(null);
         spec.setIncludeSourceText(false);
-        spec.setNote("基于文件 #" + outputId + " 快速修改生成；原文件保留。");
+        spec.setNote("基于原文件整理的新版本，原文件保留。");
         return ApiResponse.ok("新版本已生成", workbookService.generate(null, operatorId, spec));
     }
 

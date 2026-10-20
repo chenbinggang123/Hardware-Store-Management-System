@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>快捷开单 · 小五</title><link rel="stylesheet" href="billing-ui/billing.css"><script src="billing-ui/billing-image.js" defer></script><script src="billing-ui/billing.js" defer></script></head>
+<body>
+<header><a class="brand" href="ocr-lab.html">小五 <span>五金店经营助手</span></a><a href="ocr-lab.html">返回对话工作台</a></header>
+<div class="workspace">
+  <aside><button id="newDocument" class="primary">＋ 新建单据</button><h2>最近单据 <small>5 条</small></h2><p class="muted">草稿和已保存单据，仅当前账号可见</p><div id="history" aria-label="最近5条单据"></div></aside>
+  <main><div class="heading"><div><h1>快捷开单 <span id="documentState" class="badge">新草稿</span></h1><p class="muted">先核对和修改单据，再统一生成 Excel。</p></div><button id="copyDocument">复制为新草稿</button></div>
+    <div id="status" role="status" aria-live="polite"></div>
+    <div class="view-switch" role="group" aria-label="单据视图"><button id="editView" aria-pressed="true">编辑明细</button><button id="previewView" aria-pressed="false">单据预览</button><span class="muted">预览随修改更新，金额自动计算</span></div>
+    <details id="sourceEvidence" hidden><summary>查看来源内容与核对提示</summary><p>来源金额仅供核对；新单据金额按当前数量和单价计算。未勾选的商品不会进入长期记忆。</p><pre id="sourceNote"></pre></details>
+    <section id="editor" aria-label="开单内容">
+      <div class="document-meta"><div class="field-with-suggestions"><label>购货单位／客户<input id="customerName" maxlength="80" autocomplete="off" aria-controls="customerCandidates" aria-autocomplete="list" placeholder="输入名称查找客户，也可直接填写"></label><div id="customerCandidates" class="field-suggestions" role="listbox" aria-label="客户候选"></div></div><label>单据日期<input id="date" type="date"></label><label>本店名称<input id="companyName" maxlength="80" placeholder="填写打印抬头"></label><label>联系电话<input id="phone" maxlength="80" placeholder="选填"></label></div>
+      <div class="search-section"><label for="productSearch">连续添加商品</label><input id="productSearch" type="search" autocomplete="off" aria-controls="candidates" aria-autocomplete="list" maxlength="80" placeholder="搜名称、规格或常用简称；不输入时显示最近使用"><div id="candidates" class="candidates" role="listbox" aria-label="商品候选"></div><p class="muted">空白时显示最近使用的 5 项；也可搜索本店记忆、商品档案和商品百科。百科只提供已有名称、别名和单位候选，价格留空；↑↓ 选择，Enter 添加。</p></div>
+      <div class="table-scroll" tabindex="0" aria-label="开单明细，可左右滚动"><table class="lines"><thead><tr><th>商品名称</th><th>规格</th><th>单位</th><th>数量</th><th>单价（元）</th><th>金额（元）</th><th>备注</th><th>下次沿用</th><th><span class="sr-only">操作</span></th></tr></thead><tbody id="lines"></tbody></table></div>
+      <div class="table-bottom"><button id="addLine">＋ 添加一行</button><span id="calculationHint" class="muted"></span><div class="total">合计 <strong id="total">0.00</strong> 元</div></div>
+      <label class="remark">整单备注<input id="remark" maxlength="200" placeholder="选填，显示在单据上"></label>
+      <p class="muted scope">本页保存的是标准单据。销售记账、客户欠款和库存出库后续接入。</p>
+    </section>
+    <section id="documentPreview" hidden aria-label="单据预览"><div class="preview-caption"><p id="previewHint">这是待确认的单据，切回编辑明细可继续修改。</p><button id="modifyPreview">返回修改</button></div><div class="paper-scroll" tabindex="0" aria-label="完整单据，可左右滚动"><div id="previewPaper" class="bill-paper"></div></div></section>
+    <div class="actions"><span id="saveState" class="muted">草稿尚未保存</span><button id="saveDraft">立即保存</button><button id="confirmDocument" class="primary">核对并生成 Excel</button><button id="imageDocument" hidden>生成图片</button><button id="printDocument" hidden>打印／存为 PDF</button><button id="exportDocument" class="primary" hidden>生成／查看 Excel</button></div>
+    <a id="fileLink" class="file-link" hidden>打开生成的 Excel 预览 →</a>
+  </main>
+</div>
+<dialog id="confirmation"><form method="dialog"><h2>确认生成这张单据</h2><p id="confirmationSummary"></p><p>请核对商品、规格、单位和金额。</p><div class="review-scroll"><table><thead><tr><th>商品</th><th>规格</th><th>单位</th><th>数量</th><th>单价</th><th>金额</th><th>来源金额</th></tr></thead><tbody id="reviewLines"></tbody></table></div><div id="memoryReview"></div><p class="muted">确认后保存当前版本并生成 Excel；不会登记销售、欠款或库存。修改已保存单据时会创建新草稿，原文件保留。</p><div class="dialog-actions"><button value="cancel">返回修改</button><button id="approveDocument" type="button" class="primary">确认并生成 Excel</button></div></form></dialog>
+<dialog id="imagePreviewDialog" class="image-dialog"><form method="dialog"><div class="image-dialog-heading"><div><h2>单据图片预览</h2><p id="imagePreviewMeta" class="muted"></p></div><button value="close" aria-label="关闭图片预览">关闭</button></div><div class="image-preview-scroll"><img id="imagePreview" alt="已生成的销售单图片预览"></div><div class="dialog-actions"><button value="close">返回单据</button><button id="downloadImage" type="button" class="primary">下载 PNG 图片</button></div></form></dialog>
+<section id="printPaper" aria-hidden="true"></section>
+</body></html>

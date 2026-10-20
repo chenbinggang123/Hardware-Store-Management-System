@@ -9,18 +9,27 @@ function cleanMarkdown(value) {
 }
 
 function plainBlocks(value) {
-  const text = cleanMarkdown(value)
+  const text = String(value || '').replace(/\r/g, '')
     .replace(/\|\s*:?-{3,}:?\s*(?=\||$)/g, '')
     .replace(/\s+-\s+(?=[^：:\n]{1,18}[：:])/g, '\n')
     // Only trim spaces around table separators. Using \s here also consumes
     // newlines and collapses every OCR order row into one unreadable paragraph.
     .replace(/[ \t]*\|[ \t]*/g, ' · ')
 
-  return text.split(/\n+/).map((line) => line.trim()).filter(Boolean).map((line) => {
+  return text.split(/\n+/).map((line) => line.trim()).filter(Boolean).map((source) => {
+    if (/^(?:-{2,}|_{2,}|\*{2,}|[·•。；;，,\s]+)$/.test(source)) return null
+    const heading = source.match(/^#{1,6}\s+(.+)$/)
+    if (heading) return { type: 'heading', text: cleanMarkdown(heading[1]) }
+    const list = source.match(/^\s*(?:[-+*·•●▪]|(\d+)[.)、])\s*(.+)$/)
+    if (list) return { type: 'list', marker: list[1] ? `${list[1]}.` : '•', text: cleanMarkdown(list[2]) }
+    const line = cleanMarkdown(source)
+    if (/^(?:结果|重点|明细|商品明细|待确认|下一步|文件在哪看|处理结果|查询结果|合计|建议)$/.test(line)) {
+      return { type: 'heading', text: line }
+    }
     const field = line.match(/^-?\s*([^：:]{1,18})[：:]\s*(.+)$/)
     if (field) return { type: 'field', label: field[1].trim(), value: field[2].trim() }
-    return { type: 'text', text: line.replace(/^[-•]\s*/, '') }
-  })
+    return { type: 'text', text: line.replace(/^[-·•●▪]\s*/, '') }
+  }).filter(Boolean)
 }
 
 function tableCells(line) {

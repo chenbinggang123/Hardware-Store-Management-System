@@ -3,6 +3,7 @@ const cloudConfig = require('../config/cloud')
 const factoryLedgerStore = require('./factory-ledger')
 
 const AUTH_STORAGE_KEY = 'auth_session'
+const TEMP_AGENT_CLEANUP_KEY = 'agent_temp_cleanup_by_run'
 const state = clone(seedState)
 
 function clone(value) {
@@ -148,7 +149,50 @@ function removeCloudFile(fileID) {
   return wx.cloud.deleteFile({ fileList: [fileID] }).catch(() => null)
 }
 
-function uploadAgentFile(file, conversationId) {
+function updateTemporaryCleanupQueue(updater) {
+  const current = wx.getStorageSync(TEMP_AGENT_CLEANUP_KEY) || []
+  wx.setStorageSync(TEMP_AGENT_CLEANUP_KEY, updater(Array.isArray(current) ? current : []))
+}
+
+function queueTemporaryAgentFiles(runId, attachments) {
+  if (!runId) return
+  const cloudFileIds = (attachments || []).map((item) => item && item.cloudFileId).filter(Boolean)
+  if (!cloudFileIds.length) return
+  updateTemporaryCleanupQueue((items) => {
+    const kept = items.filter((item) => String(item.runId) !== String(runId))
+    return kept.concat({ runId, cloudFileIds: Array.from(new Set(cloudFileIds)) })
+  })
+}
+
+function cleanupTemporaryAgentFiles(runId) {
+  const current = wx.getStorageSync(TEMP_AGENT_CLEANUP_KEY) || []
+  const item = (Array.isArray(current) ? current : []).find((entry) => String(entry.runId) === String(runId))
+  if (!item || !item.cloudFileIds || !item.cloudFileIds.length) return Promise.resolve(true)
+  if (!wx.cloud || !wx.cloud.deleteFile) return Promise.resolve(false)
+  return Promise.all(item.cloudFileIds.map((fileID) => wx.cloud.deleteFile({ fileList: [fileID] })
+    .then((result) => {
+      const files = result && result.fileList
+      return Array.isArray(files) && files.length > 0 && files.every((file) => !file.status) ? null : fileID
+    })
+    .catch(() => fileID))).then((failed) => {
+    const remaining = failed.filter(Boolean)
+    updateTemporaryCleanupQueue((items) => remaining.length
+      ? items.map((entry) => String(entry.runId) === String(runId) ? { ...entry, cloudFileIds: remaining } : entry)
+      : items.filter((entry) => String(entry.runId) !== String(runId)))
+    return remaining.length === 0
+  })
+}
+
+function cleanupTerminalTemporaryAgentFiles() {
+  const current = wx.getStorageSync(TEMP_AGENT_CLEANUP_KEY) || []
+  const queued = Array.isArray(current) ? current.slice() : []
+  return Promise.all(queued.map((item) => agentRequest(`/agent/runs/${item.runId}`)
+    .then((run) => run && ['COMPLETED', 'FAILED', 'CANCELLED', 'EXPIRED', 'PARTIAL'].includes(run.status)
+      ? cleanupTemporaryAgentFiles(item.runId) : false)
+    .catch(() => false)))
+}
+
+function uploadAgentFile(file, conversationId, saveToFiles = false) {
   if (!wx.cloud || !wx.cloud.uploadFile || !wx.cloud.getTempFileURL) {
     return Promise.reject({ message: '当前微信基础库不支持 CloudBase 文件上传' })
   }
@@ -156,7 +200,9 @@ function uploadAgentFile(file, conversationId) {
   const originalName = localFileName(file)
   let uploadedFileID = ''
   return localFileSize(file, filePath)
-    .then((fileSize) => wx.cloud.uploadFile({ cloudPath: cloudPathFor(originalName), filePath })
+    .then((fileSize) => wx.cloud.uploadFile({
+      cloudPath: cloudPathFor(originalName, saveToFiles ? 'agent-files' : 'agent-temp'), filePath
+    })
       .then((uploadResult) => {
         uploadedFileID = uploadResult.fileID
         return wx.cloud.getTempFileURL({ fileList: [uploadedFileID] })
@@ -543,8 +589,17 @@ module.exports = {
   startAgentMessageStream(content, conversationId, attachmentIds) {
     return agentRequest('/agent/messages/stream', { method: 'POST', data: { content, conversationId, attachmentIds: attachmentIds || [] } })
   },
-  uploadAgentAttachment(filePath, conversationId) {
-    return uploadAgentFile(filePath, conversationId)
+  uploadAgentAttachment(filePath, conversationId, saveToFiles = false) {
+    return uploadAgentFile(filePath, conversationId, saveToFiles)
+  },
+  queueTemporaryAgentFiles(runId, attachments) {
+    queueTemporaryAgentFiles(runId, attachments)
+  },
+  cleanupTemporaryAgentFiles(runId) {
+    return cleanupTemporaryAgentFiles(runId)
+  },
+  cleanupTerminalTemporaryAgentFiles() {
+    return cleanupTerminalTemporaryAgentFiles()
   },
   deleteAgentAttachment(attachment) {
     const attachmentId = typeof attachment === 'object' ? attachment.id : attachment
@@ -573,6 +628,24 @@ module.exports = {
   },
   resolveAgentApproval(runId, approved) {
     return agentRequest(`/agent/runs/${runId}/approval`, { method: 'POST', data: { approved } })
+  },
+  getBillingDocument(id) {
+    return request(`/billing/documents/${id}`)
+  },
+  createBillingDocument(data) {
+    return request('/billing/documents', { method: 'POST', data })
+  },
+  saveBillingDocument(id, data) {
+    return request(`/billing/documents/${id}`, { method: 'PUT', data })
+  },
+  confirmBillingDocument(id, version) {
+    return request(`/billing/documents/${id}/confirm`, { method: 'POST', data: { version } })
+  },
+  exportBillingDocument(id) {
+    return request(`/billing/documents/${id}/excel`, { method: 'POST' })
+  },
+  searchBillingProducts(keyword = '') {
+    return request('/billing/products', { query: { keyword } })
   },
   getAgentOutputs() {
     return agentRequest('/agent/outputs')

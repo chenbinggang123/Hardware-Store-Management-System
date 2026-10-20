@@ -15,6 +15,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import com.example.demo.agent.hook.AgentHookContext;
+import com.example.demo.agent.model.AgentToolCall;
+import com.example.demo.agent.tool.AgentPreparedTool;
+import com.example.demo.agent.tool.AgentTool;
+import com.example.demo.agent.tool.AgentToolDefinition;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -26,6 +33,30 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class AgentApprovalAndContextTest {
+
+    @Test
+    void pendingPreviewStaysStructuredInsteadOfBeingEmbeddedInReply() {
+        AgentRunStore store = mock(AgentRunStore.class);
+        when(store.save(any(AgentRun.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        AgentRun run = waitingRun();
+        AgentRunContext context = mock(AgentRunContext.class);
+        when(context.getToolResults()).thenReturn(List.of());
+        AgentTool tool = mock(AgentTool.class);
+        AgentToolDefinition definition = mock(AgentToolDefinition.class);
+        when(tool.definition()).thenReturn(definition);
+        when(definition.getApprovalTitle()).thenReturn("生成 Excel");
+        AgentHookContext hook = mock(AgentHookContext.class);
+        when(hook.call()).thenReturn(new AgentToolCall("excel-1", "generate_excel_workbook", Map.of()));
+        Map<String, Object> preview = Map.of("kind", "EXCEL_WORKBOOK", "fileName", "核对单.xlsx", "rowCount", 5);
+        AgentPreparedTool prepared = new AgentPreparedTool(tool, hook, null, preview);
+
+        AgentRunResult result = service(store).pause(run, context, prepared);
+
+        assertEquals("操作内容已准备好，请核对预览后确认。", result.getOutput());
+        assertEquals(AgentRunStatus.WAITING_APPROVAL, result.getStatus());
+        assertSame(preview, result.getPendingAction().getPreview());
+        assertTrue(run.getPendingPreviewJson().contains("核对单.xlsx"));
+    }
 
     @Test
     void expiresApprovalThatCanNoLongerBeClaimed() {
@@ -94,7 +125,8 @@ class AgentApprovalAndContextTest {
         when(approvalService.prepareApproved(run, 7L)).thenThrow(failure);
         when(approvalService.fail(run, false, failure)).thenReturn(failedResult);
         AgentHarness harness = new AgentHarness(
-                runStore, toolExecutor, contextManager, approvalService, resultFactory);
+                runStore, toolExecutor, contextManager, approvalService, resultFactory,
+                mock(com.example.demo.agent.harness.AgentRoutingService.class), new ObjectMapper());
 
         AgentRunResult result = harness.resolveApproval(31L, 7L, true, null);
 

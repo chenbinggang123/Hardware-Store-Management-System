@@ -12,7 +12,7 @@ Page({
 
   onShow() {
     if (api.getStoredSession()) {
-      wx.switchTab({ url: '/pages/agent/index' })
+      wx.reLaunch({ url: '/pages/agent/index' })
     }
   },
 
@@ -38,7 +38,7 @@ Page({
     }).then((session) => {
       getApp().setSession(session)
       showToast('登录成功', 'success')
-      wx.switchTab({
+      wx.reLaunch({
         url: '/pages/agent/index'
       })
     }).catch((error) => {

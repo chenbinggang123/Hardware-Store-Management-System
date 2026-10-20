@@ -31,6 +31,8 @@ public class AgentRun {
     private String outputText;
     @Lob
     private String contextJson;
+    @Lob
+    private String executionPlanJson;
     private String pendingToolCallId;
     private String pendingToolName;
     @Lob

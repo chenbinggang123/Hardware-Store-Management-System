@@ -80,6 +80,18 @@
     </dependency>
   </dependencies>
   <build>
+    <resources>
+      <resource>
+        <directory>${project.basedir}/../docs/商品百科</directory>
+        <targetPath>product-encyclopedia</targetPath>
+        <includes>
+          <include>*.md</include>
+        </includes>
+      </resource>
+      <resource>
+        <directory>${project.basedir}/src/main/resources</directory>
+      </resource>
+    </resources>
     <plugins>
       <plugin>
         <groupId>org.springframework.boot</groupId>

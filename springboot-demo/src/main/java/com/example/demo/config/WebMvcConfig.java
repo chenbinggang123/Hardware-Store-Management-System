@@ -20,6 +20,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(authInterceptor)
                 .addPathPatterns("/**")
-                .excludePathPatterns("/hello", "/auth/login", "/error");
+                .excludePathPatterns("/hello", "/auth/login", "/error", "/ocr-lab.html", "/workbench/**", "/billing.html", "/billing-ui/**");
     }
 }
