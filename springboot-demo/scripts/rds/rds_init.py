@@ -14,13 +14,15 @@ from mysql_utils import connect_mysql, ensure_database, execute_sql_script  # no
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Initialize RDS MySQL database using schema.sql and data.sql.")
+    parser = argparse.ArgumentParser(description="Initialize RDS MySQL database using schema.sql (and demo-data.sql only with --with-demo-data).")
     parser.add_argument("config_path", nargs="?", default="scripts/rds/rds.config.example.json")
     parser.add_argument("--host")
     parser.add_argument("--port", type=int)
     parser.add_argument("--database")
     parser.add_argument("--username")
     parser.add_argument("--password")
+    parser.add_argument("--with-demo-data", action="store_true",
+                        help="Also load demo-data.sql. It overwrites rows with the same id; never use on a database with real data.")
     return parser.parse_args()
 
 
@@ -40,11 +42,11 @@ def main() -> int:
 
     resource_root = project_root() / "src" / "main" / "resources"
     schema_path = resource_root / "schema.sql"
-    data_path = resource_root / "data.sql"
+    data_path = resource_root / "demo-data.sql"
 
     if not schema_path.exists():
         raise FileNotFoundError("Schema file not found: {0}".format(schema_path))
-    if not data_path.exists():
+    if args.with_demo_data and not data_path.exists():
         raise FileNotFoundError("Seed data file not found: {0}".format(data_path))
 
     print("Initializing database: {0}:{1}/{2}".format(host, port, database))
@@ -53,14 +55,14 @@ def main() -> int:
     connection = connect_mysql(host, port, username, password, database)
     try:
         schema_count = execute_sql_script(connection, schema_path.read_text(encoding="utf-8"))
-        data_count = execute_sql_script(connection, data_path.read_text(encoding="utf-8"))
+        data_count = execute_sql_script(connection, data_path.read_text(encoding="utf-8")) if args.with_demo_data else 0
     finally:
         connection.close()
 
     print("Database initialization completed.")
     print("Database: {0}".format(database))
     print("Schema: {0}".format(schema_path))
-    print("Seed data: {0}".format(data_path))
+    print("Seed data: {0}".format(data_path if args.with_demo_data else "skipped (use --with-demo-data for an empty test database)"))
     print("Executed schema statements: {0}".format(schema_count))
     print("Executed data statements: {0}".format(data_count))
     return 0

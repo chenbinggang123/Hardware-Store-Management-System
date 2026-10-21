@@ -26,12 +26,14 @@ public class SalesOrderController {
 
     @PostMapping
     public ApiResponse<SalesOrder> addSalesOrder(@RequestBody SalesOrder salesOrder) {
+        salesOrder.setOperatorId(com.example.demo.common.CurrentOperator.require());
         return ApiResponse.ok("销售单新增成功", salesOrderService.saveSalesOrder(salesOrder));
     }
 
     @PutMapping("/{id}")
     public ApiResponse<SalesOrder> updateSalesOrder(@PathVariable Long id, @RequestBody SalesOrder salesOrder) {
         salesOrder.setId(id);
+        salesOrder.setOperatorId(com.example.demo.common.CurrentOperator.require());
         return ApiResponse.ok("销售单更新成功", salesOrderService.updateSalesOrder(salesOrder));
     }
 

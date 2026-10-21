@@ -10,6 +10,7 @@ const DRAWER_STATE_KEY = 'agent_drawer_sections'
 const STREAM_POLL_INTERVAL = 320
 const MAX_STREAM_POLL_FAILURES = 4
 const DRAWER_ROUTES = Object.freeze({
+  billingList: '/pages/billing-list/index',
   files: '/pages/agent-files/index',
   sales: '/pages/sales-orders/index',
   purchases: '/pages/purchase-orders/index',
@@ -20,7 +21,6 @@ const DRAWER_ROUTES = Object.freeze({
   factories: '/pages/factory-ledgers/index',
   products: '/pages/products/index',
   prices: '/pages/price-history/index',
-  mappings: '/pages/product-mappings/index',
   excel: '/pages/excel-tasks/index',
   reports: '/pages/report-center/index',
   settings: '/pages/settings/index'
@@ -233,7 +233,7 @@ Page({
       { key: 'billing', title: '快捷开单', description: '录商品并预览销售单' },
       { key: 'scan', title: '拍单识别', description: '拍照生成可修改草稿' },
       { key: 'inventory', title: '查商品库存', description: '查价格、规格和数量' },
-      { key: 'ledger', title: '查客户往来', description: '查欠款、收款和历史' }
+      { key: 'ledger', title: '查工厂账本', description: '查拿货、收款和欠款' }
     ]
   },
 
@@ -285,7 +285,7 @@ Page({
     const prompts = {
       billing: '我要快捷开单：',
       inventory: '查商品库存：',
-      ledger: '查客户往来：'
+      ledger: '查工厂账本：'
     }
     const input = prompts[action]
     if (input) this.setData({ input, inputFocus: true }, () => this.scrollToBottom())
@@ -662,7 +662,7 @@ Page({
     const id = event.currentTarget.dataset.id
     if (id) openPage('/pages/product-detail/index', { id })
   },
-  openWorkbench() { openPage('/pages/finance-ledger/index') },
+  openWorkbench() { openPage('/pages/factory-ledgers/index') },
   openMyFiles() {
     this.setData({ historyOpen: false })
     openPage('/pages/agent-files/index')
@@ -713,7 +713,7 @@ Page({
     const target = event.currentTarget.dataset.target
     const params = event.currentTarget.dataset.params || {}
     const routes = {
-      WORKBENCH: '/pages/workbench/index', PRODUCT_LIST: '/pages/products/index', PRODUCT_DETAIL: '/pages/product-detail/index',
+      WORKBENCH: '/pages/factory-ledgers/index', PRODUCT_LIST: '/pages/products/index', PRODUCT_DETAIL: '/pages/product-detail/index',
       INVENTORY_LIST: '/pages/inventories/index', SALES_ORDER_DETAIL: '/pages/sales-detail/index',
       PURCHASE_ORDER_DETAIL: '/pages/purchase-detail/index', EXCEL_TASK_DETAIL: '/pages/excel-task-detail/index',
       PRICE_HISTORY: '/pages/price-history/index', BILLING_DOCUMENT: '/pages/billing-editor/index'
@@ -767,9 +767,16 @@ Page({
     }
     api.cleanupTemporaryAgentFiles(run.runId).catch(() => {})
     wx.removeStorageSync(ACTIVE_RUN_KEY)
+    const justFinished = this.data.sending
     this.finalizeStreamingMessage(run.output, run.status, run.files, run.billingDocumentId)
     this.setData({ run, conversationId, sending: false, streaming: false }, () => this.scrollToBottom())
     this.loadConversations()
+    // 开单草稿不再需要审批：本次刚完成的运行直接进入开单页，历史记录只保留入口按钮。
+    if (justFinished && run.status === 'COMPLETED' && run.billingDocumentId
+      && this.autoBillingOpenRunId !== run.runId) {
+      this.autoBillingOpenRunId = run.runId
+      openPage('/pages/billing-editor/index', { id: run.billingDocumentId })
+    }
   },
 
   ensureStreamingMessage() {

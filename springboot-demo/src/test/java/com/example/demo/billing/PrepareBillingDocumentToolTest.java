@@ -10,6 +10,11 @@ import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
 
 class PrepareBillingDocumentToolTest {
+    @Test void editableDraftRunsWithoutApprovalAndEndsRun(){
+        var mapper=new ObjectMapper();var tool=new PrepareBillingDocumentTool(new BillingService(null,null,null,null,mapper),mapper);
+        var decision=new com.example.demo.agent.policy.AgentPolicyEngine().evaluate(new AgentToolContext(1L,7L),tool,Map.of("lines",List.of(Map.of("name","螺丝"))));
+        assertThat(decision).isEqualTo(com.example.demo.agent.policy.AgentPolicyDecision.ALLOW);assertThat(tool.completesRun()).isTrue();
+    }
     @Test void previewCannotPersistAndExecutionOnlyCreatesIdempotentUnlearnedDraft(){
         var mapper=new ObjectMapper();var billing=spy(new BillingService(null,null,null,null,mapper));var tool=new PrepareBillingDocumentTool(billing,mapper);var context=new AgentToolContext(88L,7L);
         Map<String,Object> args=Map.of("sourceNote","★原单号MOCK-1002，√单位待确认","lines",List.of(Map.of("name","√示例材料甲","specification","Φ12×100","quantity",5,"price",17,"sourceAmount","￥80.00","remark","☑ 待确认","remember",true)));

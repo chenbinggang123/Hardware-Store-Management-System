@@ -213,6 +213,10 @@ public class AgentHarness {
                     }
                     Object toolResult = toolExecutor.execute(prepared);
                     context.addToolResult(call.getId(), call.getName(), call.getArguments(), toolResult);
+                    if (prepared.tool().completesRun()) {
+                        run.setContextJson(contextManager.toJson(context.getToolResults()));
+                        return approvalService.completeWithoutGateway(run, toolResult);
+                    }
                 }
             }
             throw new IllegalStateException("Agent 模型调用次数超过限制");

@@ -1,5 +1,6 @@
 package com.example.demo.service.impl;
 
+import com.example.demo.common.CurrentOperator;
 import com.example.demo.dto.InventoryAdjustRequest;
 import com.example.demo.entity.Inventory;
 import com.example.demo.entity.InventoryLog;
@@ -57,7 +58,7 @@ public class InventoryServiceImpl implements InventoryService {
         }
         Inventory saved = inventoryRepository.save(inventory);
         syncProduct(saved);
-        saveOperationLog("INVENTORY", "CREATE", "新增库存记录，商品ID：" + saved.getProductId(), 1L);
+        saveOperationLog("INVENTORY", "CREATE", "新增库存记录，商品ID：" + saved.getProductId(), CurrentOperator.idOrNull());
         return saved;
     }
 
@@ -79,7 +80,7 @@ public class InventoryServiceImpl implements InventoryService {
         existingInventory.setLastUpdateTime(LocalDateTime.now());
         Inventory saved = inventoryRepository.save(existingInventory);
         syncProduct(saved);
-        saveOperationLog("INVENTORY", "UPDATE", "更新库存记录，商品ID：" + saved.getProductId(), 1L);
+        saveOperationLog("INVENTORY", "UPDATE", "更新库存记录，商品ID：" + saved.getProductId(), CurrentOperator.idOrNull());
         return saved;
     }
 
@@ -88,7 +89,7 @@ public class InventoryServiceImpl implements InventoryService {
         Inventory inventory = getInventoryById(id)
                 .orElseThrow(() -> new IllegalArgumentException("库存记录不存在，无法删除"));
         inventoryRepository.deleteById(id);
-        saveOperationLog("INVENTORY", "DELETE", "删除库存记录，商品ID：" + inventory.getProductId(), 1L);
+        saveOperationLog("INVENTORY", "DELETE", "删除库存记录，商品ID：" + inventory.getProductId(), CurrentOperator.idOrNull());
     }
 
     @Override
@@ -173,8 +174,22 @@ public class InventoryServiceImpl implements InventoryService {
         }
     }
 
-    private void ensureInventoryForProducts() {
-        for (Product product : productRepository.findAll()) {
+    @Override
+    public Inventory ensureForProduct(Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new IllegalArgumentException("商品不存在"));
+        return inventoryRepository.findByProductId(productId).orElseGet(() -> {
+            Inventory inventory = new Inventory();
+            inventory.setProductId(product.getId());
+            inventory.setQuantity(defaultInteger(product.getStock()));
+            inventory.setLocationId(product.getLocationId());
+            inventory.setWarningThreshold(10);
+            inventory.setLastUpdateTime(LocalDateTime.now());
+            return inventoryRepository.save(inventory);
+        });
+    }
+
+    private void ensureInventoryForProducts() {        for (Product product : productRepository.findAll()) {
             Optional<Inventory> optionalInventory = inventoryRepository.findByProductId(product.getId());
             if (optionalInventory.isEmpty()) {
                 Inventory inventory = new Inventory();

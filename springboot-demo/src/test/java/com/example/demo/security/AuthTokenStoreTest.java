@@ -73,6 +73,46 @@ class AuthTokenStoreTest {
     }
 
     @Test
+    void backendOnlySeesTokenHash() {
+        InMemoryAuthTokenBackend backend = new InMemoryAuthTokenBackend();
+        AuthTokenStore store = new AuthTokenStore(backend, Duration.ofDays(30), Clock.systemUTC());
+
+        String token = store.createSession(user()).getToken();
+
+        assertEquals(64, token.length());
+        assertFalse(backend.find(token).isPresent());
+        assertTrue(backend.find(AuthTokenStore.hash(token)).isPresent());
+    }
+
+    @Test
+    void activeSessionIsRenewedAndIdleSessionExpires() {
+        MutableClock clock = new MutableClock(Instant.parse("2026-10-01T00:00:00Z"));
+        AuthTokenStore store = new AuthTokenStore(Duration.ofDays(30), clock);
+        AuthSession session = store.createSession(user());
+
+        clock.advance(Duration.ofDays(20));
+        assertEquals(Instant.parse("2026-11-20T00:00:00Z"), store.getSession(session.getToken()).orElseThrow().getExpiresAt());
+
+        clock.advance(Duration.ofDays(29));
+        assertTrue(store.getSession(session.getToken()).isPresent());
+
+        clock.advance(Duration.ofDays(31));
+        assertFalse(store.getSession(session.getToken()).isPresent());
+    }
+
+    @Test
+    void removingUserSessionsLogsOutEveryDevice() {
+        AuthTokenStore store = new AuthTokenStore(Duration.ofDays(30), Clock.systemUTC());
+        String phone = store.createSession(user()).getToken();
+        String tablet = store.createSession(user()).getToken();
+
+        store.removeUserSessions(1L);
+
+        assertFalse(store.getSession(phone).isPresent());
+        assertFalse(store.getSession(tablet).isPresent());
+    }
+
+    @Test
     void rejectsNonPositiveTtl() {
         assertThrows(IllegalArgumentException.class,
                 () -> new AuthTokenStore(Duration.ZERO, Clock.systemUTC()));

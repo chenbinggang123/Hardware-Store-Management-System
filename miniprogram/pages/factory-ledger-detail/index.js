@@ -1,6 +1,6 @@
 const ledgerStore = require('../../utils/factory-ledger')
 const api = require('../../utils/api')
-const { openPage } = require('../../utils/router')
+const { openPage, showToast } = require('../../utils/router')
 
 Page({
   data: { id: '', month: ledgerStore.currentMonth(), ledger: null, loading: true, error: '' },
@@ -19,5 +19,27 @@ Page({
   },
   addPurchase() { openPage('/pages/factory-ledger-entry/index', { id: this.data.id, type: 'PURCHASE' }) },
   addPayment() { openPage('/pages/factory-ledger-entry/index', { id: this.data.id, type: 'PAYMENT' }) },
-  addReturn() { openPage('/pages/factory-ledger-entry/index', { id: this.data.id, type: 'RETURN' }) }
+  addReturn() { openPage('/pages/factory-ledger-entry/index', { id: this.data.id, type: 'RETURN' }) },
+  editLedger() { openPage('/pages/factory-ledger-form/index', { id: this.data.id }) },
+
+  // 记错了：不删除原记录，而是记一笔金额相反的冲销，应收马上恢复。
+  reverseTransaction(event) {
+    const transactionId = event.currentTarget.dataset.id
+    const label = event.currentTarget.dataset.label || '这笔记录'
+    if (!transactionId || this.reversing) return
+    wx.showModal({
+      title: `冲销${label}？`,
+      content: '',
+      editable: true,
+      placeholderText: '写一句原因，例如数量记错了',
+      confirmText: '冲销'
+    }).then((choice) => {
+      if (!choice.confirm) return
+      this.reversing = true
+      return api.reverseFactoryLedgerTransaction(this.data.id, transactionId, choice.content || '记错了')
+        .then(() => { showToast('已冲销', 'success'); return this.loadData() })
+        .catch((error) => showToast((error && error.message) || '冲销失败，请重试'))
+        .finally(() => { this.reversing = false })
+    })
+  }
 })

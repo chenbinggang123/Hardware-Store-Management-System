@@ -18,4 +18,7 @@ public interface InventoryService {
     Inventory adjustInventory(Long id, InventoryAdjustRequest request);
     List<InventoryLog> getInventoryLogs(Long id);
     List<Inventory> getWarnings();
+
+    /** 取商品的库存记录，没有就按商品当前数量建一条，盘点前调用。 */
+    Inventory ensureForProduct(Long productId);
 }

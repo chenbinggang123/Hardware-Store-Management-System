@@ -58,6 +58,26 @@ public class FactoryLedgerController {
                 factoryLedgerService.addTransaction(id, request, currentUserId(httpRequest)));
     }
 
+    @PutMapping("/{id}")
+    public ApiResponse<Map<String, Object>> update(
+            @PathVariable Long id,
+            @RequestBody FactoryLedgerCreateRequest request,
+            HttpServletRequest httpRequest) {
+        return ApiResponse.ok("账本资料已保存", factoryLedgerService.updateLedger(id, request, currentUserId(httpRequest)));
+    }
+
+    public record ReverseRequest(String reason) { }
+
+    @PostMapping("/{id}/transactions/{transactionId}/reverse")
+    public ApiResponse<Map<String, Object>> reverse(
+            @PathVariable Long id,
+            @PathVariable Long transactionId,
+            @RequestBody(required = false) ReverseRequest request,
+            HttpServletRequest httpRequest) {
+        return ApiResponse.ok("已冲销", factoryLedgerService.reverseTransaction(id, transactionId,
+                request == null ? null : request.reason(), currentUserId(httpRequest)));
+    }
+
     @PutMapping("/{id}/settlements/{month}/status")
     public ApiResponse<Map<String, Object>> updateSettlementStatus(
             @PathVariable Long id,

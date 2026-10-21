@@ -1,0 +1,10 @@
+.sum-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14rpx; margin-top: 8rpx; }
+.sum-cell { padding: 20rpx; display: flex; flex-direction: column; gap: 6rpx; border: 1rpx solid #D8E0DC; border-radius: 16rpx; background: #FFFFFF; }
+.sum-cell > text:first-child { color: #68756F; font-size: 22rpx; }
+.sum-cell.strong { border-color: #9CC8B2; background: #EEF7F2; }
+.sum-value { color: #18231E; font-size: 34rpx; font-weight: 780; font-variant-numeric: tabular-nums; }
+.sum-value.green { color: #247052; }
+.sum-sub { color: #7A8680; font-size: 20rpx; }
+.sum-section-title { margin: 30rpx 4rpx 12rpx; color: #18231E; font-size: 28rpx; font-weight: 750; }
+.sum-balance { flex: 0 0 auto; color: #A83F32; font-size: 30rpx; font-weight: 780; font-variant-numeric: tabular-nums; }
+.sum-old { margin: 26rpx 0 40rpx; color: #245E9B; font-size: 22rpx; text-align: center; }

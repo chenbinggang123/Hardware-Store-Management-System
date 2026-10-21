@@ -69,6 +69,48 @@ class FactoryLedgerServiceTest {
     }
 
     @Test
+    void reversalRestoresBalanceAndCanOnlyHappenOnce() {
+        FactoryLedgerTransaction purchase = transaction("PURCHASE", "2026-10-09", 10560);
+        purchase.setId(11L);
+        purchase.setLedgerId(1L);
+        purchase.setTransactionNo("LS-1");
+        when(transactionRepository.findById(11L)).thenReturn(Optional.of(purchase));
+
+        Map<String, Object> reversal = service.reverseTransaction(1L, 11L, "数量记错", 7L);
+
+        assertEquals("-10560", String.valueOf(reversal.get("amountCents")));
+        assertEquals("-¥105.60", reversal.get("signedAmount"));
+        assertEquals("REVERSED", purchase.getStatus());
+        assertThrows(IllegalArgumentException.class, () -> service.reverseTransaction(1L, 11L, "再来一次", 7L));
+
+        purchase.setStatus("REVERSED");
+        FactoryLedgerTransaction saved = new FactoryLedgerTransaction();
+        saved.setLedgerId(1L);
+        saved.setType("PURCHASE");
+        saved.setAmountCents(-10560L);
+        saved.setTransactionDate(java.time.LocalDate.parse("2026-10-21"));
+        when(transactionRepository.findByLedgerIdOrderByTransactionDateDescCreateTimeDesc(1L)).thenReturn(List.of(saved, purchase));
+        Map<?, ?> summary = (Map<?, ?>) service.get(1L, "2026-10").get("summary");
+        assertEquals("0.00", summary.get("purchaseAmount"));
+    }
+
+    @Test
+    void newEntryDoesNotResetAConfirmedMonth() {
+        com.example.demo.entity.FactoryLedgerSettlement confirmed = new com.example.demo.entity.FactoryLedgerSettlement();
+        confirmed.setStatus("CONFIRMED");
+        when(settlementRepository.findByLedgerIdAndSettlementMonth(1L, "2026-10")).thenReturn(Optional.of(confirmed));
+        FactoryLedgerTransactionRequest request = new FactoryLedgerTransactionRequest();
+        request.setType("PAYMENT");
+        request.setDate(java.time.LocalDate.parse("2026-10-15"));
+        request.setPaymentAmount(new java.math.BigDecimal("20"));
+
+        Map<String, Object> result = service.addTransaction(1L, request, 7L);
+
+        assertEquals("CONFIRMED", confirmed.getStatus());
+        org.junit.jupiter.api.Assertions.assertNotNull(result.get("warning"));
+    }
+
+    @Test
     void rejectsDuplicateReceiptBeforeWriting() {
         when(transactionRepository.existsByLedgerIdAndReceiptNo(1L, "A-001")).thenReturn(true);
         FactoryLedgerTransactionRequest request = new FactoryLedgerTransactionRequest();
@@ -90,7 +132,7 @@ class FactoryLedgerServiceTest {
         Map<String, Object> result = service.setSettlementStatus(1L, "2026-10", "CONFIRMED", 7L);
 
         assertEquals("CONFIRMED", result.get("status"));
-        assertEquals("已确认", result.get("statusLabel"));
+        assertEquals("已对账", result.get("statusLabel"));
     }
 
     @Test

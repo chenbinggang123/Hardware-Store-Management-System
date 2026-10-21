@@ -4,16 +4,69 @@
 
   <block wx:else>
     <view class="billing-head">
-      <view><view class="eyebrow">快捷开单</view><view class="page-title">{{document && document.status === 'CONFIRMED' ? '已保存销售单' : '编辑销售单'}}</view><view class="page-subtitle">先修改内容，再按正式版式预览</view></view>
-      <view class="document-state {{document && document.status === 'CONFIRMED' ? 'confirmed' : ''}}">{{document && document.status === 'CONFIRMED' ? '已保存' : '草稿'}}</view>
+      <view><view class="eyebrow">快捷开单</view><view class="page-title">{{document && document.status === 'VOIDED' ? '已作废的销售单' : (document && document.status === 'CONFIRMED' ? '已保存销售单' : '编辑销售单')}}</view><view class="page-subtitle">黄色标记的行需要核对，其余可直接保存</view></view>
+      <view class="document-state {{document && document.status === 'CONFIRMED' ? 'confirmed' : ''}} {{document && document.status === 'VOIDED' ? 'voided' : ''}}">{{document && document.status === 'VOIDED' ? '已作废' : (document && document.status === 'CONFIRMED' ? '已保存' : '草稿')}}</view>
     </view>
 
     <view class="view-switch">
-      <view class="{{mode === 'edit' ? 'active' : ''}}" data-mode="edit" bindtap="setMode">编辑明细</view>
+      <view class="{{mode === 'edit' ? 'active' : ''}}" data-mode="edit" bindtap="setMode">核对明细</view>
       <view class="{{mode === 'preview' ? 'active' : ''}}" data-mode="preview" bindtap="setMode">单据预览</view>
     </view>
 
     <view class="editor" wx:if="{{mode === 'edit'}}">
+      <view class="section-card info-card">
+        <view class="info-summary" bindtap="toggleHeader"><view class="info-summary-main"><view class="section-title">单据信息</view><view class="section-note">{{form.customerName || '未填客户'}} · {{form.date}}<text wx:if="{{form.phone}}"> · {{form.phone}}</text></view></view><text class="info-toggle">{{headerOpen ? '收起' : '修改'}}</text></view>
+        <picker class="ledger-picker" range="{{ledgerNames}}" value="{{ledgerIndex}}" bindchange="changeLedger"><view class="ledger-row {{ledgerIndex ? 'active' : ''}}"><text>记入厂家账本</text><text class="ledger-value">{{ledgerIndex ? ledgerName : '不记账'}} ›</text></view></picker>
+        <block wx:if="{{headerOpen}}">
+          <view class="field"><text>开票方</text><input value="{{form.companyName}}" data-field="companyName" bindinput="changeForm" placeholder="店铺或公司名称" /></view>
+          <view class="field-grid">
+            <view class="field"><text>客户名称</text><input value="{{form.customerName}}" data-field="customerName" bindinput="changeForm" placeholder="可暂不填写" /></view>
+            <view class="field"><text>开单日期</text><picker mode="date" value="{{form.date}}" bindchange="changeDate"><view class="picker-field">{{form.date}}</view></picker></view>
+          </view>
+          <view class="field-grid">
+            <view class="field"><text>联系电话</text><input value="{{form.phone}}" data-field="phone" bindinput="changeForm" placeholder="可暂不填写" /></view>
+            <view class="field"><text>整单备注</text><input value="{{form.remark}}" data-field="remark" bindinput="changeForm" placeholder="交付、收款等说明" /></view>
+          </view>
+        </block>
+      </view>
+
+      <view class="section-card lines-card">
+        <view class="section-heading"><view><view class="section-title">商品明细 · {{lines.length}} 项</view><view class="section-note">点一行展开修改，金额按数量 × 单价自动计算</view></view><view class="add-line" bindtap="addLine">＋ 添加</view></view>
+        <view class="review-strip" wx:if="{{reviewLineCount}}"><text>{{reviewLineCount}} 行待核对</text><view class="review-filter" bindtap="toggleReviewOnly">{{reviewOnly ? '显示全部' : '只看待核对'}}</view></view>
+        <view class="line-table-head"><text class="row-no">#</text><text class="row-main">商品</text><text class="row-qty">数量</text><text class="row-price">单价</text><text class="row-amount">金额</text></view>
+        <block wx:for="{{lines}}" wx:key="index">
+          <view class="line-item {{item.needsReview ? 'flagged' : ''}} {{item.expanded ? 'open' : ''}}" wx:if="{{!reviewOnly || item.needsReview || item.expanded}}">
+            <view class="line-row" data-index="{{index}}" bindtap="toggleLine">
+              <text class="row-no">{{index + 1}}</text>
+              <view class="row-main"><view class="row-name {{item.nameUncertain ? 'review-text' : ''}}">{{item.name || '待填写名称'}}</view><view class="row-sub" wx:if="{{item.specification}}">{{item.specification}}</view></view>
+              <text class="row-qty {{item.quantityUncertain || item.unitUncertain ? 'review-text' : ''}}">{{item.quantity || '?'}}{{item.unit || ''}}</text>
+              <text class="row-price {{item.priceUncertain ? 'review-text' : ''}}">{{item.price || '?'}}</text>
+              <text class="row-amount">{{item.amountText}}</text>
+            </view>
+            <view class="line-card" wx:if="{{item.expanded}}">
+              <view class="line-head"><view><text class="line-collapse" data-index="{{index}}" bindtap="toggleLine">收起 ▴</text></view><view class="line-actions"><label class="remember-compact" aria-label="记住商品"><switch checked="{{item.remember}}" data-index="{{index}}" bindchange="toggleRemember" color="#2865D7" /><text>记住</text></label><view class="copy-line" data-index="{{index}}" bindtap="duplicateLine">复制</view><view class="remove-line" data-index="{{index}}" bindtap="removeLine">删除</view></view></view>
+              <view class="field-grid primary-grid">
+                <view class="field {{item.nameUncertain ? 'needs-review' : ''}}"><text>商品名称</text><input value="{{item.name}}" focus="{{item.nameFocus}}" data-index="{{index}}" data-field="name" bindfocus="focusLineName" bindinput="changeLine" placeholder="输入并搜索" /></view>
+                <view class="field"><text>规格型号</text><input value="{{item.specification}}" data-index="{{index}}" data-field="specification" bindinput="changeLine" placeholder="选填" /></view>
+              </view>
+              <scroll-view class="inline-candidates" scroll-x wx:if="{{activeLineIndex === index && candidates.length}}" enhanced show-scrollbar="{{false}}">
+                <view class="candidate-row"><view class="candidate compact" wx:for="{{candidates}}" wx:for-item="candidate" wx:for-index="candidateIndex" wx:key="candidateKey" data-index="{{candidateIndex}}" data-key="{{candidate.candidateKey}}" bindtap="chooseCandidate"><view class="candidate-name">{{candidate.name}}</view><view class="candidate-meta">{{candidate.specification || candidate.category || '通用商品'}}<text wx:if="{{candidate.unit}}"> · {{candidate.unit}}</text><text wx:elif="{{candidate.unitCandidates.length === 1}}"> · {{candidate.unitCandidates[0]}}</text><text wx:if="{{candidate.price !== null && candidate.price !== undefined}}"> · ¥{{candidate.price}}</text></view></view></view>
+              </scroll-view>
+              <view class="field-grid number-grid">
+                <view class="field {{item.unitUncertain ? 'needs-review' : ''}}"><text>单位</text><input value="{{item.unit}}" data-index="{{index}}" data-field="unit" bindinput="changeLine" placeholder="个/支/套" /></view>
+                <view class="field {{item.quantityUncertain ? 'needs-review' : ''}}"><text>数量</text><input type="digit" value="{{item.quantity}}" focus="{{item.quantityFocus}}" confirm-type="next" data-index="{{index}}" data-field="quantity" bindfocus="focusLineInput" bindinput="changeLine" bindconfirm="confirmLineField" placeholder="必填" /></view>
+                <view class="field {{item.priceUncertain ? 'needs-review' : ''}}"><text>单价</text><input type="digit" value="{{item.price}}" focus="{{item.priceFocus}}" confirm-type="next" data-index="{{index}}" data-field="price" bindfocus="focusLineInput" bindinput="changeLine" bindconfirm="confirmLineField" placeholder="必填" /></view>
+              </view>
+              <view class="unit-choices" wx:if="{{item.unitChoices.length}}"><view wx:for="{{item.unitChoices}}" wx:for-item="unit" wx:for-index="unitIndex" wx:key="*this" data-index="{{item.index - 1}}" data-unit="{{unit}}" bindtap="chooseUnit">{{unit}}</view></view>
+              <view class="line-detail-row"><view class="line-detail-toggle" data-index="{{index}}" bindtap="toggleLineRemark">{{item.remarkToggleText}}</view><view class="line-detail-toggle catalog-add" wx:if="{{!item.inCatalog && item.name}}" data-index="{{index}}" bindtap="addLineToCatalog">＋ 加入商品库</view></view>
+              <view class="field compact-remark" wx:if="{{item.remarkOpen}}"><text>备注</text><input value="{{item.remark}}" data-index="{{index}}" data-field="remark" bindinput="changeLine" placeholder="选填，例如交付说明" /></view>
+              <view class="line-review-note" wx:if="{{item.amountMismatch}}">票面金额与数量 × 单价不一致，请核对单价</view>
+              <view class="source-note" wx:if="{{item.referenceSource || item.sourceAmount || item.referenceCaution}}"><text wx:if="{{item.referenceSource}}">{{item.referenceSource}}</text><text wx:if="{{item.sourceAmount}}">票面金额：{{item.sourceAmount}}</text><text wx:if="{{item.referenceCaution}}">{{item.referenceCaution}}</text></view>
+            </view>
+          </view>
+        </block>
+      </view>
+
       <view class="section-card product-search">
         <view class="section-heading"><view><view class="section-title">快速添加商品</view><view class="section-note">常用商品排在前面，也可搜索商品库和百科</view></view></view>
         <view class="search-row"><text>⌕</text><input value="{{searchKeyword}}" placeholder="输入名称，点选后自动填写" bindinput="changeSearch" bindfocus="focusGlobalSearch" /></view>
@@ -22,48 +75,13 @@
           <view class="candidate-row"><view class="candidate" wx:for="{{candidates}}" wx:key="candidateKey" data-index="{{index}}" data-key="{{item.candidateKey}}" bindtap="chooseCandidate"><view class="candidate-name">{{item.name}}</view><view class="candidate-meta">{{item.specification || item.category || '通用商品'}}<text wx:if="{{item.unit}}"> · {{item.unit}}</text><text wx:elif="{{item.unitCandidates.length === 1}}"> · {{item.unitCandidates[0]}}</text><text wx:if="{{item.price !== null && item.price !== undefined}}"> · ¥{{item.price}}</text></view><view class="candidate-foot"><text class="candidate-source">{{item.source}}</text><text class="candidate-use" wx:if="{{item.useCount}}">用过 {{item.useCount}} 次</text></view></view></view>
         </scroll-view>
       </view>
-
-      <view class="section-card">
-        <view class="section-heading"><view><view class="section-title">单据信息</view><view class="section-note">表头与底部核心信息</view></view></view>
-        <view class="field"><text>开票方</text><input value="{{form.companyName}}" data-field="companyName" bindinput="changeForm" placeholder="店铺或公司名称" /></view>
-        <view class="field-grid">
-          <view class="field"><text>客户名称</text><input value="{{form.customerName}}" data-field="customerName" bindinput="changeForm" placeholder="可暂不填写" /></view>
-          <view class="field"><text>开单日期</text><picker mode="date" value="{{form.date}}" bindchange="changeDate"><view class="picker-field">{{form.date}}</view></picker></view>
-        </view>
-        <view class="field-grid">
-          <view class="field"><text>联系电话</text><input value="{{form.phone}}" data-field="phone" bindinput="changeForm" placeholder="可暂不填写" /></view>
-          <view class="field"><text>整单备注</text><input value="{{form.remark}}" data-field="remark" bindinput="changeForm" placeholder="交付、收款等说明" /></view>
-        </view>
-      </view>
-
-      <view class="section-card lines-card">
-        <view class="section-heading"><view><view class="section-title">商品明细</view><view class="section-note">金额按数量 × 单价自动计算</view></view><view class="add-line" bindtap="addLine">＋ 添加</view></view>
-        <view class="review-strip" wx:if="{{reviewCount}}"><text>{{reviewCount}} 处待核对</text><text>修改黄色字段即可</text></view>
-        <view class="line-card" wx:for="{{lines}}" wx:key="index">
-          <view class="line-head"><view><text>第 {{index + 1}} 项</text><text class="line-amount">¥{{item.amountText}}</text></view><view class="line-actions"><label class="remember-compact" aria-label="记住商品"><switch checked="{{item.remember}}" data-index="{{index}}" bindchange="toggleRemember" color="#2865D7" /><text>记住</text></label><view class="copy-line" data-index="{{index}}" bindtap="duplicateLine">复制</view><view class="remove-line" data-index="{{index}}" bindtap="removeLine">删除</view></view></view>
-          <view class="field-grid primary-grid">
-            <view class="field {{item.nameUncertain ? 'needs-review' : ''}}"><text>商品名称</text><input value="{{item.name}}" focus="{{item.nameFocus}}" data-index="{{index}}" data-field="name" bindfocus="focusLineName" bindinput="changeLine" placeholder="输入并搜索" /></view>
-            <view class="field"><text>规格型号</text><input value="{{item.specification}}" data-index="{{index}}" data-field="specification" bindinput="changeLine" placeholder="选填" /></view>
-          </view>
-          <scroll-view class="inline-candidates" scroll-x wx:if="{{activeLineIndex === index && candidates.length}}" enhanced show-scrollbar="{{false}}">
-            <view class="candidate-row"><view class="candidate compact" wx:for="{{candidates}}" wx:for-item="candidate" wx:for-index="candidateIndex" wx:key="candidateKey" data-index="{{candidateIndex}}" data-key="{{candidate.candidateKey}}" bindtap="chooseCandidate"><view class="candidate-name">{{candidate.name}}</view><view class="candidate-meta">{{candidate.specification || candidate.category || '通用商品'}}<text wx:if="{{candidate.unit}}"> · {{candidate.unit}}</text><text wx:elif="{{candidate.unitCandidates.length === 1}}"> · {{candidate.unitCandidates[0]}}</text><text wx:if="{{candidate.price !== null && candidate.price !== undefined}}"> · ¥{{candidate.price}}</text></view></view></view>
-          </scroll-view>
-          <view class="field-grid number-grid">
-            <view class="field {{item.unitUncertain ? 'needs-review' : ''}}"><text>单位</text><input value="{{item.unit}}" data-index="{{index}}" data-field="unit" bindinput="changeLine" placeholder="个/支/套" /></view>
-            <view class="field {{item.quantityUncertain ? 'needs-review' : ''}}"><text>数量</text><input type="digit" value="{{item.quantity}}" focus="{{item.quantityFocus}}" confirm-type="next" data-index="{{index}}" data-field="quantity" bindfocus="focusLineInput" bindinput="changeLine" bindconfirm="confirmLineField" placeholder="必填" /></view>
-            <view class="field {{item.priceUncertain ? 'needs-review' : ''}}"><text>单价</text><input type="digit" value="{{item.price}}" focus="{{item.priceFocus}}" confirm-type="next" data-index="{{index}}" data-field="price" bindfocus="focusLineInput" bindinput="changeLine" bindconfirm="confirmLineField" placeholder="必填" /></view>
-          </view>
-          <view class="unit-choices" wx:if="{{item.unitChoices.length}}"><view wx:for="{{item.unitChoices}}" wx:for-item="unit" wx:for-index="unitIndex" wx:key="*this" data-index="{{item.index - 1}}" data-unit="{{unit}}" bindtap="chooseUnit">{{unit}}</view></view>
-          <view class="line-detail-toggle" data-index="{{index}}" bindtap="toggleLineRemark">{{item.remarkToggleText}}</view>
-          <view class="field compact-remark" wx:if="{{item.remarkOpen}}"><text>备注</text><input value="{{item.remark}}" data-index="{{index}}" data-field="remark" bindinput="changeLine" placeholder="选填，例如交付说明" /></view>
-          <view class="line-review-note" wx:if="{{item.amountMismatch}}">票面金额与数量 × 单价不一致，请核对单价</view>
-          <view class="source-note" wx:if="{{item.referenceSource || item.sourceAmount || item.referenceCaution}}"><text wx:if="{{item.referenceSource}}">{{item.referenceSource}}</text><text wx:if="{{item.sourceAmount}}">票面金额：{{item.sourceAmount}}</text><text wx:if="{{item.referenceCaution}}">{{item.referenceCaution}}</text></view>
-        </view>
-      </view>
       <view class="source-evidence" wx:if="{{form.sourceNote}}"><view class="source-evidence-head" bindtap="toggleEvidence"><view><view class="section-title">识别说明</view><view class="section-note">原始识别内容仅在需要时查看</view></view><text>{{evidenceOpen ? '收起' : '查看'}}</text></view><view class="source-evidence-body" wx:if="{{evidenceOpen}}">{{form.sourceNote}}</view></view>
     </view>
 
     <view class="preview-wrap" wx:else>
+      <view class="ledger-card" wx:if="{{ledgerPosting && ledgerPosting.reversed}}"><view><text>「{{ledgerPosting.factoryName}}」账本里的这笔已冲销</text><text>原流水 {{ledgerPosting.transactionNo}} · 拿货 ¥{{ledgerPosting.amount}}</text></view></view>
+      <view class="ledger-card posted" wx:elif="{{ledgerPosting}}"><view><text>已记入「{{ledgerPosting.factoryName}}」账本</text><text>拿货 ¥{{ledgerPosting.amount}} · {{ledgerPosting.date}} · 流水 {{ledgerPosting.transactionNo}}</text></view></view>
+      <view class="ledger-card" wx:elif="{{document && document.status === 'CONFIRMED'}}"><view><text>还没记入厂家账本</text><text>选一家工厂，记为这家的一笔拿货</text></view><view class="ledger-action" wx:if="{{ledgerIndex}}" bindtap="postToLedger">{{ledgerBusy ? '记账中…' : '记入' + ledgerName}}</view><picker wx:else range="{{ledgerNames}}" value="{{ledgerIndex}}" bindchange="chooseLedgerForSaved"><view class="ledger-action">{{ledgerBusy ? '记账中…' : '选择账本'}}</view></picker></view>
       <view class="preview-hint"><text>{{document && document.status === 'CONFIRMED' ? '这是已保存版本' : '预览会随编辑内容同步更新'}}</text><view wx:if="{{incompleteCount}}">{{incompleteCount}} 行待补齐</view></view>
       <view class="receipt-paper">
         <view class="receipt-company">{{form.companyName || '恒迪模具五金'}}</view>
@@ -78,7 +96,8 @@
         </view>
         <view class="receipt-footer"><view><text>备注</text><text class="receipt-footer-value">{{form.remark || '无'}}</text></view><view class="receipt-notice">请当面核对商品、数量和金额；本单据仅用于打印和导出。</view></view>
       </view>
-      <view class="image-export-card"><view><text>保存为图片</text><text>生成清晰长图，可直接发微信或打印</text></view><view class="image-export-action" bindtap="saveAsImage">{{imageBusy ? '生成中…' : '保存到相册'}}</view></view>
+      <view class="fix-card" wx:if="{{document && document.status !== 'DRAFT'}}"><view><text>{{document.status === 'VOIDED' ? '这张单已作废' : '开错了？'}}</text><text>{{document.status === 'VOIDED' ? '可以复制内容重新开一张' : '作废后会自动冲销账本里的这笔；也可以复制后改一张新单'}}</text></view><view class="fix-actions"><view class="fix-action" bindtap="copyAsNew">复制为新单</view><view class="fix-action danger" wx:if="{{document.status === 'CONFIRMED'}}" bindtap="voidDocument">作废</view></view></view>
+      <view class="image-export-card" wx:if="{{!document || document.status !== 'VOIDED'}}"><view><text>保存为图片</text><text>生成清晰长图，可直接发微信或打印</text></view><view class="image-export-action" bindtap="saveAsImage">{{imageBusy ? '生成中…' : '保存到相册'}}</view></view>
     </view>
     <canvas type="2d" id="billingImageCanvas" class="billing-image-canvas"></canvas>
     <view class="action-notice" wx:if="{{actionError}}"><view><text>操作没有完成</text><text>{{actionError}}</text></view><view class="notice-retry" wx:if="{{actionRetry}}" bindtap="retryAction">{{actionRetryText}}</view></view>
@@ -86,8 +105,9 @@
 
     <view class="billing-bar">
       <view class="billing-summary"><text>合计</text><text class="billing-summary-value">¥{{totalText}}</text><text class="billing-summary-status">{{statusText}}</text></view>
-      <view class="bar-actions" wx:if="{{document && document.status === 'CONFIRMED'}}"><view class="secondary-action" wx:if="{{generatedFile}}" bindtap="openGenerated">打开 Excel</view><view class="primary-action" bindtap="chooseExportFormat">{{busy || imageBusy ? '处理中…' : '选择导出'}}</view></view>
-      <view class="bar-actions" wx:else><view class="secondary-action" wx:if="{{mode === 'edit'}}" bindtap="saveDraft">保存草稿</view><view class="secondary-action" wx:else data-mode="edit" bindtap="setMode">返回修改</view><view class="primary-action" bindtap="confirmDocument">{{busy ? '处理中…' : '保存并导出'}}</view></view>
+      <view class="bar-actions" wx:if="{{document && document.status === 'VOIDED'}}"><view class="primary-action" bindtap="copyAsNew">复制为新单</view></view>
+      <view class="bar-actions" wx:elif="{{document && document.status === 'CONFIRMED'}}"><view class="secondary-action" wx:if="{{generatedFile}}" bindtap="openGenerated">打开 Excel</view><view class="primary-action" bindtap="chooseExportFormat">{{busy || imageBusy ? '处理中…' : '选择导出'}}</view></view>
+      <view class="bar-actions" wx:else><view class="secondary-action" wx:if="{{mode === 'edit'}}" bindtap="saveDraft">保存草稿</view><view class="secondary-action" wx:else data-mode="edit" bindtap="setMode">返回修改</view><view class="primary-action" bindtap="confirmDocument">{{busy || ledgerBusy ? '处理中…' : (ledgerIndex ? '保存并记账' : '保存并导出')}}</view></view>
     </view>
   </block>
 </view>

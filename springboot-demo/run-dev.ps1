@@ -24,6 +24,13 @@ if (Test-Path $agentConfigPath) {
     }
     Write-Host "Loaded local Agent settings from agent.local.env (file is excluded from Git)."
 }
+# Demo data is only loaded into a local MySQL. When DB_HOST points elsewhere (e.g. a cloud database)
+# it is never loaded, because demo-data.sql overwrites rows that share an id with real data.
+$localDbHost = [string]::IsNullOrWhiteSpace($env:DB_HOST) -or @('127.0.0.1', 'localhost') -contains $env:DB_HOST.Trim()
+if ($localDbHost -and [string]::IsNullOrWhiteSpace($env:SPRING_SQL_INIT_DATA_LOCATIONS)) {
+    $env:SPRING_SQL_INIT_DATA_LOCATIONS = 'classpath:demo-data.sql'
+    Write-Host "Local MySQL detected: demo-data.sql will be loaded."
+}
 if ($env:AGENT_MODEL_ENABLED -eq 'true' -and [string]::IsNullOrWhiteSpace($env:AGENT_MODEL_API_KEY)) {
     $env:AGENT_MODEL_ENABLED = 'false'
     Write-Warning "AGENT_MODEL_API_KEY is empty. Model calls are disabled for this run; fill the key in agent.local.env and restart to enable them."

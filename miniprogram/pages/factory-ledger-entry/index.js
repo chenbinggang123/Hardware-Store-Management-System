@@ -45,7 +45,11 @@ Page({
       success: (result) => {
         if (!result.confirm) return
         this.setData({ saving: true })
-        api.addFactoryLedgerTransaction(this.data.ledgerId, form).then(() => {
+        api.addFactoryLedgerTransaction(this.data.ledgerId, form).then((saved) => {
+          if (saved && saved.warning) {
+            wx.showModal({ title: '已经记到账本', content: saved.warning, showCancel: false, success: () => wx.navigateBack() })
+            return
+          }
           wx.showToast({ title: '已经记到账本', icon: 'success' })
           setTimeout(() => wx.navigateBack(), 350)
         }).catch((error) => {

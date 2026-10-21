@@ -100,6 +100,8 @@ CREATE TABLE IF NOT EXISTS factory_ledger_transaction (
     source VARCHAR(32) NOT NULL,
     operator_id BIGINT,
     create_time DATETIME NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
+    reversal_of_id BIGINT NULL,
     UNIQUE KEY uk_factory_transaction_no (transaction_no),
     UNIQUE KEY uk_factory_ledger_receipt (ledger_id, receipt_no),
     KEY idx_factory_transaction_ledger_date (ledger_id, transaction_date, create_time)
@@ -865,3 +867,37 @@ CREATE TABLE IF NOT EXISTS operation_log (
     detail VARCHAR(255),
     create_time DATETIME NOT NULL
 );
+
+-- 登录令牌：只存 SHA-256，发布和重启后仍然有效。
+CREATE TABLE IF NOT EXISTS auth_token (
+    token_hash CHAR(64) PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    expires_at DATETIME(6) NOT NULL,
+    last_seen_at DATETIME(6) NOT NULL,
+    create_time DATETIME(6) NOT NULL,
+    KEY idx_auth_token_user (user_id),
+    KEY idx_auth_token_expires (expires_at)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- 2026-10-21 工厂账本红字冲销：旧库补列，可重复执行。
+SET @add_factory_tx_status = (
+    SELECT IF(COUNT(*) = 0,
+              'ALTER TABLE factory_ledger_transaction ADD COLUMN status VARCHAR(16) NOT NULL DEFAULT ''ACTIVE''',
+              'SELECT 1')
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'factory_ledger_transaction' AND column_name = 'status'
+);
+PREPARE add_factory_tx_status_stmt FROM @add_factory_tx_status;
+EXECUTE add_factory_tx_status_stmt;
+DEALLOCATE PREPARE add_factory_tx_status_stmt;
+
+SET @add_factory_tx_reversal = (
+    SELECT IF(COUNT(*) = 0,
+              'ALTER TABLE factory_ledger_transaction ADD COLUMN reversal_of_id BIGINT NULL',
+              'SELECT 1')
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'factory_ledger_transaction' AND column_name = 'reversal_of_id'
+);
+PREPARE add_factory_tx_reversal_stmt FROM @add_factory_tx_reversal;
+EXECUTE add_factory_tx_reversal_stmt;
+DEALLOCATE PREPARE add_factory_tx_reversal_stmt;

@@ -1,0 +1,32 @@
+<view class="screen">
+  <view class="page-heading">
+    <view class="page-heading-copy">
+      <view class="page-kicker">开单记录</view>
+      <view class="section-title">开过的单都在这里</view>
+      <view class="page-description">共 {{total}} 张，可按单号、客户或商品查找</view>
+    </view>
+    <view class="btn btn-primary btn-sm" bindtap="openCreate">＋ 开单</view>
+  </view>
+
+  <view class="record-search"><input value="{{keyword}}" placeholder="搜单号、客户或商品" bindinput="changeKeyword" confirm-type="search" /><text wx:if="{{keyword}}" bindtap="clearKeyword">×</text></view>
+
+  <view class="loading-state" wx:if="{{loading}}">正在加载开单记录…</view>
+  <view class="list" wx:elif="{{items.length}}">
+    <view class="list-card" wx:for="{{items}}" wx:key="id" data-id="{{item.id}}" bindtap="openDocument">
+      <view class="list-head">
+        <view style="flex:1; min-width:0;">
+          <view class="list-title">{{item.title}}</view>
+          <view class="list-meta">{{item.meta}}</view>
+        </view>
+        <view class="record-total">¥{{item.totalText}}</view>
+      </view>
+      <view class="tag {{item.statusTone}}">{{item.statusText}}</view>
+    </view>
+    <view class="record-end" wx:if="{{loadingMore}}">正在加载更多…</view>
+    <view class="record-end" wx:elif="{{totalPages && page + 1 >= totalPages}}">已经到底了</view>
+  </view>
+  <view class="empty-state" wx:else>
+    <view class="empty-title">{{keyword ? '没有找到相关单据' : '还没有开过单'}}</view>
+    <view class="empty-desc">点右上角“开单”开始第一张</view>
+  </view>
+</view>

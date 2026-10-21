@@ -56,16 +56,6 @@ public class SettingsController {
         return ApiResponse.ok("用户状态更新成功", settingsService.updateUserStatus(id, status));
     }
 
-    @PostMapping("/backup")
-    public ApiResponse<Map<String, Object>> backup() {
-        return ApiResponse.ok("系统备份执行成功", settingsService.backup());
-    }
-
-    @PostMapping("/restore")
-    public ApiResponse<Map<String, Object>> restore(@RequestParam String backupName) {
-        return ApiResponse.ok("系统恢复执行成功", settingsService.restore(backupName));
-    }
-
     @GetMapping("/logs")
     public ApiResponse<List<OperationLog>> getLogs(
             @RequestParam(required = false) String module,

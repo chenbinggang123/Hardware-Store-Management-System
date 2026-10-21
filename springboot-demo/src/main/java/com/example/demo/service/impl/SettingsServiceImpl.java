@@ -4,8 +4,10 @@ import com.example.demo.entity.AppUser;
 import com.example.demo.entity.OperationLog;
 import com.example.demo.repository.AppUserRepository;
 import com.example.demo.repository.OperationLogRepository;
+import com.example.demo.security.AuthTokenStore;
 import com.example.demo.security.PasswordSupport;
 import com.example.demo.service.SettingsService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -26,10 +28,18 @@ public class SettingsServiceImpl implements SettingsService {
 
     private final AppUserRepository appUserRepository;
     private final OperationLogRepository operationLogRepository;
+    private final AuthTokenStore authTokenStore;
 
     public SettingsServiceImpl(AppUserRepository appUserRepository, OperationLogRepository operationLogRepository) {
+        this(appUserRepository, operationLogRepository, null);
+    }
+
+    @Autowired
+    public SettingsServiceImpl(AppUserRepository appUserRepository, OperationLogRepository operationLogRepository,
+                               AuthTokenStore authTokenStore) {
         this.appUserRepository = appUserRepository;
         this.operationLogRepository = operationLogRepository;
+        this.authTokenStore = authTokenStore;
     }
 
     @Override
@@ -65,6 +75,7 @@ public class SettingsServiceImpl implements SettingsService {
         }
         AppUser existingUser = getUserById(id)
                 .orElseThrow(() -> new IllegalArgumentException("用户不存在，无法更新"));
+        String existingPassword = existingUser.getPassword();
         String password = StringUtils.hasText(user.getPassword())
                 ? PasswordSupport.encode(user.getPassword())
                 : existingUser.getPassword();
@@ -83,6 +94,9 @@ public class SettingsServiceImpl implements SettingsService {
             existingUser.setStatus(user.getStatus());
         }
         AppUser saved = appUserRepository.save(existingUser);
+        if (!password.equals(existingPassword) || !Integer.valueOf(1).equals(saved.getStatus())) {
+            revokeSessions(saved.getId());
+        }
         saveOperationLog(saved.getId(), "SETTINGS", "UPDATE_USER", "更新用户：" + saved.getUsername());
         return saved;
     }
@@ -105,32 +119,11 @@ public class SettingsServiceImpl implements SettingsService {
                 .orElseThrow(() -> new IllegalArgumentException("用户不存在，无法修改状态"));
         user.setStatus(status);
         AppUser saved = appUserRepository.save(user);
+        if (status != 1) {
+            revokeSessions(saved.getId());
+        }
         saveOperationLog(saved.getId(), "SETTINGS", "UPDATE_STATUS", "修改状态为：" + status);
         return saved;
-    }
-
-    @Override
-    public Map<String, Object> backup() {
-        saveOperationLog(1L, "SETTINGS", "BACKUP", "执行系统备份");
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("status", "SIMULATED");
-        result.put("backupName", "backup-" + LocalDateTime.now());
-        result.put("message", "当前为 MySQL 版本，备份接口返回模拟结果");
-        return result;
-    }
-
-    @Override
-    public Map<String, Object> restore(String backupName) {
-        if (!StringUtils.hasText(backupName)) {
-            throw new IllegalArgumentException("备份名称不能为空");
-        }
-        backupName = backupName.trim();
-        saveOperationLog(1L, "SETTINGS", "RESTORE", "执行系统恢复：" + backupName);
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("status", "SIMULATED");
-        result.put("backupName", backupName);
-        result.put("message", "当前为 MySQL 版本，恢复接口返回模拟结果");
-        return result;
     }
 
     @Override
@@ -140,6 +133,13 @@ public class SettingsServiceImpl implements SettingsService {
                 .filter(log -> !StringUtils.hasText(module) || module.equalsIgnoreCase(log.getModule()))
                 .filter(log -> operatorId == null || operatorId.equals(log.getOperatorId()))
                 .collect(Collectors.toList());
+    }
+
+    /** 改密码或禁用账号后，该用户所有设备必须重新登录。 */
+    private void revokeSessions(Long userId) {
+        if (authTokenStore != null) {
+            authTokenStore.removeUserSessions(userId);
+        }
     }
 
     private void saveOperationLog(Long operatorId, String module, String action, String detail) {

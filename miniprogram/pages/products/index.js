@@ -90,14 +90,19 @@ Page({
   openSale(event) {
     const product = this.data.products.find((item) => `${item.id}` === `${event.currentTarget.dataset.id}`)
     if (!product) return
-    wx.setStorageSync(PENDING_PROMPT_KEY, `帮我给客户开单，商品是“${product.name}”，数量和客户请问我。`)
-    wx.reLaunch({ url: '/pages/agent/index' })
+    // 直接打开快捷开单并带入这个商品，不再绕到小五对话
+    openPage('/pages/billing-editor/index', { productId: product.id })
   },
 
   openAdjust(event) {
     const inventoryId = event.currentTarget.dataset.inventoryId
-    if (!inventoryId) return showToast('这个商品还没有库存记录，请先编辑保存商品')
-    openPage('/pages/inventory-adjust/index', { id: inventoryId })
+    if (inventoryId) return openPage('/pages/inventory-adjust/index', { id: inventoryId })
+    // 还没有库存记录的商品：先自动建一条，再进入盘点
+    const productId = event.currentTarget.dataset.id
+    if (!productId) return showToast('没找到这个商品')
+    api.ensureInventory(productId)
+      .then((inventory) => openPage('/pages/inventory-adjust/index', { id: inventory.id }))
+      .catch(() => showToast('库存记录创建失败，请重试'))
   },
 
   manageProduct(event) {

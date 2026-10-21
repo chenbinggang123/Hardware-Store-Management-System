@@ -1,18 +1,19 @@
 <view class="screen">
-  <view class="flow-head"><view class="flow-step-label">第一步 · 建本</view><view class="flow-title">给这家工厂建一本电子账</view><view class="flow-desc">只填平时写在本子封面上的信息。保存前还会让你核对一次。</view></view>
+  <view class="flow-head" wx:if="{{!id}}"><view class="flow-step-label">第一步 · 建本</view><view class="flow-title">给这家工厂建一本电子账</view><view class="flow-desc">只填平时写在本子封面上的信息。保存前还会让你核对一次。</view></view>
+  <view class="flow-head" wx:else><view class="flow-title">修改账本资料</view><view class="flow-desc">只改名称和联系方式，金额和流水不受影响。记错的流水请在明细里点“记错了”。</view></view>
   <view class="form-card">
     <view class="form-group"><view class="form-label">工厂名称（必填）</view><input class="form-input" value="{{form.factoryName}}" data-field="factoryName" bindinput="updateField" placeholder="例如：陈志生模具厂" maxlength="40" /></view>
     <view class="grid-2">
       <view class="form-group"><view class="form-label">联系人</view><input class="form-input" value="{{form.contactPerson}}" data-field="contactPerson" bindinput="updateField" placeholder="例如：陈会计" maxlength="20" /></view>
       <view class="form-group"><view class="form-label">联系电话</view><input class="form-input" value="{{form.phone}}" data-field="phone" bindinput="updateField" placeholder="手机号或座机" type="number" maxlength="20" /></view>
     </view>
-    <view class="form-group"><view class="form-label">启用日期</view><picker mode="date" value="{{form.startDate}}" bindchange="selectDate"><view class="form-picker">{{form.startDate}} ›</view></picker></view>
+    <view class="form-group" wx:if="{{!id}}"><view class="form-label">启用日期</view><picker mode="date" value="{{form.startDate}}" bindchange="selectDate"><view class="form-picker">{{form.startDate}} ›</view></picker></view>
     <view class="grid-2">
-      <view class="form-group"><view class="form-label">期初未结余额（元）</view><input class="form-input" value="{{form.openingBalance}}" data-field="openingBalance" bindinput="updateField" type="digit" placeholder="0.00" /></view>
+      <view class="form-group" wx:if="{{!id}}"><view class="form-label">期初未结余额（元）</view><input class="form-input" value="{{form.openingBalance}}" data-field="openingBalance" bindinput="updateField" type="digit" placeholder="0.00" /></view>
       <view class="form-group"><view class="form-label">每月结账日</view><input class="form-input" value="{{form.settlementDay}}" data-field="settlementDay" bindinput="updateField" type="number" maxlength="2" /></view>
     </view>
     <view class="form-group"><view class="form-label">备注</view><textarea class="form-textarea" value="{{form.remark}}" data-field="remark" bindinput="updateField" placeholder="例如：每月月底带单子去财务处核对" maxlength="200" /></view>
   </view>
   <view class="fixed-action-space"></view>
-  <view class="fixed-action"><button class="fixed-primary {{saving ? 'disabled' : ''}}" disabled="{{saving}}" bindtap="submit">{{saving ? '正在建立…' : '下一步：核对并建立'}}</button></view>
+  <view class="fixed-action"><button class="fixed-primary {{saving ? 'disabled' : ''}}" disabled="{{saving}}" bindtap="submit">{{saving ? '正在保存…' : (id ? '保存资料' : '下一步：核对并建立')}}</button></view>
 </view>

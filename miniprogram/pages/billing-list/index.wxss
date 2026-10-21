@@ -1,0 +1,6 @@
+.record-search { height: 76rpx; margin: 8rpx 0 18rpx; padding: 0 20rpx; display: flex; align-items: center; gap: 12rpx; border: 1rpx solid #CBD6D0; border-radius: 14rpx; background: #FFFFFF; box-sizing: border-box; }
+.record-search input { flex: 1; height: 74rpx; font-size: 26rpx; }
+.record-search text { color: #7A8680; font-size: 34rpx; padding: 0 6rpx; }
+.record-total { flex: 0 0 auto; color: #18231E; font-size: 30rpx; font-weight: 760; font-variant-numeric: tabular-nums; }
+.record-end { padding: 24rpx 0 40rpx; color: #89938E; font-size: 22rpx; text-align: center; }
+.tag-neutral { color: #5E6B65; background: #E8ECEA; }

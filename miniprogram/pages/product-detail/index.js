@@ -89,8 +89,12 @@ Page({
   },
 
   openInventoryAdjust() {
-    if (!this.data.product || !this.data.product.inventoryId) return showToast('这个商品还没有库存记录')
-    openPage('/pages/inventory-adjust/index', { id: this.data.product.inventoryId })
+    const product = this.data.product
+    if (!product) return
+    if (product.inventoryId) return openPage('/pages/inventory-adjust/index', { id: product.inventoryId })
+    api.ensureInventory(product.id)
+      .then((inventory) => openPage('/pages/inventory-adjust/index', { id: inventory.id }))
+      .catch(() => showToast('库存记录创建失败，请重试'))
   },
 
   openInventoryLogs() {

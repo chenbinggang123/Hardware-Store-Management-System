@@ -60,6 +60,16 @@ public class InventoryController {
         return ApiResponse.ok("库存日志查询成功", inventoryService.getInventoryLogs(id));
     }
 
+    @PostMapping("/ensure")
+
+    public ApiResponse<Inventory> ensureForProduct(@RequestParam Long productId) {
+
+        return ApiResponse.ok("库存记录已就绪", inventoryService.ensureForProduct(productId));
+
+    }
+
+    
+
     @GetMapping("/warnings")
     public ApiResponse<List<Inventory>> getWarnings() {
         return ApiResponse.ok("库存预警查询成功", inventoryService.getWarnings());

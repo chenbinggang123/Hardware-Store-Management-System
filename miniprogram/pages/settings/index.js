@@ -1,37 +1,46 @@
 const api = require('../../utils/api')
 const { openPage, showToast } = require('../../utils/router')
 
+// 不常用、只给管理员用的功能都收在这里，侧栏只保留日常要用的入口。
+const MORE_TOOLS = [
+  { mark: '月', title: '月度汇总', desc: '本月开单、各厂拿货、收款和应收', path: '/pages/monthly-summary/index' },
+  { mark: '单', title: '销售单（旧）', desc: '扣库存、记客户欠款的旧开单方式', path: '/pages/sales-orders/index' },
+  { mark: '往', title: '往来账', desc: '旧的应收应付记录，只读核对用', path: '/pages/finance-ledger/index' },
+  { mark: '客', title: '客户与进货厂家', desc: '维护名称、联系人和电话', path: '/pages/contacts/index' },
+  { mark: '价', title: '价格变化记录', desc: '追溯进价和售价变化', path: '/pages/price-history/index' },
+  { mark: '导', title: '批量导入', desc: '用 Excel 或价格表图片批量导入商品和价格', path: '/pages/excel-tasks/index' }
+]
+
 Page({
   data: {
     currentUser: {},
     userInitial: '管',
+    isAdmin: false,
+    moreTools: MORE_TOOLS,
     users: [],
-    logs: [],
-    lastBackup: null
-  },
-
-  onLoad() {
-    const app = getApp()
-    const currentUser = app.globalData.currentUser || {}
-    this.setData({
-      currentUser,
-      userInitial: currentUser.name ? String(currentUser.name).slice(0, 1) : '管'
-    })
+    logs: []
   },
 
   onShow() {
-    const app = getApp()
-    const currentUser = app.globalData.currentUser || {}
+    const currentUser = getApp().globalData.currentUser || {}
+    const isAdmin = currentUser.role === 'ADMIN'
     this.setData({
       currentUser,
+      isAdmin,
       userInitial: currentUser.name ? String(currentUser.name).slice(0, 1) : '管'
     })
+    if (!isAdmin) return
     Promise.all([api.getUsers(), api.getLogs()]).then(([users, logs]) => {
       this.setData({
         users,
         logs: Array.isArray(logs) ? logs.slice(0, 4) : []
       })
-    })
+    }).catch(() => {})
+  },
+
+  openTool(event) {
+    const path = event.currentTarget.dataset.path
+    if (path) openPage(path)
   },
 
   openUsers() {
@@ -40,24 +49,6 @@ Page({
 
   openLogs() {
     openPage('/pages/system-logs/index')
-  },
-
-  openContacts() { openPage('/pages/contacts/index') },
-  openReports() { openPage('/pages/report-center/index') },
-  openPurchases() { openPage('/pages/purchase-orders/index') },
-
-  backupNow() {
-    api.backupSystem().then((result) => {
-      this.setData({ lastBackup: result })
-      showToast('备份完成', 'success')
-    })
-  },
-
-  restoreLast() {
-    const backupName = (this.data.lastBackup && this.data.lastBackup.backupName) || 'latest-backup'
-    api.restoreSystem(backupName).then(() => {
-      showToast('恢复结果已返回', 'success')
-    })
   },
 
   logout() {

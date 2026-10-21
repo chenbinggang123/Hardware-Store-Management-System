@@ -50,26 +50,7 @@
       </view>
 
       <view class="history-section-head nav-heading"><view><view class="history-section-label">功能导航</view><view class="history-section-note">按业务分类查找</view></view></view>
-      <view class="drawer-nav-panel"><view class="drawer-group">
-        <view class="drawer-group-head" role="button" data-section="businessExpanded" bindtap="toggleDrawerSection"><view class="drawer-group-copy"><text>经营</text><text>销售 · 采购 · 库存</text></view><view class="drawer-chevron {{businessExpanded ? 'open' : ''}}"></view></view>
-        <view class="drawer-group-body" wx:if="{{businessExpanded}}"><view data-route="sales" bindtap="openDrawerPage">销售单</view><view data-route="purchases" bindtap="openDrawerPage">采购单</view><view data-route="inventory" bindtap="openDrawerPage">库存盘点</view></view>
-      </view>
-      <view class="drawer-group">
-        <view class="drawer-group-head" role="button" data-section="contactsExpanded" bindtap="toggleDrawerSection"><view class="drawer-group-copy"><text>往来与财务</text><text>客户 · 供应商 · 账本</text></view><view class="drawer-chevron {{contactsExpanded ? 'open' : ''}}"></view></view>
-        <view class="drawer-group-body" wx:if="{{contactsExpanded}}"><view data-route="finance" bindtap="openDrawerPage">往来账</view><view data-route="customers" bindtap="openDrawerPage">客户</view><view data-route="suppliers" bindtap="openDrawerPage">供应商</view><view data-route="factories" bindtap="openDrawerPage">工厂账本</view></view>
-      </view>
-      <view class="drawer-group">
-        <view class="drawer-group-head" role="button" data-section="catalogExpanded" bindtap="toggleDrawerSection"><view class="drawer-group-copy"><text>商品</text><text>商品库 · 价格 · 映射</text></view><view class="drawer-chevron {{catalogExpanded ? 'open' : ''}}"></view></view>
-        <view class="drawer-group-body" wx:if="{{catalogExpanded}}"><view data-route="products" bindtap="openDrawerPage">商品库</view><view data-route="prices" bindtap="openDrawerPage">价格记录</view><view data-route="mappings" bindtap="openDrawerPage">商品映射</view></view>
-      </view>
-      <view class="drawer-group">
-        <view class="drawer-group-head" role="button" data-section="filesExpanded" bindtap="toggleDrawerSection"><view class="drawer-group-copy"><text>文件与报表</text><text>文件任务 · 报表中心</text></view><view class="drawer-chevron {{filesExpanded ? 'open' : ''}}"></view></view>
-        <view class="drawer-group-body" wx:if="{{filesExpanded}}"><view data-route="files" bindtap="openDrawerPage">我的文件</view><view data-route="excel" bindtap="openDrawerPage">文件任务</view><view data-route="reports" bindtap="openDrawerPage">报表中心</view></view>
-      </view>
-      <view class="drawer-group">
-        <view class="drawer-group-head" role="button" data-section="settingsExpanded" bindtap="toggleDrawerSection"><view class="drawer-group-copy"><text>设置与帮助</text><text>账号 · 系统设置</text></view><view class="drawer-chevron {{settingsExpanded ? 'open' : ''}}"></view></view>
-        <view class="drawer-group-body" wx:if="{{settingsExpanded}}"><view data-route="settings" bindtap="openDrawerPage">账号与系统设置</view></view>
-      </view></view>
+      <view class="drawer-nav-panel"><view class="drawer-group"><view class="drawer-group-body drawer-flat"><view data-route="billingList" bindtap="openDrawerPage">开单记录</view><view data-route="factories" bindtap="openDrawerPage">工厂账本</view><view data-route="products" bindtap="openDrawerPage">商品（含库存）</view><view data-route="purchases" bindtap="openDrawerPage">进货</view><view data-route="files" bindtap="openDrawerPage">文件</view><view data-route="settings" bindtap="openDrawerPage">设置与更多工具</view></view></view></view>
     </scroll-view>
     <view class="drawer-foot">正式业务操作始终需要你确认</view>
   </view>
@@ -152,7 +133,7 @@
     <view class="run-progress-track"><view class="{{run.progressPercent ? 'determinate' : ''}}" style="width: {{run.progressPercent ? run.progressPercent + '%' : '38%'}};"></view></view>
     <view class="run-progress-count" wx:if="{{run.progressTotal}}">已完成 {{run.progressCompleted}} / {{run.progressTotal}}<text wx:if="{{run.issueCount}}"> · {{run.issueCount}} 个问题待确认</text></view>
     <view class="run-progress-note">{{run.canLeave ? '可以先去别的页面，任务会继续处理，回来后从最近会话查看。' : '请暂时留在当前页面，完成后会立即显示结果。'}}</view>
-    <view class="run-progress-actions"><view class="run-progress-action secondary" wx:if="{{run.canCancel}}" bindtap="cancelRun">{{cancelling ? '正在取消…' : '取消任务'}}</view><view class="run-progress-action" bindtap="openWorkbench">查看财务</view></view>
+    <view class="run-progress-actions"><view class="run-progress-action secondary" wx:if="{{run.canCancel}}" bindtap="cancelRun">{{cancelling ? '正在取消…' : '取消任务'}}</view><view class="run-progress-action" bindtap="openWorkbench">查看账本</view></view>
   </view>
   <view class="network-state" wx:if="{{connectionInterrupted}}"><view><view class="network-title">网络连接中断</view><view class="network-desc">任务可能仍在后台处理，当前会话已经保留。</view></view><view class="network-retry" bindtap="retryConnection">重新连接</view></view>
 
@@ -234,7 +215,7 @@
   <view class="result-sheet tone-{{run.statusTone}}" wx:if="{{run && run.status !== 'WAITING_APPROVAL' && run.status !== 'RUNNING'}}">
     <view class="result-status">{{run.statusText}}</view><view class="result-copy">{{run.status === 'COMPLETED' ? (run.files && run.files.length ? '文件已放在上面的回复里，可以打开、转发，或让小五继续修改。' : '结果已显示在上方，可以继续提问或去对应页面查看。') : run.status === 'PARTIAL' ? '部分内容已经完成，请查看上方说明和未完成项目。' : run.status === 'FAILED' ? '这次没有完成，原来的输入和附件仍可继续使用。' : '任务已经结束，说明保留在当前会话中。'}}</view>
     <view class="result-summary-grid" wx:if="{{run.summary}}"><view><text>{{run.summary.successCount || 0}}</text><text>完成</text></view><view><text>{{run.summary.skippedCount || 0}}</text><text>跳过</text></view><view class="danger"><text>{{run.summary.failedCount || 0}}</text><text>失败</text></view></view>
-    <view class="result-actions"><view wx:for="{{run.actions}}" wx:key="label" data-target="{{item.target}}" data-params="{{item.params}}" bindtap="openResultAction">{{item.label}}</view><view bindtap="openMyFiles">{{run.files && run.files.length ? '全部生成的文件' : '我的文件'}}</view><view bindtap="openWorkbench">查看财务</view><view wx:if="{{run.status === 'FAILED' || (run.retry && run.retry.supported)}}" bindtap="retryLastMessage">重新输入并重试</view></view>
+    <view class="result-actions"><view wx:for="{{run.actions}}" wx:key="label" data-target="{{item.target}}" data-params="{{item.params}}" bindtap="openResultAction">{{item.label}}</view><view bindtap="openMyFiles">{{run.files && run.files.length ? '全部生成的文件' : '我的文件'}}</view><view bindtap="openWorkbench">查看账本</view><view wx:if="{{run.status === 'FAILED' || (run.retry && run.retry.supported)}}" bindtap="retryLastMessage">重新输入并重试</view></view>
   </view>
   <view id="conversation-end" class="conversation-end"></view>
   </scroll-view>

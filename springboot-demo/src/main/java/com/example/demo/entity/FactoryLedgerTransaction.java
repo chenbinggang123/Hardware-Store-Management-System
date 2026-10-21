@@ -37,6 +37,10 @@ public class FactoryLedgerTransaction {
     private String source;
     private Long operatorId;
     private LocalDateTime createTime;
+    /** ACTIVE：有效；REVERSED：已被红字冲销。冲销记录本身也是 ACTIVE，金额为负。 */
+    private String status = "ACTIVE";
+    /** 冲销记录指向被冲销的原记录。 */
+    private Long reversalOfId;
 
     @Lob
     @Column(name = "items_json")

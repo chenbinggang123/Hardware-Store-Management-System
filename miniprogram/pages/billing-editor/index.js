@@ -12,7 +12,7 @@ function blankLine() {
   return {
     name: '', specification: '', unit: '', quantity: '', price: '', remark: '', alias: '',
     candidateKey: '', referenceSource: '', referenceCategory: '', referenceAliases: [],
-    unitCandidates: [], referenceCaution: '', remember: false, sourceAmount: '', remarkOpen: false
+    unitCandidates: [], referenceCaution: '', remember: false, sourceAmount: '', remarkOpen: false, expanded: false
   }
 }
 
@@ -47,17 +47,20 @@ function lineView(line, index) {
   const calculated = q === null || p === null ? null : q * p
   const amountMismatch = sourceAmount !== null && calculated !== null && Math.abs(sourceAmount - calculated) > 0.009
   const caution = `${line.referenceCaution || ''} ${line.remark || ''}`
+  const nameUncertain = !String(line.name || '').trim() || /名称.*(?:疑|截断|待确认)/.test(caution)
+  const unitUncertain = !validUnit(line.unit) || /单位.*(?:未识别|待确认|疑)/.test(caution)
+  const quantityUncertain = q === null || q <= 0
+  const priceUncertain = p === null || p < 0 || amountMismatch
   return {
     ...blankLine(), ...line, quantity, price, index: index + 1,
     remarkOpen: line.remarkOpen === undefined ? Boolean(line.remark) : Boolean(line.remarkOpen),
     remarkToggleText: line.remarkOpen === undefined ? (line.remark ? '收起备注' : '＋ 添加备注') : (line.remarkOpen ? '收起备注' : (line.remark ? '查看备注' : '＋ 添加备注')),
     amountText: calculated === null ? '—' : money(calculated),
     unitChoices: (line.unitCandidates || []).slice(0, 4),
-    nameUncertain: !String(line.name || '').trim() || /名称.*(?:疑|截断|待确认)/.test(caution),
-    unitUncertain: !validUnit(line.unit) || /单位.*(?:未识别|待确认|疑)/.test(caution),
-    quantityUncertain: q === null || q <= 0,
-    priceUncertain: p === null || p < 0 || amountMismatch,
-    amountMismatch
+    nameUncertain, unitUncertain, quantityUncertain, priceUncertain, amountMismatch,
+    needsReview: nameUncertain || unitUncertain || quantityUncertain || priceUncertain,
+    inCatalog: String(line.candidateKey || '').indexOf('product:') === 0,
+    expanded: Boolean(line.expanded)
   }
 }
 
@@ -67,6 +70,7 @@ function formView(content) {
     companyName: source.companyName || '恒迪模具五金',
     phone: source.phone || '',
     customerName: source.customerName || '',
+    ledgerId: source.ledgerId || null,
     date: source.date || today(),
     remark: source.remark || '',
     sourceNote: source.sourceNote || ''
@@ -81,14 +85,22 @@ function errorText(error, fallback) {
   if (/No static resource\s+billing\/documents/i.test(text) || /billing\/documents.*404/i.test(text)) {
     return '云端开单服务尚未更新，请发布最新后端后重试'
   }
+  if (/network socket|secure TLS|connection.*established/i.test(text)) {
+    return '当前环境无法写入系统相册，请在微信真机中重试'
+  }
+  if (/privacy agreement|api scope is not declared/i.test(text)) {
+    return '小程序后台尚未声明“使用你的相册（仅写入）”权限'
+  }
   return text || fallback
 }
 
 Page({
   data: {
     loading: true, error: '', busy: false, mode: 'preview', dirty: false,
-    documentId: null, document: null, form: formView(), lines: [lineView(blankLine(), 0)],
-    totalText: '0.00', incompleteCount: 1, reviewCount: 4, searchKeyword: '', candidates: [], searching: false,
+    documentId: null, document: null, form: formView(), lines: [lineView({ ...blankLine(), expanded: true }, 0)],
+    totalText: '0.00', incompleteCount: 1, reviewCount: 4, reviewLineCount: 1, searchKeyword: '', candidates: [], searching: false,
+    headerOpen: false, reviewOnly: false,
+    ledgers: [], ledgerNames: ['不记入账本'], ledgerIndex: 0, ledgerName: '', ledgerPosting: null, ledgerBusy: false,
     candidateTitle: '最近常用', activeLineIndex: null, evidenceOpen: false,
     statusText: '', actionError: '', actionRetry: '', actionRetryText: '', imageBusy: false, generatedFile: null
   },
@@ -96,8 +108,145 @@ Page({
   onLoad(options) {
     const id = Number(options.id)
     if (id) this.loadDocument(id)
-    else this.setData({ loading: false, mode: 'edit' }, () => this.recalculate())
+    else this.setData({ loading: false, mode: 'edit' }, () => {
+      this.recalculate()
+      if (options.productId) this.prefillProduct(options.productId)
+      if (options.copyFrom) this.copyFrom(options.copyFrom)
+    })
     this.searchProducts('')
+    this.loadLedgers()
+  },
+
+  // 复制为新单：带入原单的客户和商品，日期改为今天，保存后是一张新单号的单据。
+  copyFrom(sourceId) {
+    api.getBillingDocument(sourceId).then((source) => {
+      const content = (source && source.content) || {}
+      const lines = (content.lines && content.lines.length ? content.lines : [blankLine()])
+        .map((line) => ({ ...line, expanded: false }))
+      this.setData({
+        form: { ...formView(content), date: today() },
+        lines: lines.map(lineView),
+        dirty: true,
+        statusText: `从 ${source.number || '原单'} 复制，尚未保存`
+      }, () => {
+        this.recalculate()
+        this.syncLedgerIndex(true)
+      })
+    }).catch(() => wx.showToast({ title: '原单加载失败', icon: 'none' }))
+  },
+
+  copyAsNew() {
+    if (!this.data.documentId) return
+    openPage('/pages/billing-editor/index', { copyFrom: this.data.documentId })
+  },
+
+  // 作废：单据标为作废；如果已记入厂家账本，后端会自动红字冲销。
+  voidDocument() {
+    const document = this.data.document
+    if (!document || document.status !== 'CONFIRMED' || this.data.busy) return
+    const posted = this.data.ledgerPosting && !this.data.ledgerPosting.reversed
+    wx.showModal({
+      title: '作废这张单？',
+      content: '',
+      editable: true,
+      placeholderText: posted ? `会同时冲销「${this.data.ledgerPosting.factoryName}」的这笔拿货；写一句原因` : '写一句原因，例如开错了',
+      confirmText: '作废'
+    }).then((choice) => {
+      if (!choice.confirm) return
+      this.setData({ busy: true })
+      return api.voidBillingDocument(document.id, choice.content || '开错了')
+        .then(() => {
+          wx.showToast({ title: posted ? '已作废并冲销账本' : '已作废', icon: 'success' })
+          this.loadDocument(document.id)
+        })
+        .catch((error) => wx.showToast({ title: errorText(error, '作废失败'), icon: 'none', duration: 3000 }))
+        .finally(() => this.setData({ busy: false }))
+    })
+  },
+
+  // 从商品库点“开单”进来：第一行带入该商品，光标停在数量。
+  prefillProduct(productId) {
+    api.getProduct(productId).then((product) => {
+      if (!product) return
+      const line = lineView({
+        ...blankLine(), name: product.name || '', specification: product.spec || '', unit: product.unit || '',
+        price: product.retailPrice === null || product.retailPrice === undefined ? '' : product.retailPrice,
+        quantity: '1', candidateKey: `product:${product.id}`, referenceSource: '商品库', remember: true, expanded: true
+      }, 0)
+      this.setData({ lines: [line], dirty: true }, () => {
+        this.recalculate()
+        this.focusLineField(0, 'quantity')
+      })
+    }).catch(() => {})
+  },
+
+  // 厂家账本：开单时选一家，保存单据后自动记为这家的“拿货”。
+  loadLedgers() {
+    return api.getFactoryLedgers({}).then((result) => {
+      const ledgers = ((result && result.ledgers) || []).map((item) => ({ id: item.id, factoryName: item.factoryName }))
+      this.setData({ ledgers, ledgerNames: ['不记入账本'].concat(ledgers.map((item) => item.factoryName)) }, () => this.syncLedgerIndex(true))
+    }).catch(() => {})
+  },
+
+  syncLedgerIndex(autoMatch) {
+    const ledgers = this.data.ledgers
+    if (!ledgers.length) return // 账本列表还没加载完，保留单据里已选的账本
+    let ledgerId = this.data.form.ledgerId
+    if (!ledgerId && autoMatch && !(this.data.document && this.data.document.status === 'CONFIRMED')) {
+      const name = String(this.data.form.customerName || '').trim()
+      const matched = name && ledgers.find((item) => item.factoryName === name)
+      if (matched) ledgerId = matched.id
+    }
+    const index = ledgers.findIndex((item) => item.id === ledgerId)
+    this.setData({
+      'form.ledgerId': index >= 0 ? ledgerId : null,
+      ledgerIndex: index >= 0 ? index + 1 : 0,
+      ledgerName: index >= 0 ? ledgers[index].factoryName : ''
+    })
+  },
+
+  changeLedger(event) {
+    const index = Number(event.detail.value)
+    const ledger = index > 0 ? this.data.ledgers[index - 1] : null
+    const update = {
+      'form.ledgerId': ledger ? ledger.id : null, ledgerIndex: ledger ? index : 0, ledgerName: ledger ? ledger.factoryName : '',
+      dirty: true, statusText: '有修改尚未保存'
+    }
+    if (ledger && !String(this.data.form.customerName || '').trim()) update['form.customerName'] = ledger.factoryName
+    this.setData(update)
+  },
+
+  loadLedgerPosting(id) {
+    if (!id) return Promise.resolve(null)
+    return api.getBillingLedgerPosting(id).then((posting) => {
+      this.setData({ ledgerPosting: posting && posting.posted ? posting : null })
+      return posting
+    }).catch(() => null)
+  },
+
+  postToLedger(documentId) {
+    const id = Number(documentId) || Number(this.data.documentId)
+    const ledgerId = this.data.form.ledgerId
+    if (!id || !ledgerId || this.data.ledgerBusy) return Promise.resolve(null)
+    this.setData({ ledgerBusy: true, statusText: '正在记入厂家账本…' })
+    return api.postBillingToLedger(id, ledgerId).then((posting) => {
+      this.setData({ ledgerPosting: posting && posting.posted ? posting : null, actionError: '', actionRetry: '', actionRetryText: '', statusText: `已记入 ${posting.factoryName} 的账本` })
+      wx.showToast({ title: `已记入 ${posting.factoryName}`, icon: 'success' })
+      return posting
+    }).catch((error) => {
+      const message = errorText(error, '记账失败')
+      this.setData({ actionError: `单据已保存，但没有记入账本：${message}`, actionRetry: 'ledger', actionRetryText: '重新记账', statusText: '记账未完成' })
+      wx.showToast({ title: message, icon: 'none', duration: 3000 })
+      return null
+    }).finally(() => this.setData({ ledgerBusy: false }))
+  },
+
+  // 已保存但还没记账的单据：选厂家后直接补记。
+  chooseLedgerForSaved(event) {
+    const index = Number(event.detail.value)
+    const ledger = index > 0 ? this.data.ledgers[index - 1] : null
+    if (!ledger) return
+    this.setData({ 'form.ledgerId': ledger.id, ledgerIndex: index, ledgerName: ledger.factoryName }, () => this.postToLedger())
   },
 
   onUnload() { clearTimeout(this.searchTimer) },
@@ -113,31 +262,61 @@ Page({
     if (this.data.documentId) this.loadDocument(this.data.documentId)
   },
 
-  showDocument(document, keepPreview) {
+  showDocument(document, fresh) {
     const content = document.content || {}
+    const confirmed = document.status === 'CONFIRMED' || document.status === 'VOIDED'
+    // 保存草稿后保留当前展开的行；重新打开的草稿直接进入紧凑核对视图，已保存单据进入预览。
+    const previous = fresh ? [] : this.data.lines
+    const lines = (content.lines && content.lines.length ? content.lines : [blankLine()])
+      .map((line, index) => ({ ...line, expanded: Boolean(previous[index] && previous[index].expanded) }))
     this.setData({
       documentId: document.id,
       document,
       form: formView(content),
-      lines: (content.lines && content.lines.length ? content.lines : [blankLine()]).map(lineView),
-      mode: keepPreview ? 'preview' : this.data.mode,
+      lines: lines.map(lineView),
+      mode: confirmed ? 'preview' : (fresh ? 'edit' : this.data.mode),
+      reviewOnly: fresh ? false : this.data.reviewOnly,
       dirty: false,
-      statusText: document.status === 'CONFIRMED' ? `已保存 · ${document.number}` : `草稿 #${document.id} · 已保存`
-    }, () => this.recalculate())
+      statusText: document.status === 'VOIDED' ? `已作废 · ${document.number}` : (document.status === 'CONFIRMED' ? `已保存 · ${document.number}` : `草稿 #${document.id} · 已保存`)
+    }, () => {
+      this.recalculate()
+      this.syncLedgerIndex(fresh)
+      if (confirmed) this.loadLedgerPosting(document.id)
+      else this.setData({ ledgerPosting: null })
+    })
   },
 
   setMode(event) {
     const mode = event.currentTarget.dataset.mode
-    if (mode === 'edit' && this.data.document && this.data.document.status === 'CONFIRMED') {
-      return wx.showToast({ title: '已保存单据不能直接修改', icon: 'none' })
+    if (mode === 'edit' && this.data.document && this.data.document.status !== 'DRAFT') {
+      return wx.showToast({ title: '已保存单据不能直接修改，可“复制为新单”', icon: 'none' })
     }
     this.setData({ mode })
     if (mode === 'edit' && !this.data.searchKeyword) this.searchProducts('')
   },
 
+  toggleHeader() { this.setData({ headerOpen: !this.data.headerOpen }) },
+
+  toggleReviewOnly() { this.setData({ reviewOnly: !this.data.reviewOnly }) },
+
+  toggleLine(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    const target = this.data.lines[index]
+    if (!target) return
+    const open = !target.expanded
+    const lines = this.data.lines.map((line, lineIndex) => ({
+      ...line,
+      expanded: lineIndex === index ? open : false,
+      nameFocus: false, quantityFocus: false, priceFocus: false
+    }))
+    this.setData({ lines, activeLineIndex: null })
+  },
+
   changeForm(event) {
     const field = event.currentTarget.dataset.field
-    this.setData({ [`form.${field}`]: event.detail.value, dirty: true, actionError: '', actionRetry: '', actionRetryText: '', statusText: '有修改尚未保存' })
+    this.setData({ [`form.${field}`]: event.detail.value, dirty: true, actionError: '', actionRetry: '', actionRetryText: '', statusText: '有修改尚未保存' }, () => {
+      if (field === 'customerName' && !this.data.form.ledgerId) this.syncLedgerIndex(true)
+    })
   },
 
   changeDate(event) {
@@ -176,6 +355,7 @@ Page({
   focusLineField(index, field) {
     const lines = this.data.lines.map((line, lineIndex) => ({
       ...line,
+      expanded: lineIndex === index,
       nameFocus: lineIndex === index && field === 'name',
       quantityFocus: lineIndex === index && field === 'quantity',
       priceFocus: lineIndex === index && field === 'price'
@@ -244,6 +424,7 @@ Page({
     let total = 0
     let incompleteCount = 0
     let reviewCount = 0
+    let reviewLineCount = 0
     const lines = this.data.lines.map((line, index) => {
       const next = lineView(line, index)
       const q = decimal(next.quantity)
@@ -251,9 +432,10 @@ Page({
       if (q !== null && p !== null) total += q * p
       if (!next.name.trim() || !validUnit(next.unit) || q === null || q <= 0 || p === null || p < 0) incompleteCount += 1
       reviewCount += [next.nameUncertain, next.unitUncertain, next.quantityUncertain, next.priceUncertain].filter(Boolean).length
+      if (next.needsReview) reviewLineCount += 1
       return next
     })
-    this.setData({ lines, totalText: money(total), incompleteCount, reviewCount })
+    this.setData({ lines, totalText: money(total), incompleteCount, reviewCount, reviewLineCount, reviewOnly: reviewLineCount ? this.data.reviewOnly : false })
   },
 
   changeSearch(event) {
@@ -307,6 +489,27 @@ Page({
     })
   },
 
+  // 开单时新遇到的商品：一键加入商品库，以后在商品里能查到价格和库存。
+  addLineToCatalog(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    const line = this.data.lines[index]
+    if (!line || !line.name.trim() || this.addingProduct) return
+    if (!validUnit(line.unit)) return wx.showToast({ title: '先填上单位再加入商品库', icon: 'none' })
+    const price = decimal(line.price)
+    this.addingProduct = true
+    api.saveProduct({
+      name: line.name.trim(), spec: line.specification.trim(), unit: line.unit.trim(), barcode: '',
+      retailPrice: price === null ? 0 : price, wholesalePrice: 0, oldCustomerPrice: 0, costPrice: 0,
+      stock: 0, status: 1, locationId: '', sourceFactory: '', imageUrl: ''
+    }).then((product) => {
+      const lines = this.data.lines.slice()
+      lines[index] = lineView({ ...lines[index], candidateKey: `product:${product.id}`, referenceSource: '商品库' }, index)
+      this.setData({ lines, dirty: true })
+      wx.showToast({ title: '已加入商品库', icon: 'success' })
+    }).catch((error) => wx.showToast({ title: errorText(error, '加入失败'), icon: 'none', duration: 3000 }))
+      .finally(() => { this.addingProduct = false })
+  },
+
   toggleEvidence() { this.setData({ evidenceOpen: !this.data.evidenceOpen }) },
 
   payload() {
@@ -320,6 +523,7 @@ Page({
         nameFocus: undefined, quantityFocus: undefined, priceFocus: undefined,
         nameUncertain: undefined, unitUncertain: undefined, quantityUncertain: undefined,
         priceUncertain: undefined, amountMismatch: undefined, remarkOpen: undefined, remarkToggleText: undefined,
+        needsReview: undefined, expanded: undefined, inCatalog: undefined,
         name: line.name.trim(), specification: line.specification.trim(), unit: line.unit.trim(),
         quantity: line.quantity === '' ? null : line.quantity,
         price: line.price === '' ? null : line.price
@@ -354,22 +558,25 @@ Page({
     if (this.data.busy) return Promise.resolve()
     if (this.data.incompleteCount) {
       const message = `还有 ${this.data.incompleteCount} 行需要补齐名称、单位、数量和单价`
+      // 直接展开第一行未补齐的商品，省去用户自己找。
+      const first = this.data.lines.findIndex((line) => !line.name.trim() || !validUnit(line.unit)
+        || decimal(line.quantity) === null || decimal(line.quantity) <= 0 || decimal(line.price) === null)
+      if (this.data.mode !== 'edit') this.setData({ mode: 'edit' })
+      if (first >= 0) this.focusLineField(first, decimal(this.data.lines[first].quantity) === null ? 'quantity' : (decimal(this.data.lines[first].price) === null ? 'price' : 'name'))
       this.setData({ actionError: message, actionRetry: '', actionRetryText: '' })
       return wx.showToast({ title: message, icon: 'none', duration: 3000 })
     }
     this.setData({ actionError: '', actionRetry: '', actionRetryText: '' })
-    return wx.showModal({
-      title: '保存这张销售单？',
-      content: `共 ${this.data.lines.length} 项，合计 ¥${this.data.totalText}。保存后可选择图片或 Excel，本阶段不会登记销售和欠款。`,
-      confirmText: '保存并导出'
-    }).then((choice) => {
-      if (!choice.confirm) return
+    // 底部“保存并导出”就是唯一确认，不再弹二次确认框；单据不登记销售、欠款或库存。
+    return Promise.resolve().then(() => {
       return this.saveDraft().then((draft) => {
         if (!draft) return
         this.setData({ busy: true, statusText: '正在保存正式单据…' })
         return api.confirmBillingDocument(draft.id, draft.version).then((document) => {
           this.showDocument(document, true)
-          return this.chooseExportFormat(document.id)
+          // 选了厂家账本就顺手记账；记账失败不影响单据，可以重试。
+          const posting = this.data.form.ledgerId ? this.postToLedger(document.id) : Promise.resolve(null)
+          return posting.then(() => this.chooseExportFormat(document.id))
         }).catch((error) => {
           const message = errorText(error, '单据保存失败')
           this.setData({ actionError: `单据没有确认：${message}`, actionRetry: '', actionRetryText: '', statusText: '正式单据保存未完成' })
@@ -427,7 +634,17 @@ Page({
     this.setData({ imageBusy: true, actionError: '', actionRetry: '', actionRetryText: '', statusText: '正在生成单据图片…' })
     const content = { ...this.data.form, lines: this.data.lines }
     return renderAndSave(this, content, { number: this.data.document && this.data.document.number, total: this.data.totalText })
-      .then(() => {
+      .then((result) => {
+        if (result && result.mode === 'preview') {
+          const privacyMissing = /privacy agreement|api scope is not declared/i.test(result.originalError || '')
+          this.setData({
+            statusText: privacyMissing
+              ? '图片已生成；配置小程序相册隐私声明后可直接保存'
+              : '图片已生成并打开预览，请在微信真机中保存到相册'
+          })
+          wx.showToast({ title: privacyMissing ? '图片已生成，请先配置相册声明' : '图片已打开预览', icon: 'none', duration: 3000 })
+          return
+        }
         this.setData({ statusText: '单据图片已保存到手机相册' })
         wx.showToast({ title: '图片已保存到相册', icon: 'success' })
       }).catch((error) => {
@@ -441,5 +658,6 @@ Page({
     if (this.data.actionRetry === 'image') return this.saveAsImage()
     if (this.data.actionRetry === 'openExcel') return this.openGenerated()
     if (this.data.actionRetry === 'excel') return this.exportExcel()
+    if (this.data.actionRetry === 'ledger') return this.postToLedger()
   }
 })

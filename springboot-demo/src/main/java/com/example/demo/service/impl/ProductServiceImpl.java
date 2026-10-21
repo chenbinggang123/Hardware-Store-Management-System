@@ -1,5 +1,6 @@
 package com.example.demo.service.impl;
 
+import com.example.demo.common.CurrentOperator;
 import com.example.demo.entity.OperationLog;
 import com.example.demo.entity.Product;
 import com.example.demo.repository.OperationLogRepository;
@@ -41,9 +42,19 @@ public class ProductServiceImpl implements ProductService {
         this.priceHistoryService = priceHistoryService;
     }
 
+    private com.example.demo.repository.InventoryLogRepository inventoryLogRepository;
+    private com.example.demo.repository.InventoryRepository inventoryRepository;
+
+    @Autowired(required = false)
+    void setInventoryRepositories(com.example.demo.repository.InventoryLogRepository inventoryLogRepository,
+                                  com.example.demo.repository.InventoryRepository inventoryRepository) {
+        this.inventoryLogRepository = inventoryLogRepository;
+        this.inventoryRepository = inventoryRepository;
+    }
+
     @Override
     public Product saveProduct(Product product) {
-        return saveProduct(product, 1L);
+        return saveProduct(product, CurrentOperator.idOrNull());
     }
 
     @Override
@@ -62,7 +73,7 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public Product updateProduct(Product product) {
-        return updateProduct(product, 1L);
+        return updateProduct(product, CurrentOperator.idOrNull());
     }
 
     @Override
@@ -98,8 +109,15 @@ public class ProductServiceImpl implements ProductService {
     public void deleteProduct(Long id) {
         Product product = getProductById(id)
                 .orElseThrow(() -> new IllegalArgumentException("商品不存在，无法删除"));
+        // 有出入库或盘点记录的商品不能删，否则历史流水会找不到商品。
+        if (inventoryLogRepository != null && !inventoryLogRepository.findByProductIdOrderByCreateTimeDesc(id).isEmpty()) {
+            throw new IllegalArgumentException("这个商品已有出入库或盘点记录，不能删除；不再卖可以不管它");
+        }
+        if (inventoryRepository != null) {
+            inventoryRepository.findByProductId(id).ifPresent(inventoryRepository::delete);
+        }
         productRepository.deleteById(id);
-        saveOperationLog("PRODUCT", "DELETE", "删除商品：" + product.getName(), 1L);
+        saveOperationLog("PRODUCT", "DELETE", "删除商品：" + product.getName(), CurrentOperator.idOrNull());
     }
 
     @Override
@@ -126,7 +144,7 @@ public class ProductServiceImpl implements ProductService {
                 .orElseThrow(() -> new IllegalArgumentException("商品不存在，无法修改状态"));
         product.setStatus(status);
         productRepository.save(product);
-        saveOperationLog("PRODUCT", "UPDATE_STATUS", "修改商品状态：" + product.getName(), 1L);
+        saveOperationLog("PRODUCT", "UPDATE_STATUS", "修改商品状态：" + product.getName(), CurrentOperator.idOrNull());
     }
 
     private boolean matchesKeyword(Product product, String keyword) {
@@ -164,7 +182,8 @@ public class ProductServiceImpl implements ProductService {
             throw new IllegalArgumentException("商品名称不能为空");
         }
         if (!StringUtils.hasText(product.getBarcode())) {
-            throw new IllegalArgumentException("商品条码不能为空");
+            // 很多五金件没有条码：系统自动编一个内部编号，满足数据库唯一约束。
+            product.setBarcode("ZD" + System.currentTimeMillis() + UUID.randomUUID().toString().substring(0, 4).toUpperCase());
         }
         product.setName(product.getName().trim());
         product.setBarcode(product.getBarcode().trim());
@@ -196,7 +215,9 @@ public class ProductServiceImpl implements ProductService {
 
     private void mergeProduct(Product target, Product source) {
         target.setName(source.getName());
-        target.setBarcode(source.getBarcode());
+        if (StringUtils.hasText(source.getBarcode())) {
+            target.setBarcode(source.getBarcode());
+        }
         target.setSpec(source.getSpec());
         target.setUnit(source.getUnit());
         target.setUnitConvert(source.getUnitConvert());
@@ -204,7 +225,7 @@ public class ProductServiceImpl implements ProductService {
         target.setWholesalePrice(source.getWholesalePrice());
         target.setOldCustomerPrice(source.getOldCustomerPrice());
         target.setCostPrice(source.getCostPrice());
-        target.setStock(source.getStock());
+        // 库存数量只能通过盘点、出入库修改，编辑商品资料不改库存，避免商品表和库存表对不上。
         target.setLocationId(source.getLocationId());
         target.setSourceFactory(source.getSourceFactory());
         target.setImageUrl(source.getImageUrl());

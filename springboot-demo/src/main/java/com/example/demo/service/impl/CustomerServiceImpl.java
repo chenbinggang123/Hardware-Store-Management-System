@@ -1,5 +1,6 @@
 package com.example.demo.service.impl;
 
+import com.example.demo.common.CurrentOperator;
 import com.example.demo.entity.AccountRecord;
 import com.example.demo.entity.Customer;
 import com.example.demo.entity.OperationLog;
@@ -49,7 +50,7 @@ public class CustomerServiceImpl implements CustomerService {
             customer.setDebt(BigDecimal.ZERO);
         }
         Customer saved = customerRepository.save(customer);
-        saveOperationLog("CUSTOMER", "CREATE", "新增客户：" + saved.getName(), 1L);
+        saveOperationLog("CUSTOMER", "CREATE", "新增客户：" + saved.getName(), CurrentOperator.idOrNull());
         return saved;
     }
 
@@ -64,7 +65,7 @@ public class CustomerServiceImpl implements CustomerService {
         existingCustomer.setAddress(customer.getAddress());
         existingCustomer.setRemark(customer.getRemark());
         Customer saved = customerRepository.save(existingCustomer);
-        saveOperationLog("CUSTOMER", "UPDATE", "更新客户：" + saved.getName(), 1L);
+        saveOperationLog("CUSTOMER", "UPDATE", "更新客户：" + saved.getName(), CurrentOperator.idOrNull());
         return saved;
     }
 
@@ -76,7 +77,7 @@ public class CustomerServiceImpl implements CustomerService {
             throw new IllegalArgumentException("客户存在销售订单，不允许删除");
         }
         customerRepository.deleteById(id);
-        saveOperationLog("CUSTOMER", "DELETE", "删除客户：" + customer.getName(), 1L);
+        saveOperationLog("CUSTOMER", "DELETE", "删除客户：" + customer.getName(), CurrentOperator.idOrNull());
     }
 
     @Override

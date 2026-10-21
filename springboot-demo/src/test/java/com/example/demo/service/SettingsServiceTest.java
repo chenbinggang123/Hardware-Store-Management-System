@@ -87,14 +87,6 @@ class SettingsServiceTest {
         verify(appUserRepository, never()).save(any());
     }
 
-    @Test
-    void restoreRejectsBlankBackupNameAndReportsSimulation() {
-        assertThrows(IllegalArgumentException.class, () -> service.restore(" "));
-
-        assertEquals("SIMULATED", service.backup().get("status"));
-        assertTrue(service.backup().get("message").toString().contains("模拟"));
-    }
-
     private AppUser user(Long id, String username, String password, String role, Integer status) {
         AppUser user = new AppUser();
         user.setId(id);

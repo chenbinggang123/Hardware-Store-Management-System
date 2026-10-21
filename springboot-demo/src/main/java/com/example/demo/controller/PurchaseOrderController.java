@@ -25,12 +25,14 @@ public class PurchaseOrderController {
 
     @PostMapping
     public ApiResponse<PurchaseOrder> addPurchaseOrder(@RequestBody PurchaseOrder purchaseOrder) {
+        purchaseOrder.setOperatorId(com.example.demo.common.CurrentOperator.require());
         return ApiResponse.ok("采购单新增成功", purchaseOrderService.savePurchaseOrder(purchaseOrder));
     }
 
     @PutMapping("/{id}")
     public ApiResponse<PurchaseOrder> updatePurchaseOrder(@PathVariable Long id, @RequestBody PurchaseOrder purchaseOrder) {
         purchaseOrder.setId(id);
+        purchaseOrder.setOperatorId(com.example.demo.common.CurrentOperator.require());
         return ApiResponse.ok("采购单更新成功", purchaseOrderService.updatePurchaseOrder(purchaseOrder));
     }
 

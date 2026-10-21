@@ -1,0 +1,33 @@
+<view class="screen">
+  <view class="page-heading">
+    <view class="page-heading-copy">
+      <view class="page-kicker">月度汇总</view>
+      <view class="section-title">这个月的生意一页看完</view>
+      <view class="page-description">数据来自快捷开单和工厂账本</view>
+    </view>
+    <picker mode="date" fields="month" value="{{month}}" bindchange="changeMonth"><view class="btn btn-outline btn-sm">{{month}} ›</view></picker>
+  </view>
+
+  <view class="loading-state" wx:if="{{loading && !summary}}">正在汇总…</view>
+  <block wx:elif="{{summary}}">
+    <view class="sum-grid">
+      <view class="sum-cell" bindtap="openRecords"><text>开单</text><text class="sum-value">{{summary.billing.count}} 张</text><text class="sum-sub">¥{{summary.billing.amount}}<text wx:if="{{summary.billing.voidedCount}}"> · 作废 {{summary.billing.voidedCount}}</text></text></view>
+      <view class="sum-cell"><text>各厂拿货</text><text class="sum-value">¥{{summary.ledger.purchaseAmount}}</text><text class="sum-sub">退货 ¥{{summary.ledger.returnAmount}}</text></view>
+      <view class="sum-cell"><text>本月收款</text><text class="sum-value green">¥{{summary.ledger.paymentAmount}}</text><text class="sum-sub">{{summary.ledger.factoryCount}} 家工厂</text></view>
+      <view class="sum-cell strong" bindtap="openSettlements"><text>当前应收</text><text class="sum-value">¥{{summary.ledger.balanceAmount}}</text><text class="sum-sub">{{summary.ledger.owingCount}} 家还欠款 · 去对账 ›</text></view>
+    </view>
+
+    <view class="sum-section-title">各厂明细（按欠款从多到少）</view>
+    <view class="list" wx:if="{{summary.factories.length}}">
+      <view class="list-card" wx:for="{{summary.factories}}" wx:key="id" data-id="{{item.id}}" bindtap="openLedger">
+        <view class="list-head">
+          <view style="flex:1; min-width:0;"><view class="list-title">{{item.factoryName}}</view><view class="list-meta">拿货 ¥{{item.purchaseAmount}} · 收款 ¥{{item.paymentAmount}} · {{item.statusLabel}}</view></view>
+          <view class="sum-balance">¥{{item.balanceAmount}}</view>
+        </view>
+      </view>
+    </view>
+    <view class="empty-state" wx:else><view class="empty-title">还没有工厂账本</view><view class="empty-desc">在侧栏“工厂账本”里新建第一家</view></view>
+
+    <view class="sum-old" bindtap="openOldReports">查看旧版经营报表（基于销售单、采购单）›</view>
+  </block>
+</view>

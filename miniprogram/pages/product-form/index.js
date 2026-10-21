@@ -88,14 +88,6 @@ Page({
       showToast('请填写商品名称')
       return false
     }
-    if (!payload.barcode.trim()) {
-      showToast('请填写商品条码')
-      return false
-    }
-    if (!payload.spec.trim()) {
-      showToast('请填写商品规格')
-      return false
-    }
     if (!payload.unit.trim()) {
       showToast('请填写商品单位')
       return false
@@ -139,7 +131,7 @@ Page({
 
     api.getProducts().then((products) => {
       const duplicate = products.find((item) => {
-        return `${item.barcode || ''}`.trim() === payload.barcode
+        return payload.barcode && `${item.barcode || ''}`.trim() === payload.barcode
           && `${item.id}` !== `${this.data.id || ''}`
       })
 

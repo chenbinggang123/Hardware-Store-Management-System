@@ -12,11 +12,11 @@
       <input class="form-input" value="{{form.name}}" data-key="name" bindinput="updateField" placeholder="请输入商品名称" />
     </view>
     <view class="form-group">
-      <view class="form-label">条码 *</view>
-      <input class="form-input" value="{{form.barcode}}" data-key="barcode" bindinput="updateField" placeholder="请输入商品条码" />
+      <view class="form-label">条码</view>
+      <input class="form-input" value="{{form.barcode}}" data-key="barcode" bindinput="updateField" placeholder="选填，没有条码系统会自动编号" />
     </view>
     <view class="form-group">
-      <view class="form-label">规格 *</view>
+      <view class="form-label">规格</view>
       <input class="form-input" value="{{form.spec}}" data-key="spec" bindinput="updateField" placeholder="例如 16oz / 680W / 20mm" />
     </view>
     <view class="form-group">
@@ -63,9 +63,9 @@
 
   <view class="form-card">
     <view class="form-section-title">库存与状态</view>
-    <view class="form-group">
-      <view class="form-label">库存数量</view>
-      <input class="form-input" type="number" value="{{form.stock}}" data-key="stock" bindinput="updateField" placeholder="请输入库存数量" />
+    <view class="form-group" wx:if="{{!id}}">
+      <view class="form-label">期初库存</view>
+      <input class="form-input" type="number" value="{{form.stock}}" data-key="stock" bindinput="updateField" placeholder="现在店里有多少，以后改数量请用盘点" />
     </view>
     <view class="form-group">
       <view class="form-label">库位</view>

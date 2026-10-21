@@ -56,14 +56,21 @@ class MasterDataWorkflowTest {
     }
 
     @Test
+    void productWithoutBarcodeGetsAnInternalNumber() {
+        Product noBarcode = validProduct();
+        noBarcode.setBarcode("");
+        org.mockito.Mockito.when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Product saved = productService.saveProduct(noBarcode);
+
+        org.junit.jupiter.api.Assertions.assertTrue(saved.getBarcode().startsWith("ZD"));
+    }
+
+    @Test
     void productRejectsBlankRequiredFieldsAndInvalidNumbers() {
         Product blankName = validProduct();
         blankName.setName(" ");
         assertThrows(IllegalArgumentException.class, () -> productService.saveProduct(blankName));
-
-        Product blankBarcode = validProduct();
-        blankBarcode.setBarcode("");
-        assertThrows(IllegalArgumentException.class, () -> productService.saveProduct(blankBarcode));
 
         Product negativePrice = validProduct();
         negativePrice.setRetailPrice(new BigDecimal("-0.01"));

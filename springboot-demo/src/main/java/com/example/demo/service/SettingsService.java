@@ -17,7 +17,5 @@ public interface SettingsService {
     AppUser updateUser(Long id, AppUser user);
     AppUser updateUserRole(Long id, String role);
     AppUser updateUserStatus(Long id, Integer status);
-    Map<String, Object> backup();
-    Map<String, Object> restore(String backupName);
     List<OperationLog> getLogs(String module, Long operatorId);
 }

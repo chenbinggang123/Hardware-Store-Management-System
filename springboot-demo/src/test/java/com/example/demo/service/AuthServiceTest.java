@@ -126,6 +126,31 @@ class AuthServiceTest {
     }
 
     @Test
+    void fiveWrongPasswordsLockTheAccountForTenMinutes() {
+        AppUser user = enabledUser();
+        user.setPassword(PasswordSupport.encode("123456"));
+        when(appUserRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        java.util.concurrent.atomic.AtomicReference<java.time.Instant> now =
+                new java.util.concurrent.atomic.AtomicReference<>(java.time.Instant.parse("2026-10-21T08:00:00Z"));
+        java.time.Clock clock = new java.time.Clock() {
+            @Override public java.time.ZoneId getZone() { return java.time.ZoneOffset.UTC; }
+            @Override public java.time.Clock withZone(java.time.ZoneId zone) { return this; }
+            @Override public java.time.Instant instant() { return now.get(); }
+        };
+        AuthServiceImpl service = new AuthServiceImpl(appUserRepository, operationLogRepository, authTokenStore, clock);
+
+        for (int attempt = 0; attempt < 5; attempt++) {
+            assertUnauthorized(() -> service.login(loginRequest("admin", "wrong")));
+        }
+        ResponseStatusException locked = assertThrows(ResponseStatusException.class,
+                () -> service.login(loginRequest("admin", "123456")));
+        assertEquals(429, locked.getStatusCode().value());
+
+        now.set(now.get().plus(java.time.Duration.ofMinutes(10)));
+        assertNotNull(service.login(loginRequest("admin", "123456")).getToken());
+    }
+
+    @Test
     void currentUserRejectsMissingToken() {
         assertUnauthorized(() -> authService.getCurrentUser(""));
     }

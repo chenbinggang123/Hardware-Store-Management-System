@@ -20,6 +20,9 @@ public class AgentPolicyEngine {
         if (risk == AgentToolRisk.R0_READ_ONLY) {
             return AgentPolicyDecision.ALLOW;
         }
+        if (risk == AgentToolRisk.R1_DRAFT && tool.draftWithoutApproval()) {
+            return AgentPolicyDecision.ALLOW;
+        }
         if (risk == AgentToolRisk.R1_DRAFT || risk == AgentToolRisk.R2_WRITE) {
             return AgentPolicyDecision.REQUIRE_APPROVAL;
         }

@@ -1,5 +1,6 @@
 package com.example.demo.service.impl;
 
+import com.example.demo.common.CurrentOperator;
 import com.example.demo.entity.OperationLog;
 import com.example.demo.entity.PriceTrendItem;
 import com.example.demo.entity.PurchaseOrder;
@@ -47,7 +48,7 @@ public class SupplierServiceImpl implements SupplierService {
             supplier.setCreateTime(LocalDateTime.now());
         }
         Supplier saved = supplierRepository.save(supplier);
-        saveOperationLog("SUPPLIER", "CREATE", "新增供应商：" + saved.getName(), 1L);
+        saveOperationLog("SUPPLIER", "CREATE", "新增供应商：" + saved.getName(), CurrentOperator.idOrNull());
         return saved;
     }
 
@@ -62,7 +63,7 @@ public class SupplierServiceImpl implements SupplierService {
         existingSupplier.setAddress(supplier.getAddress());
         existingSupplier.setRemark(supplier.getRemark());
         Supplier saved = supplierRepository.save(existingSupplier);
-        saveOperationLog("SUPPLIER", "UPDATE", "更新供应商：" + saved.getName(), 1L);
+        saveOperationLog("SUPPLIER", "UPDATE", "更新供应商：" + saved.getName(), CurrentOperator.idOrNull());
         return saved;
     }
 
@@ -74,7 +75,7 @@ public class SupplierServiceImpl implements SupplierService {
             throw new IllegalArgumentException("供应商存在采购订单，不允许删除");
         }
         supplierRepository.deleteById(id);
-        saveOperationLog("SUPPLIER", "DELETE", "删除供应商：" + supplier.getName(), 1L);
+        saveOperationLog("SUPPLIER", "DELETE", "删除供应商：" + supplier.getName(), CurrentOperator.idOrNull());
     }
 
     @Override

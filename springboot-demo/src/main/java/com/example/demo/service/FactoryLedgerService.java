@@ -133,6 +133,11 @@ public class FactoryLedgerService {
         return addTransaction(ledgerId, request, operatorId, "AGENT");
     }
 
+    /** 开单页保存的销售单记入账本，来源标记为 BILLING，收据号就是单据号。 */
+    public Map<String, Object> addBillingTransaction(Long ledgerId, FactoryLedgerTransactionRequest request, Long operatorId) {
+        return addTransaction(ledgerId, request, operatorId, "BILLING");
+    }
+
     @Transactional(readOnly = true)
     public Map<String, Object> previewTransaction(Long ledgerId, FactoryLedgerTransactionRequest request) {
         PreparedTransaction prepared = prepareTransaction(ledgerId, request);
@@ -192,9 +197,80 @@ public class FactoryLedgerService {
 
         ledger.setUpdateTime(now);
         ledgerRepository.save(ledger);
-        upsertSettlement(ledgerId, YearMonth.from(saved.getTransactionDate()).toString(), "PENDING_SUMMARY", operatorId);
+        String settledStatus = ensureSettlement(ledgerId, YearMonth.from(saved.getTransactionDate()).toString(), operatorId);
         audit(operatorId, request.getType(), transactionTypeLabel(request.getType()) + "：" + ledger.getFactoryName() + " ¥" + yuan(amountCents));
+        Map<String, Object> view = transactionView(saved);
+        if (!"PENDING_SUMMARY".equals(settledStatus)) {
+            // 已对过账的月份又记了一笔：不再把结账状态重置回“待汇总”，但提醒用户重新核对。
+            view.put("warning", YearMonth.from(saved.getTransactionDate()) + " 已经“" + settlementStatusLabel(settledStatus) + "”，这笔会改变该月金额，请重新核对");
+        }
+        return view;
+    }
+
+    /**
+     * 红字冲销：不删除原记录，而是记一笔金额相反的记录，应收立即恢复，原记录标为“已冲销”。
+     * 冲销记在今天，不改动已经对过账的月份。
+     */
+    public Map<String, Object> reverseTransaction(Long ledgerId, Long transactionId, String reason, Long operatorId) {
+        FactoryLedger ledger = requireLedger(ledgerId);
+        FactoryLedgerTransaction original = transactionRepository.findById(transactionId)
+                .filter(found -> ledgerId.equals(found.getLedgerId()))
+                .orElseThrow(() -> new IllegalArgumentException("账本记录不存在"));
+        if (original.getReversalOfId() != null) {
+            throw new IllegalArgumentException("这是一条冲销记录，不能再冲销");
+        }
+        if ("REVERSED".equals(original.getStatus())) {
+            throw new IllegalArgumentException("这条记录已经冲销过了");
+        }
+        String why = StringUtils.hasText(reason) ? reason.trim() : "记错了";
+        if (why.length() > 60) why = why.substring(0, 60);
+        LocalDateTime now = LocalDateTime.now();
+        FactoryLedgerTransaction reversal = new FactoryLedgerTransaction();
+        reversal.setTransactionNo(readableNumber("CX"));
+        reversal.setLedgerId(ledgerId);
+        reversal.setType(original.getType());
+        reversal.setTransactionDate(LocalDate.now());
+        reversal.setAmountCents(-original.getAmountCents());
+        reversal.setItems(original.getItems());
+        String remark = "冲销 " + original.getTransactionDate() + " " + original.getTransactionNo() + "：" + why;
+        reversal.setRemark(remark.length() > 255 ? remark.substring(0, 255) : remark);
+        reversal.setSource("REVERSAL");
+        reversal.setOperatorId(operatorId);
+        reversal.setCreateTime(now);
+        reversal.setReversalOfId(original.getId());
+        FactoryLedgerTransaction saved = transactionRepository.save(reversal);
+        original.setStatus("REVERSED");
+        transactionRepository.save(original);
+        ledger.setUpdateTime(now);
+        ledgerRepository.save(ledger);
+        ensureSettlement(ledgerId, YearMonth.from(saved.getTransactionDate()).toString(), operatorId);
+        audit(operatorId, "REVERSE", "冲销" + transactionTypeLabel(original.getType()) + "：" + ledger.getFactoryName()
+                + " ¥" + yuan(original.getAmountCents()) + "，原因：" + why);
         return transactionView(saved);
+    }
+
+    /** 修改账本资料：工厂改名、换联系人、停用。金额和流水不在这里改。 */
+    public Map<String, Object> updateLedger(Long ledgerId, FactoryLedgerCreateRequest request, Long operatorId) {
+        FactoryLedger ledger = requireLedger(ledgerId);
+        if (request == null || !StringUtils.hasText(request.getFactoryName())) {
+            throw new IllegalArgumentException("请填写工厂名称");
+        }
+        String factoryName = request.getFactoryName().trim();
+        ledgerRepository.findByFactoryNameIgnoreCase(factoryName)
+                .filter(other -> !other.getId().equals(ledgerId))
+                .ifPresent(other -> { throw new IllegalArgumentException("已经有同名的工厂账本"); });
+        if (request.getSettlementDay() != null && (request.getSettlementDay() < 1 || request.getSettlementDay() > 31)) {
+            throw new IllegalArgumentException("结账日必须在 1 到 31 之间");
+        }
+        ledger.setFactoryName(factoryName);
+        ledger.setContactPerson(trim(request.getContactPerson()));
+        ledger.setPhone(trim(request.getPhone()));
+        if (request.getSettlementDay() != null) ledger.setSettlementDay(request.getSettlementDay());
+        ledger.setRemark(trim(request.getRemark()));
+        ledger.setUpdateTime(LocalDateTime.now());
+        FactoryLedger saved = ledgerRepository.save(ledger);
+        audit(operatorId, "UPDATE", "修改工厂账本资料：" + saved.getFactoryName());
+        return ledgerView(saved);
     }
 
     private PreparedTransaction prepareTransaction(Long ledgerId, FactoryLedgerTransactionRequest request) {
@@ -324,7 +400,14 @@ public class FactoryLedgerService {
         result.put("items", transaction.getItems());
         result.put("amountCents", transaction.getAmountCents());
         result.put("amount", yuan(transaction.getAmountCents()));
-        result.put("signedAmount", ("PURCHASE".equals(transaction.getType()) ? "+" : "-") + "¥" + yuan(transaction.getAmountCents()));
+        long delta = transactionDelta(transaction);
+        result.put("signedAmount", (delta >= 0 ? "+" : "-") + "¥" + yuan(Math.abs(delta)));
+        result.put("increase", delta >= 0);
+        result.put("status", transaction.getStatus() == null ? "ACTIVE" : transaction.getStatus());
+        result.put("reversalOfId", transaction.getReversalOfId());
+        result.put("reversed", "REVERSED".equals(transaction.getStatus()));
+        result.put("isReversal", transaction.getReversalOfId() != null);
+        result.put("reversible", !"REVERSED".equals(transaction.getStatus()) && transaction.getReversalOfId() == null);
         result.put("content", transactionContent(transaction));
         result.put("remark", transaction.getRemark());
         result.put("source", transaction.getSource());
@@ -359,6 +442,16 @@ public class FactoryLedgerService {
         settlement.setOperatorId(operatorId);
         settlement.setUpdateTime(LocalDateTime.now());
         return settlementRepository.save(settlement);
+    }
+
+    /** 只在该月还没有结账记录时新建“待汇总”，不覆盖已有的对账结果；返回该月当前状态。 */
+    private String ensureSettlement(Long ledgerId, String month, Long operatorId) {
+        return settlementRepository.findByLedgerIdAndSettlementMonth(ledgerId, month)
+                .map(FactoryLedgerSettlement::getStatus)
+                .orElseGet(() -> {
+                    FactoryLedgerSettlement created = upsertSettlement(ledgerId, month, "PENDING_SUMMARY", operatorId);
+                    return created == null || created.getStatus() == null ? "PENDING_SUMMARY" : created.getStatus();
+                });
     }
 
     private FactoryLedger requireLedger(Long ledgerId) {
@@ -407,8 +500,10 @@ public class FactoryLedgerService {
 
     private String settlementStatusLabel(String status) {
         return switch (status) {
-            case "PENDING_CHECK" -> "待核对"; case "CONFIRMED" -> "已确认"; case "INVOICED" -> "已开单";
-            case "PARTIAL_PAID" -> "部分付款"; case "PAID" -> "已付款"; case "CLOSED" -> "已结清"; default -> "待汇总";
+            // 界面只保留三步：未对账 → 已对账 → 已结清，旧状态归到最接近的一步。
+            case "CONFIRMED", "INVOICED", "PARTIAL_PAID" -> "已对账";
+            case "PAID", "CLOSED" -> "已结清";
+            default -> "未对账";
         };
     }
 

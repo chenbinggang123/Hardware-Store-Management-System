@@ -91,6 +91,62 @@ function toTempFile(canvas, width, height) {
   })
 }
 
+function errorMessage(error) {
+  return String(error && (error.errMsg || error.message) || error || '')
+}
+
+function downloadFile(url) {
+  return new Promise((resolve, reject) => {
+    wx.downloadFile({
+      url,
+      success: (result) => {
+        if (Number(result.statusCode || 200) >= 400 || !result.tempFilePath) {
+          reject(new Error('生成的图片没有成功下载到本地'))
+          return
+        }
+        resolve(result.tempFilePath)
+      },
+      fail: reject
+    })
+  })
+}
+
+function unlinkQuietly(fileSystem, filePath) {
+  return new Promise((resolve) => {
+    fileSystem.unlink({ filePath, success: resolve, fail: resolve })
+  })
+}
+
+/**
+ * canvasToTempFilePath occasionally returns a devtools/temporary URL. The album
+ * API may then try to fetch it again and fail with a TLS socket error. Copying
+ * it into USER_DATA_PATH guarantees that saveImageToPhotosAlbum receives a
+ * stable local path on both real devices and the developer tools.
+ */
+function stableLocalFile(filePath) {
+  const sourceTask = /^https?:\/\//i.test(String(filePath || '')) ? downloadFile(filePath) : Promise.resolve(filePath)
+  return sourceTask.then((sourcePath) => {
+    if (!sourcePath) throw new Error('图片临时文件没有生成成功')
+    if (!wx.getFileSystemManager || !wx.env || !wx.env.USER_DATA_PATH) return sourcePath
+    const fileSystem = wx.getFileSystemManager()
+    const targetPath = `${wx.env.USER_DATA_PATH}/billing-receipt-latest.png`
+    if (sourcePath === targetPath) return targetPath
+    return unlinkQuietly(fileSystem, targetPath).then(() => new Promise((resolve, reject) => {
+      fileSystem.copyFile({ srcPath: sourcePath, destPath: targetPath, success: () => resolve(targetPath), fail: reject })
+    }))
+  })
+}
+
+function previewImage(filePath) {
+  return new Promise((resolve, reject) => {
+    if (!wx.previewImage) {
+      reject(new Error('当前环境无法打开图片预览'))
+      return
+    }
+    wx.previewImage({ current: filePath, urls: [filePath], success: resolve, fail: reject })
+  })
+}
+
 function saveToAlbum(filePath) {
   return new Promise((resolve, reject) => wx.saveImageToPhotosAlbum({ filePath, success: resolve, fail: reject }))
     .catch((error) => {
@@ -104,6 +160,10 @@ function saveToAlbum(filePath) {
           return saveToAlbum(filePath)
         })
     })
+}
+
+function shouldPreviewInstead(error) {
+  return /network socket|secure tls|connection.*established|devtools|not support|system error|privacy agreement|api scope is not declared/i.test(errorMessage(error))
 }
 
 function render(page, content, options = {}) {
@@ -169,7 +229,14 @@ function render(page, content, options = {}) {
 }
 
 function renderAndSave(page, content, options) {
-  return render(page, content, options).then((filePath) => saveToAlbum(filePath).then(() => filePath))
+  return render(page, content, options)
+    .then(stableLocalFile)
+    .then((filePath) => saveToAlbum(filePath)
+      .then(() => ({ filePath, mode: 'album' }))
+      .catch((error) => {
+        if (!shouldPreviewInstead(error)) throw error
+        return previewImage(filePath).then(() => ({ filePath, mode: 'preview', originalError: errorMessage(error) }))
+      }))
 }
 
-module.exports = { render, renderAndSave }
+module.exports = { render, renderAndSave, stableLocalFile }

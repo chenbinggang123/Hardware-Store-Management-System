@@ -1,81 +1,42 @@
 <view class="screen">
-  <!-- User Profile -->
   <view class="hero-card">
     <view class="hero-eyebrow">我的</view>
     <view style="display:flex; align-items:center; gap:20rpx; margin-top: 16rpx;">
       <view class="avatar avatar-lg">{{userInitial}}</view>
       <view>
         <view class="hero-title" style="font-size: 32rpx; margin-top: 0;">{{currentUser.name || '管理员'}}</view>
-        <view class="hero-subtitle" style="margin-top: 4rpx;">{{currentUser.role || '管理员'}} · {{currentUser.username || 'admin'}}</view>
+        <view class="hero-subtitle" style="margin-top: 4rpx;">{{isAdmin ? '管理员' : '店员'}} · {{currentUser.username || ''}}</view>
       </view>
     </view>
   </view>
 
-  <!-- Menu -->
+  <view class="form-card" wx:if="{{isAdmin}}">
+    <view class="form-section-title">更多工具</view>
+    <view class="setting-row" wx:for="{{moreTools}}" wx:key="path" data-path="{{item.path}}" bindtap="openTool">
+      <view class="setting-left"><view class="setting-icon users">{{item.mark}}</view><view><view class="setting-label">{{item.title}}</view><view class="setting-desc">{{item.desc}}</view></view></view><view><text class="setting-arrow">→</text></view>
+    </view>
+  </view>
+
   <view class="form-card">
-    <view class="setting-row" bindtap="openContacts">
-      <view class="setting-left"><view class="setting-icon users">往</view><view><view class="setting-label">客户与厂商资料</view><view class="setting-desc">维护名称、联系人和电话</view></view></view><view><text class="setting-arrow">→</text></view>
-    </view>
-    <view class="setting-row" bindtap="openPurchases">
-      <view class="setting-left"><view class="setting-icon backup">购</view><view><view class="setting-label">采购记录</view><view class="setting-desc">查看采购、到货和入库</view></view></view><view><text class="setting-arrow">→</text></view>
-    </view>
-    <view class="setting-row" bindtap="openReports">
-      <view class="setting-left"><view class="setting-icon logs">表</view><view><view class="setting-label">经营报表</view><view class="setting-desc">查看和导出经营数据</view></view></view><view><text class="setting-arrow">→</text></view>
-    </view>
-    <view class="setting-row" bindtap="openUsers">
-      <view class="setting-left">
-        <view class="setting-icon users">人</view>
-        <view>
-          <view class="setting-label">用户管理</view>
-          <view class="setting-desc">管理系统账号和角色权限</view>
-        </view>
-      </view>
+    <view class="form-section-title">账号与数据</view>
+    <view class="setting-row" wx:if="{{isAdmin}}" bindtap="openUsers">
+      <view class="setting-left"><view class="setting-icon users">人</view><view><view class="setting-label">用户管理</view><view class="setting-desc">管理系统账号和角色权限</view></view></view>
       <view><text class="setting-badge" wx:if="{{users.length}}">{{users.length}} 个账号</text><text class="setting-arrow">→</text></view>
     </view>
-    <view class="setting-row" bindtap="openLogs">
-      <view class="setting-left">
-        <view class="setting-icon logs">记</view>
-        <view>
-          <view class="setting-label">操作日志</view>
-          <view class="setting-desc">查看关键操作记录</view>
-        </view>
-      </view>
+    <view class="setting-row" wx:if="{{isAdmin}}" bindtap="openLogs">
+      <view class="setting-left"><view class="setting-icon logs">记</view><view><view class="setting-label">操作日志</view><view class="setting-desc">查看谁在什么时候做了什么</view></view></view>
       <view><text class="setting-arrow">→</text></view>
     </view>
-    <view class="setting-row" bindtap="backupNow">
-      <view class="setting-left">
-        <view class="setting-icon backup">存</view>
-        <view>
-          <view class="setting-label">立即备份</view>
-          <view class="setting-desc">备份当前系统数据</view>
-        </view>
-      </view>
-      <view><text class="setting-arrow">→</text></view>
-    </view>
-    <view class="setting-row" bindtap="restoreLast">
-      <view class="setting-left">
-        <view class="setting-icon backup">复</view>
-        <view>
-          <view class="setting-label">恢复备份</view>
-          <view class="setting-desc">恢复最近一次备份</view>
-        </view>
-      </view>
-      <view><text class="setting-arrow">→</text></view>
+    <view class="setting-row">
+      <view class="setting-left"><view class="setting-icon backup">存</view><view><view class="setting-label">数据备份</view><view class="setting-desc">由云数据库负责，在云开发控制台开启自动备份和恢复</view></view></view>
     </view>
     <view class="setting-row" bindtap="logout">
-      <view class="setting-left">
-        <view class="setting-icon logout">退</view>
-        <view>
-          <view class="setting-label" style="color: #B95034;">退出登录</view>
-          <view class="setting-desc">返回登录界面</view>
-        </view>
-      </view>
+      <view class="setting-left"><view class="setting-icon logout">退</view><view><view class="setting-label" style="color: #B95034;">退出登录</view><view class="setting-desc">返回登录界面</view></view></view>
       <view><text class="setting-arrow">→</text></view>
     </view>
   </view>
 
-  <!-- Quick Info -->
-  <view class="form-card">
+  <view class="form-card" wx:if="{{isAdmin}}">
     <view class="form-section-title">最近日志</view>
     <view class="mini-list" wx:if="{{logs.length}}">
       <block wx:for="{{logs}}" wx:key="id">
