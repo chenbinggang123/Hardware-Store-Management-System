@@ -163,7 +163,7 @@ function saveToAlbum(filePath) {
 }
 
 function shouldPreviewInstead(error) {
-  return /network socket|secure tls|connection.*established|devtools|not support|system error/i.test(errorMessage(error))
+  return /network socket|secure tls|connection.*established|devtools|not support|system error|privacy agreement|api scope is not declared/i.test(errorMessage(error))
 }
 
 function render(page, content, options = {}) {
