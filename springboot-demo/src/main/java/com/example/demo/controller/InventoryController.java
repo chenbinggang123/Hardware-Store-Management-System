@@ -68,7 +68,7 @@ public class InventoryController {
 
     }
 
-    
+
 
     @GetMapping("/warnings")
     public ApiResponse<List<Inventory>> getWarnings() {
