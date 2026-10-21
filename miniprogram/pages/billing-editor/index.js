@@ -280,25 +280,28 @@ Page({
 
   chooseCandidate(event) {
     const index = Number(event.currentTarget.dataset.index)
-    const candidate = this.data.candidates[index]
+    const candidateKey = String(event.currentTarget.dataset.key || '')
+    const candidate = (candidateKey && this.data.candidates.find((item) => item.candidateKey === candidateKey)) || this.data.candidates[index]
     if (!candidate) return
     const requestedTarget = this.data.activeLineIndex === null || this.data.activeLineIndex === undefined
       ? -1 : Number(this.data.activeLineIndex)
     const target = Number.isInteger(requestedTarget) && requestedTarget >= 0 && requestedTarget < this.data.lines.length
       ? requestedTarget : this.data.lines.findIndex((line) => !line.name.trim())
     const existing = target >= 0 ? this.data.lines[target] : blankLine()
+    const unitCandidates = Array.isArray(candidate.unitCandidates) ? candidate.unitCandidates.filter(Boolean) : []
+    const resolvedUnit = candidate.unit || (unitCandidates.length === 1 ? unitCandidates[0] : existing.unit) || ''
     const line = lineView({
       ...existing, name: candidate.name || existing.name || '', specification: candidate.specification || existing.specification || '',
-      unit: candidate.unit || existing.unit || '', price: candidate.price === null || candidate.price === undefined ? existing.price || '' : candidate.price,
+      unit: resolvedUnit, price: candidate.price === null || candidate.price === undefined ? existing.price || '' : candidate.price,
       quantity: existing.quantity || '1', alias: candidate.alias || '', candidateKey: candidate.candidateKey || '',
       referenceSource: candidate.source || '', referenceCategory: candidate.category || '',
-      referenceAliases: candidate.aliases || [], unitCandidates: candidate.unitCandidates || [],
+      referenceAliases: candidate.aliases || [], unitCandidates,
       referenceCaution: candidate.caution || '', remember: true
     }, target >= 0 ? target : this.data.lines.length)
     const lines = this.data.lines.slice()
     if (target >= 0) lines[target] = line
     else lines.push(line)
-    this.setData({ lines, searchKeyword: '', candidates: [], activeLineIndex: null, dirty: true, statusText: '商品信息已带入，请核对数量和单价' }, () => {
+    this.setData({ lines, searchKeyword: '', candidates: [], activeLineIndex: null, dirty: true, statusText: '名称、规格、单位和已有价格已自动带入' }, () => {
       this.recalculate()
       this.focusLineField(target >= 0 ? target : lines.length - 1, 'quantity')
     })
@@ -357,7 +360,7 @@ Page({
     this.setData({ actionError: '', actionRetry: '', actionRetryText: '' })
     return wx.showModal({
       title: '保存这张销售单？',
-      content: `共 ${this.data.lines.length} 项，合计 ¥${this.data.totalText}。保存后可生成 Excel，本阶段不会登记销售和欠款。`,
+      content: `共 ${this.data.lines.length} 项，合计 ¥${this.data.totalText}。保存后可选择图片或 Excel，本阶段不会登记销售和欠款。`,
       confirmText: '保存并导出'
     }).then((choice) => {
       if (!choice.confirm) return
@@ -366,7 +369,7 @@ Page({
         this.setData({ busy: true, statusText: '正在保存正式单据…' })
         return api.confirmBillingDocument(draft.id, draft.version).then((document) => {
           this.showDocument(document, true)
-          return this.exportExcel(document.id)
+          return this.chooseExportFormat(document.id)
         }).catch((error) => {
           const message = errorText(error, '单据保存失败')
           this.setData({ actionError: `单据没有确认：${message}`, actionRetry: '', actionRetryText: '', statusText: '正式单据保存未完成' })
@@ -374,6 +377,21 @@ Page({
         })
           .finally(() => this.setData({ busy: false }))
       })
+    })
+  },
+
+  chooseExportFormat(documentId) {
+    return wx.showActionSheet({
+      itemList: ['保存图片到相册', '导出 Excel 文件']
+    }).then((choice) => {
+      if (choice.tapIndex === 0) return this.saveAsImage()
+      if (choice.tapIndex === 1) return this.exportExcel(documentId)
+      return null
+    }).catch((error) => {
+      if (error && /cancel/i.test(error.errMsg || error.message || '')) return null
+      const message = errorText(error, '请选择导出格式')
+      this.setData({ actionError: message, statusText: '尚未选择导出格式' })
+      return null
     })
   },
 
