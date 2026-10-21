@@ -98,7 +98,7 @@ function normalizeResult(result) {
   const billingAction = billingDocumentAction(result)
   if (billingAction && !resultActions.some((item) => item.target === 'BILLING_DOCUMENT')) resultActions.unshift(billingAction)
   const displayOutput = billingAction
-    ? '开单草稿已建立。可以修改商品、数量、单位和价格，预览无误后再保存并导出 Excel。'
+    ? '开单草稿已建立。可以修改商品、数量、单位和价格，预览无误后再保存，并选择导出图片或 Excel。'
     : result.output
   return {
     ...result,
@@ -835,3 +835,4 @@ Page({
     })
   }
 })
+
