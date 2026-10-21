@@ -19,7 +19,7 @@
         <view class="search-row"><text>⌕</text><input value="{{searchKeyword}}" placeholder="输入名称，点选后自动填写" bindinput="changeSearch" bindfocus="focusGlobalSearch" /></view>
         <view class="candidate-heading"><text>{{candidateTitle}}</text><text>{{searching ? '正在查找…' : (candidates.length ? candidates.length + ' 条' : '暂无匹配')}}</text></view>
         <scroll-view class="candidate-list" scroll-x wx:if="{{candidates.length}}" enhanced show-scrollbar="{{false}}">
-          <view class="candidate-row"><view class="candidate" wx:for="{{candidates}}" wx:key="candidateKey" data-index="{{index}}" bindtap="chooseCandidate"><view class="candidate-name">{{item.name}}</view><view class="candidate-meta">{{item.specification || item.category || '通用商品'}}<text wx:if="{{item.unit}}"> · {{item.unit}}</text><text wx:if="{{item.price !== null && item.price !== undefined}}"> · ¥{{item.price}}</text></view><view class="candidate-foot"><text class="candidate-source">{{item.source}}</text><text class="candidate-use" wx:if="{{item.useCount}}">用过 {{item.useCount}} 次</text></view></view></view>
+          <view class="candidate-row"><view class="candidate" wx:for="{{candidates}}" wx:key="candidateKey" data-index="{{index}}" data-key="{{item.candidateKey}}" bindtap="chooseCandidate"><view class="candidate-name">{{item.name}}</view><view class="candidate-meta">{{item.specification || item.category || '通用商品'}}<text wx:if="{{item.unit}}"> · {{item.unit}}</text><text wx:elif="{{item.unitCandidates.length === 1}}"> · {{item.unitCandidates[0]}}</text><text wx:if="{{item.price !== null && item.price !== undefined}}"> · ¥{{item.price}}</text></view><view class="candidate-foot"><text class="candidate-source">{{item.source}}</text><text class="candidate-use" wx:if="{{item.useCount}}">用过 {{item.useCount}} 次</text></view></view></view>
         </scroll-view>
       </view>
 
@@ -46,7 +46,7 @@
             <view class="field"><text>规格型号</text><input value="{{item.specification}}" data-index="{{index}}" data-field="specification" bindinput="changeLine" placeholder="选填" /></view>
           </view>
           <scroll-view class="inline-candidates" scroll-x wx:if="{{activeLineIndex === index && candidates.length}}" enhanced show-scrollbar="{{false}}">
-            <view class="candidate-row"><view class="candidate compact" wx:for="{{candidates}}" wx:for-item="candidate" wx:for-index="candidateIndex" wx:key="candidateKey" data-index="{{candidateIndex}}" bindtap="chooseCandidate"><view class="candidate-name">{{candidate.name}}</view><view class="candidate-meta">{{candidate.specification || candidate.category || '通用商品'}}<text wx:if="{{candidate.unit}}"> · {{candidate.unit}}</text><text wx:if="{{candidate.price !== null && candidate.price !== undefined}}"> · ¥{{candidate.price}}</text></view></view></view>
+            <view class="candidate-row"><view class="candidate compact" wx:for="{{candidates}}" wx:for-item="candidate" wx:for-index="candidateIndex" wx:key="candidateKey" data-index="{{candidateIndex}}" data-key="{{candidate.candidateKey}}" bindtap="chooseCandidate"><view class="candidate-name">{{candidate.name}}</view><view class="candidate-meta">{{candidate.specification || candidate.category || '通用商品'}}<text wx:if="{{candidate.unit}}"> · {{candidate.unit}}</text><text wx:elif="{{candidate.unitCandidates.length === 1}}"> · {{candidate.unitCandidates[0]}}</text><text wx:if="{{candidate.price !== null && candidate.price !== undefined}}"> · ¥{{candidate.price}}</text></view></view></view>
           </scroll-view>
           <view class="field-grid number-grid">
             <view class="field {{item.unitUncertain ? 'needs-review' : ''}}"><text>单位</text><input value="{{item.unit}}" data-index="{{index}}" data-field="unit" bindinput="changeLine" placeholder="个/支/套" /></view>
@@ -86,7 +86,7 @@
 
     <view class="billing-bar">
       <view class="billing-summary"><text>合计</text><text class="billing-summary-value">¥{{totalText}}</text><text class="billing-summary-status">{{statusText}}</text></view>
-      <view class="bar-actions" wx:if="{{document && document.status === 'CONFIRMED'}}"><view class="secondary-action" wx:if="{{generatedFile}}" bindtap="openGenerated">打开 Excel</view><view class="primary-action" bindtap="exportExcel">{{busy ? '处理中…' : '重新生成'}}</view></view>
+      <view class="bar-actions" wx:if="{{document && document.status === 'CONFIRMED'}}"><view class="secondary-action" wx:if="{{generatedFile}}" bindtap="openGenerated">打开 Excel</view><view class="primary-action" bindtap="chooseExportFormat">{{busy || imageBusy ? '处理中…' : '选择导出'}}</view></view>
       <view class="bar-actions" wx:else><view class="secondary-action" wx:if="{{mode === 'edit'}}" bindtap="saveDraft">保存草稿</view><view class="secondary-action" wx:else data-mode="edit" bindtap="setMode">返回修改</view><view class="primary-action" bindtap="confirmDocument">{{busy ? '处理中…' : '保存并导出'}}</view></view>
     </view>
   </block>
