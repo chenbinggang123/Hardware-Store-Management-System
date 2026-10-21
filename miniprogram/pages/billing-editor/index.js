@@ -84,6 +84,9 @@ function errorText(error, fallback) {
   if (/network socket|secure TLS|connection.*established/i.test(text)) {
     return '当前环境无法写入系统相册，请在微信真机中重试'
   }
+  if (/privacy agreement|api scope is not declared/i.test(text)) {
+    return '小程序后台尚未声明“使用你的相册（仅写入）”权限'
+  }
   return text || fallback
 }
 
@@ -432,8 +435,13 @@ Page({
     return renderAndSave(this, content, { number: this.data.document && this.data.document.number, total: this.data.totalText })
       .then((result) => {
         if (result && result.mode === 'preview') {
-          this.setData({ statusText: '图片已生成并打开预览，请在微信真机中保存到相册' })
-          wx.showToast({ title: '图片已打开预览', icon: 'none', duration: 2500 })
+          const privacyMissing = /privacy agreement|api scope is not declared/i.test(result.originalError || '')
+          this.setData({
+            statusText: privacyMissing
+              ? '图片已生成；配置小程序相册隐私声明后可直接保存'
+              : '图片已生成并打开预览，请在微信真机中保存到相册'
+          })
+          wx.showToast({ title: privacyMissing ? '图片已生成，请先配置相册声明' : '图片已打开预览', icon: 'none', duration: 3000 })
           return
         }
         this.setData({ statusText: '单据图片已保存到手机相册' })
