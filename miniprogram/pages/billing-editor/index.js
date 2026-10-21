@@ -81,6 +81,9 @@ function errorText(error, fallback) {
   if (/No static resource\s+billing\/documents/i.test(text) || /billing\/documents.*404/i.test(text)) {
     return '云端开单服务尚未更新，请发布最新后端后重试'
   }
+  if (/network socket|secure TLS|connection.*established/i.test(text)) {
+    return '当前环境无法写入系统相册，请在微信真机中重试'
+  }
   return text || fallback
 }
 
@@ -427,7 +430,12 @@ Page({
     this.setData({ imageBusy: true, actionError: '', actionRetry: '', actionRetryText: '', statusText: '正在生成单据图片…' })
     const content = { ...this.data.form, lines: this.data.lines }
     return renderAndSave(this, content, { number: this.data.document && this.data.document.number, total: this.data.totalText })
-      .then(() => {
+      .then((result) => {
+        if (result && result.mode === 'preview') {
+          this.setData({ statusText: '图片已生成并打开预览，请在微信真机中保存到相册' })
+          wx.showToast({ title: '图片已打开预览', icon: 'none', duration: 2500 })
+          return
+        }
         this.setData({ statusText: '单据图片已保存到手机相册' })
         wx.showToast({ title: '图片已保存到相册', icon: 'success' })
       }).catch((error) => {
