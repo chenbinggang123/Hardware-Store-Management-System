@@ -11,4 +11,5 @@ public interface FactoryLedgerTransactionRepository extends JpaRepository<Factor
     boolean existsByLedgerIdAndReceiptNo(Long ledgerId, String receiptNo);
     Optional<FactoryLedgerTransaction> findFirstByReceiptNoAndSource(String receiptNo, String source);
     List<FactoryLedgerTransaction> findByReceiptNoInAndSource(java.util.Collection<String> receiptNos, String source);
+    List<FactoryLedgerTransaction> findBySourceAndReceiptNoStartingWith(String source, String receiptNoPrefix);
 }

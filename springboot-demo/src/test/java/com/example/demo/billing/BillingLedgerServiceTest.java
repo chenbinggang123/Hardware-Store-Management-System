@@ -27,6 +27,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class BillingLedgerServiceTest {
+    private static final String NUMBER = "KD-20261021-9";
     private final ObjectMapper mapper = new ObjectMapper();
     private BillingDocumentRepository documents;
     private FactoryLedgerService ledgers;
@@ -49,18 +50,18 @@ class BillingLedgerServiceTest {
 
     @Test
     void confirmedDocumentBecomesOnePurchaseInChosenLedger() throws Exception {
-        BillingDocument document = document("CONFIRMED", "KD-20261021-9", 3L);
+        BillingDocument document = document("CONFIRMED", NUMBER, 3L);
         when(documents.lockOwned(9L, 7L)).thenReturn(Optional.of(document));
-        FactoryLedgerTransaction saved = transaction(3L, 10560L);
-        when(transactions.findFirstByReceiptNoAndSource("KD-20261021-9", "BILLING"))
-                .thenReturn(Optional.empty(), Optional.of(saved));
+        FactoryLedgerTransaction saved = transaction(3L, 10560L, NUMBER, 1L, "ACTIVE");
+        when(transactions.findBySourceAndReceiptNoStartingWith("BILLING", NUMBER))
+                .thenReturn(List.of(), List.of(), List.of(saved));
 
         Map<String, Object> result = service.post(7L, 9L, null);
 
         ArgumentCaptor<FactoryLedgerTransactionRequest> request = ArgumentCaptor.forClass(FactoryLedgerTransactionRequest.class);
         verify(ledgers).addBillingTransaction(eq(3L), request.capture(), eq(7L));
         assertThat(request.getValue().getType()).isEqualTo("PURCHASE");
-        assertThat(request.getValue().getReceiptNo()).isEqualTo("KD-20261021-9");
+        assertThat(request.getValue().getReceiptNo()).isEqualTo(NUMBER);
         assertThat(request.getValue().getDate()).isEqualTo(LocalDate.parse("2026-10-21"));
         assertThat(request.getValue().getItems()).hasSize(1);
         assertThat(request.getValue().getItems().get(0).getUnitPrice()).isEqualByComparingTo("2.64");
@@ -71,9 +72,9 @@ class BillingLedgerServiceTest {
 
     @Test
     void postingTwiceDoesNotCreateASecondEntry() throws Exception {
-        when(documents.lockOwned(9L, 7L)).thenReturn(Optional.of(document("CONFIRMED", "KD-20261021-9", 3L)));
-        when(transactions.findFirstByReceiptNoAndSource("KD-20261021-9", "BILLING"))
-                .thenReturn(Optional.of(transaction(3L, 10560L)));
+        when(documents.lockOwned(9L, 7L)).thenReturn(Optional.of(document("CONFIRMED", NUMBER, 3L)));
+        when(transactions.findBySourceAndReceiptNoStartingWith("BILLING", NUMBER))
+                .thenReturn(List.of(transaction(3L, 10560L, NUMBER, 1L, "ACTIVE")));
 
         assertThat(service.post(7L, 9L, 3L).get("posted")).isEqualTo(true);
         assertThatThrownBy(() -> service.post(7L, 9L, 4L)).hasMessageContaining("恒达模具厂");
@@ -81,19 +82,41 @@ class BillingLedgerServiceTest {
     }
 
     @Test
-    void voidingAPostedDocumentReversesTheLedgerEntry() throws Exception {
-        BillingDocument document = document("CONFIRMED", "KD-20261021-9", 3L);
+    void reopeningReversesThenRepostingUsesARevisionNumber() throws Exception {
+        BillingDocument document = document("CONFIRMED", NUMBER, 3L);
         when(documents.lockOwned(9L, 7L)).thenReturn(Optional.of(document));
-        FactoryLedgerTransaction posted = transaction(3L, 10560L);
-        posted.setId(55L);
-        posted.setStatus("ACTIVE");
-        when(transactions.findFirstByReceiptNoAndSource("KD-20261021-9", "BILLING")).thenReturn(Optional.of(posted));
+        FactoryLedgerTransaction first = transaction(3L, 10560L, NUMBER, 55L, "ACTIVE");
+        when(transactions.findBySourceAndReceiptNoStartingWith("BILLING", NUMBER)).thenReturn(List.of(first));
+
+        service.reopen(7L, 9L);
+
+        verify(ledgers).reverseTransaction(eq(3L), eq(55L), org.mockito.ArgumentMatchers.contains("修改单据"), eq(7L));
+        assertThat(document.getStatus()).isEqualTo("DRAFT");
+
+        // 改完重新保存后再记账：原记录已冲销，新的一笔用 单号-R2
+        first.setStatus("REVERSED");
+        document.setStatus("CONFIRMED");
+        FactoryLedgerTransaction other = transaction(3L, 100L, NUMBER + "1", 99L, "ACTIVE");
+        when(transactions.findBySourceAndReceiptNoStartingWith("BILLING", NUMBER)).thenReturn(List.of(first, other));
+        service.post(7L, 9L, null);
+        ArgumentCaptor<FactoryLedgerTransactionRequest> request = ArgumentCaptor.forClass(FactoryLedgerTransactionRequest.class);
+        verify(ledgers).addBillingTransaction(eq(3L), request.capture(), eq(7L));
+        assertThat(request.getValue().getReceiptNo()).isEqualTo(NUMBER + "-R2");
+    }
+
+    @Test
+    void voidingAPostedDocumentReversesTheLedgerEntry() throws Exception {
+        BillingDocument document = document("CONFIRMED", NUMBER, 3L);
+        when(documents.lockOwned(9L, 7L)).thenReturn(Optional.of(document));
+        when(transactions.findBySourceAndReceiptNoStartingWith("BILLING", NUMBER))
+                .thenReturn(List.of(transaction(3L, 10560L, NUMBER, 55L, "ACTIVE")));
 
         service.voidDocument(7L, 9L, "客户退单");
 
         verify(ledgers).reverseTransaction(eq(3L), eq(55L), org.mockito.ArgumentMatchers.contains("客户退单"), eq(7L));
         assertThat(document.getStatus()).isEqualTo("VOIDED");
         assertThatThrownBy(() -> service.post(7L, 9L, 3L)).hasMessageContaining("先保存单据");
+        assertThatThrownBy(() -> service.reopen(7L, 9L)).hasMessageContaining("复制为新单");
     }
 
     @Test
@@ -102,7 +125,7 @@ class BillingLedgerServiceTest {
         assertThatThrownBy(() -> service.post(7L, 9L, 3L)).hasMessageContaining("先保存单据");
 
         when(documents.lockOwned(10L, 7L)).thenReturn(Optional.of(document("CONFIRMED", "KD-20261021-10", null)));
-        when(transactions.findFirstByReceiptNoAndSource("KD-20261021-10", "BILLING")).thenReturn(Optional.empty());
+        when(transactions.findBySourceAndReceiptNoStartingWith("BILLING", "KD-20261021-10")).thenReturn(List.of());
         assertThatThrownBy(() -> service.post(7L, 10L, null)).hasMessageContaining("选择");
         verify(ledgers, never()).addBillingTransaction(any(), any(), any());
     }
@@ -128,10 +151,13 @@ class BillingLedgerServiceTest {
         return document;
     }
 
-    private FactoryLedgerTransaction transaction(Long ledgerId, long cents) {
+    private FactoryLedgerTransaction transaction(Long ledgerId, long cents, String receiptNo, Long id, String status) {
         FactoryLedgerTransaction transaction = new FactoryLedgerTransaction();
+        transaction.setId(id);
         transaction.setLedgerId(ledgerId);
-        transaction.setTransactionNo("LS-1");
+        transaction.setTransactionNo("LS-" + id);
+        transaction.setReceiptNo(receiptNo);
+        transaction.setStatus(status);
         transaction.setAmountCents(cents);
         transaction.setTransactionDate(LocalDate.parse("2026-10-21"));
         return transaction;

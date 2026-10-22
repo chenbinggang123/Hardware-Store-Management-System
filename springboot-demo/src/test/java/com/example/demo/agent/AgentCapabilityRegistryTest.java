@@ -15,6 +15,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AgentCapabilityRegistryTest {
     @Test
+    void procurementRouteCanPrepareEditableDocumentWithoutPostingPurchase() {
+        AgentCapabilityRegistry registry = new AgentCapabilityRegistry();
+        List<AgentToolDefinition> tools = List.of(definition("search_source_purchase_orders"),
+                definition("record_source_purchase_order"), definition("prepare_billing_document"));
+        assertTrue(registry.toolsFor(
+                List.of(new AgentRoutingResult.Selection("procurement", "record")), tools)
+                .contains("prepare_billing_document"));
+    }
+
+    @Test
     void mapsWorkbookOperationsToOnlyTheirRegisteredTools() {
         AgentCapabilityRegistry registry = new AgentCapabilityRegistry();
         List<AgentToolDefinition> tools = List.of(

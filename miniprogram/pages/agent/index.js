@@ -749,7 +749,6 @@ Page({
             wx.showToast({ title: '草稿已建立，请从结果中打开', icon: 'none' })
             return
           }
-          openPage('/pages/billing-editor/index', action.params)
         }).catch((error) => {
           this.setData({ run, conversationId, sending: false, streaming: false })
           wx.showToast({ title: errorMessage(error, '开单预览生成失败，请重试'), icon: 'none', duration: 3000 })

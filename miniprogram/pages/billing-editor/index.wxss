@@ -144,6 +144,7 @@ page { background: #EEF2EF; color: #18231E; }
 .fix-card text:last-child { color: #75817B; font-size: 20rpx; line-height: 1.45; }
 .fix-actions { flex: 0 0 auto; display: flex; gap: 10rpx; }
 .fix-action { min-height: 56rpx; padding: 0 14rpx; display: flex; align-items: center; border-radius: 11rpx; color: #245E9B; background: #E8F0F7; font-size: 22rpx; font-weight: 700; }
+.fix-action.primary { color: #FFFFFF; background: #2865D7; }
 .fix-action.danger { color: #8D392E; background: #FFE9E4; }
 .line-detail-row { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; }
 .catalog-add { color: #247052; }

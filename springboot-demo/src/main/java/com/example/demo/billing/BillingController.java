@@ -23,6 +23,7 @@ public class BillingController {
     @PostMapping("/documents/{id}/confirm") public ApiResponse<?> confirm(@PathVariable Long id,@RequestBody Confirmation c,HttpServletRequest r){return ApiResponse.ok(service.confirm(owner(r),id,c.version()));}
     public record LedgerPosting(Long ledgerId){}
     public record VoidRequest(String reason){}
+    @PostMapping("/documents/{id}/reopen") public ApiResponse<?> reopen(@PathVariable Long id,HttpServletRequest r){return ApiResponse.ok(ledger.reopen(owner(r),id));}
     @PostMapping("/documents/{id}/void") public ApiResponse<?> voidDocument(@PathVariable Long id,@RequestBody(required=false) VoidRequest v,HttpServletRequest r){return ApiResponse.ok(ledger.voidDocument(owner(r),id,v==null?null:v.reason()));}
     @GetMapping("/documents/{id}/ledger") public ApiResponse<?> ledgerStatus(@PathVariable Long id,HttpServletRequest r){return ApiResponse.ok(ledger.status(owner(r),id));}
     @PostMapping("/documents/{id}/ledger") public ApiResponse<?> postToLedger(@PathVariable Long id,@RequestBody(required=false) LedgerPosting p,HttpServletRequest r){return ApiResponse.ok(ledger.post(owner(r),id,p==null?null:p.ledgerId()));}

@@ -96,7 +96,7 @@
         </view>
         <view class="receipt-footer"><view><text>备注</text><text class="receipt-footer-value">{{form.remark || '无'}}</text></view><view class="receipt-notice">请当面核对商品、数量和金额；本单据仅用于打印和导出。</view></view>
       </view>
-      <view class="fix-card" wx:if="{{document && document.status !== 'DRAFT'}}"><view><text>{{document.status === 'VOIDED' ? '这张单已作废' : '开错了？'}}</text><text>{{document.status === 'VOIDED' ? '可以复制内容重新开一张' : '作废后会自动冲销账本里的这笔；也可以复制后改一张新单'}}</text></view><view class="fix-actions"><view class="fix-action" bindtap="copyAsNew">复制为新单</view><view class="fix-action danger" wx:if="{{document.status === 'CONFIRMED'}}" bindtap="voidDocument">作废</view></view></view>
+      <view class="fix-card" wx:if="{{document && document.status !== 'DRAFT'}}"><view><text>{{document.status === 'VOIDED' ? '这张单已作废' : '要改或开错了？'}}</text><text>{{document.status === 'VOIDED' ? '可以复制内容重新开一张' : '修改会退回草稿；已记账的会先冲销，重新保存后再记一笔'}}</text></view><view class="fix-actions"><view class="fix-action primary" wx:if="{{document.status === 'CONFIRMED'}}" bindtap="reopenDocument">修改</view><view class="fix-action" bindtap="copyAsNew">复制</view><view class="fix-action danger" wx:if="{{document.status === 'CONFIRMED'}}" bindtap="voidDocument">作废</view></view></view>
       <view class="image-export-card" wx:if="{{!document || document.status !== 'VOIDED'}}"><view><text>保存为图片</text><text>生成清晰长图，可直接发微信或打印</text></view><view class="image-export-action" bindtap="saveAsImage">{{imageBusy ? '生成中…' : '保存到相册'}}</view></view>
     </view>
     <canvas type="2d" id="billingImageCanvas" class="billing-image-canvas"></canvas>

@@ -581,6 +581,9 @@ module.exports = {
   reverseFactoryLedgerTransaction(id, transactionId, reason) {
     return request(`/factory-ledgers/${id}/transactions/${transactionId}/reverse`, { method: 'POST', data: { reason } })
   },
+  reopenBillingDocument(id) {
+    return request(`/billing/documents/${id}/reopen`, { method: 'POST' })
+  },
   voidBillingDocument(id, reason) {
     return request(`/billing/documents/${id}/void`, { method: 'POST', data: { reason } })
   },

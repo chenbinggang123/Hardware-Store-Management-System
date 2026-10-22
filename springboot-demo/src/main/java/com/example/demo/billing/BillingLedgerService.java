@@ -69,14 +69,6 @@ public class BillingLedgerService {
         int pageSize = Math.min(Math.max(size, 1), 50);
         org.springframework.data.domain.Page<BillingDocument> found = documents.search(owner, text,
                 org.springframework.data.domain.PageRequest.of(Math.max(page, 0), pageSize));
-        List<String> numbers = found.getContent().stream().map(BillingDocument::getDocumentNumber)
-                .filter(StringUtils::hasText).toList();
-        Map<String, FactoryLedgerTransaction> posted = new java.util.HashMap<>();
-        if (!numbers.isEmpty()) {
-            for (FactoryLedgerTransaction transaction : transactions.findByReceiptNoInAndSource(numbers, SOURCE)) {
-                posted.put(transaction.getReceiptNo(), transaction);
-            }
-        }
         Map<Long, String> factoryNames = new java.util.HashMap<>();
         List<Map<String, Object>> rows = new ArrayList<>();
         for (BillingDocument document : found.getContent()) {
@@ -90,7 +82,7 @@ public class BillingLedgerService {
             row.put("itemCount", content.getLines() == null ? 0 : content.getLines().size());
             row.put("total", document.getTotalAmount());
             row.put("updatedAt", document.getUpdateTime());
-            FactoryLedgerTransaction transaction = document.getDocumentNumber() == null ? null : posted.get(document.getDocumentNumber());
+            FactoryLedgerTransaction transaction = "CONFIRMED".equals(document.getStatus()) ? posted(document).orElse(null) : null;
             row.put("ledgerName", transaction == null || "REVERSED".equals(transaction.getStatus()) ? null
                     : factoryNames.computeIfAbsent(transaction.getLedgerId(), this::factoryName));
             rows.add(row);
@@ -116,7 +108,7 @@ public class BillingLedgerService {
         Long ledgerId = requestedLedgerId != null ? requestedLedgerId : content.getLedgerId();
 
         Optional<FactoryLedgerTransaction> existing = posted(document);
-        if (existing.isPresent()) {
+        if (existing.isPresent() && !"REVERSED".equals(existing.get().getStatus())) {
             if (ledgerId != null && !ledgerId.equals(existing.get().getLedgerId())) {
                 throw new IllegalArgumentException("这张单据已记入「" + factoryName(existing.get().getLedgerId())
                         + "」的账本，不能再记到别的账本");
@@ -128,6 +120,32 @@ public class BillingLedgerService {
         }
 
         ledgers.addBillingTransaction(ledgerId, request(document, content), owner);
+        return view(posted(document));
+    }
+
+    /**
+     * 修改已保存的单据：退回草稿。如果已经记入厂家账本，先红字冲销那一笔；
+     * 改完再“保存并记账”时，会按修订号（单号-R2、-R3…）重新记一笔，账本里新旧两笔都能查到。
+     */
+    public Map<String, Object> reopen(Long owner, Long documentId) {
+        if (owner == null || owner <= 0) {
+            throw new IllegalArgumentException("请先登录");
+        }
+        BillingDocument document = documents.lockOwned(documentId, owner)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "单据不存在"));
+        if ("VOIDED".equals(document.getStatus())) {
+            throw new IllegalArgumentException("已作废的单据不能修改，可以“复制为新单”");
+        }
+        if ("CONFIRMED".equals(document.getStatus())) {
+            Optional<FactoryLedgerTransaction> posted = posted(document);
+            if (posted.isPresent() && !"REVERSED".equals(posted.get().getStatus())) {
+                ledgers.reverseTransaction(posted.get().getLedgerId(), posted.get().getId(),
+                        "修改单据 " + document.getDocumentNumber() + "，改完后重新记账", owner);
+            }
+            document.setStatus("DRAFT");
+            document.setUpdateTime(java.time.LocalDateTime.now());
+            documents.saveAndFlush(document);
+        }
         return view(posted(document));
     }
 
@@ -163,7 +181,9 @@ public class BillingLedgerService {
         FactoryLedgerTransactionRequest request = new FactoryLedgerTransactionRequest();
         request.setType("PURCHASE");
         request.setDate(date(content.getDate()));
-        request.setReceiptNo(document.getDocumentNumber());
+        // 同一张单据改过后再记账，用修订号区分，避开“同一账本收据号不能重复”的限制。
+        int revisions = postings(document).size();
+        request.setReceiptNo(revisions == 0 ? document.getDocumentNumber() : document.getDocumentNumber() + "-R" + (revisions + 1));
         String remark = "销售单 " + document.getDocumentNumber();
         if (StringUtils.hasText(content.getRemark())) {
             remark += " · " + content.getRemark().trim();
@@ -190,7 +210,20 @@ public class BillingLedgerService {
         if (!StringUtils.hasText(document.getDocumentNumber())) {
             return Optional.empty();
         }
-        return transactions.findFirstByReceiptNoAndSource(document.getDocumentNumber(), SOURCE);
+        return postings(document).stream().max(java.util.Comparator.comparing(
+                FactoryLedgerTransaction::getId, java.util.Comparator.nullsFirst(java.util.Comparator.naturalOrder())));
+    }
+
+    /** 这张单据的全部记账记录：单号本身，以及修改后重新记账的 单号-R2、-R3…。 */
+    private List<FactoryLedgerTransaction> postings(BillingDocument document) {
+        String number = document.getDocumentNumber();
+        if (!StringUtils.hasText(number)) {
+            return List.of();
+        }
+        return transactions.findBySourceAndReceiptNoStartingWith(SOURCE, number).stream()
+                .filter(transaction -> number.equals(transaction.getReceiptNo())
+                        || (transaction.getReceiptNo() != null && transaction.getReceiptNo().startsWith(number + "-R")))
+                .toList();
     }
 
     private Map<String, Object> view(Optional<FactoryLedgerTransaction> posted) {

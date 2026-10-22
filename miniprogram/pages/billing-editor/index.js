@@ -140,6 +140,27 @@ Page({
     openPage('/pages/billing-editor/index', { copyFrom: this.data.documentId })
   },
 
+  // 修改已保存的单据：退回草稿继续改。已记账的会先冲销，改完点“保存并记账”重新记一笔。
+  reopenDocument() {
+    const document = this.data.document
+    if (!document || document.status !== 'CONFIRMED' || this.data.busy) return
+    const posted = this.data.ledgerPosting && !this.data.ledgerPosting.reversed
+    wx.showModal({
+      title: '修改这张单？',
+      content: posted
+        ? `「${this.data.ledgerPosting.factoryName}」账本里的这笔会先冲销，改完点“保存并记账”重新记一笔。`
+        : '单据会退回草稿，改完再保存。',
+      confirmText: '修改'
+    }).then((choice) => {
+      if (!choice.confirm) return
+      this.setData({ busy: true })
+      return api.reopenBillingDocument(document.id)
+        .then(() => this.loadDocument(document.id))
+        .catch((error) => wx.showToast({ title: errorText(error, '无法修改'), icon: 'none', duration: 3000 }))
+        .finally(() => this.setData({ busy: false }))
+    })
+  },
+
   // 作废：单据标为作废；如果已记入厂家账本，后端会自动红字冲销。
   voidDocument() {
     const document = this.data.document
@@ -288,8 +309,9 @@ Page({
 
   setMode(event) {
     const mode = event.currentTarget.dataset.mode
-    if (mode === 'edit' && this.data.document && this.data.document.status !== 'DRAFT') {
-      return wx.showToast({ title: '已保存单据不能直接修改，可“复制为新单”', icon: 'none' })
+    if (mode === 'edit' && this.data.document && this.data.document.status === 'CONFIRMED') return this.reopenDocument()
+    if (mode === 'edit' && this.data.document && this.data.document.status === 'VOIDED') {
+      return wx.showToast({ title: '已作废的单据不能修改，可“复制为新单”', icon: 'none' })
     }
     this.setData({ mode })
     if (mode === 'edit' && !this.data.searchKeyword) this.searchProducts('')
