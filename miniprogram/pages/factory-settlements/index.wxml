@@ -1,15 +1,1 @@
-<view class="screen settlement-screen">
-  <view class="page-kicker">月底集中处理</view><view class="settlement-title">月底结账</view><view class="settlement-desc">每家工厂的拿货、退货和收款已经自动加好，按顺序去核对和收款。</view>
-  <view class="settlement-total"><view><text>{{month}} 全部工厂当前应收</text><text class="total-value">¥{{totals.balanceAmount || '0.00'}}</text></view><picker mode="date" fields="month" value="{{month}}" bindchange="onMonthChange"><view class="month-button">更换月份 ›</view></picker></view>
-  <view class="progress-note">共 {{totals.factoryCount || 0}} 家工厂 · {{totals.pendingCount || 0}} 家待处理</view>
-  <view class="loading-state" wx:if="{{loading}}">正在计算本月账款...</view>
-  <view class="error-state" wx:elif="{{error}}"><view class="error-state-title">月底汇总暂时加载失败</view><view>{{error}}</view><view class="state-action" bindtap="loadData">重新加载</view></view>
-  <view class="settlement-list" wx:elif="{{ledgers.length}}">
-    <view class="settlement-row" wx:for="{{ledgers}}" wx:key="id">
-      <view class="settlement-head" data-id="{{item.id}}" bindtap="openDetail"><view><view class="settlement-name">{{item.factoryName}}</view><view class="settlement-code">{{item.ledgerNo}} · {{item.purchaseCount}} 次拿货</view></view><view class="settlement-balance">¥{{item.balanceAmount}} ›</view></view>
-      <view class="settlement-numbers"><view><text>上月结转</text><text class="number-value">¥{{item.openingAmount}}</text></view><view><text>本月拿货</text><text class="number-value">¥{{item.purchaseAmount}}</text></view><view><text>退货/冲抵</text><text class="number-value">¥{{item.returnAmount}}</text></view><view><text>已收</text><text class="number-value">¥{{item.paymentAmount}}</text></view></view>
-      <picker range="{{statusNames}}" value="{{item.statusIndex}}" data-id="{{item.id}}" bindchange="changeStatus"><view class="status-picker">结账进度：{{item.statusLabel}} <text>点击更新 ›</text></view></picker>
-    </view>
-  </view>
-  <view class="empty-state" wx:else><view class="empty-icon">结</view><view class="empty-title">这个月还没有工厂账本</view><view class="empty-desc">先建立账本并记录拿货，月底会自动出现在这里。</view></view>
-</view>
+<view class="screen"><view class="loading-state">正在打开工厂账本…</view></view>

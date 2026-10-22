@@ -30,3 +30,10 @@
 .catalog-action { min-height: 64rpx; display: flex; align-items: center; justify-content: center; border: 1rpx solid #CBD5D0; border-radius: 10rpx; color: #405149; background: #FFF; font-size: 22rpx; font-weight: 680; }
 .catalog-action.primary { color: #FFF; border-color: #247052; background: #247052; }
 .catalog-loading-more, .catalog-end { padding: 24rpx; color: #7A8680; font-size: 21rpx; text-align: center; }
+.catalog-scope { display:flex; gap:16rpx; border-bottom:1rpx solid #D6DEDA; }
+.catalog-scope > view { flex:1; min-height:88rpx; display:flex; align-items:center; justify-content:center; font-size:28rpx; color:#53665A; }
+.catalog-scope > .active { color:#245E9B; font-weight:700; border-bottom:3rpx solid #245E9B; }
+.factory-actions { display:flex; gap:28rpx; min-height:88rpx; align-items:center; color:#245E9B; font-size:28rpx; }
+.factory-actions > view { min-height:88rpx; display:flex; align-items:center; }
+.factory-row { padding:24rpx; margin:16rpx 0; background:#FFF; border:1rpx solid #D6DEDA; border-radius:14rpx; }
+.catalog-head > .btn { flex: 0 0 auto; min-width: 96rpx; white-space: nowrap; }

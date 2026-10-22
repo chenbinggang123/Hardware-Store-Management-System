@@ -51,6 +51,7 @@ class InventoryWorkflowTest {
         Inventory inventory = inventory(10L, 1L, 10, 3);
         Product product = product(1L, "冲击钻", 10);
         when(inventoryRepository.findById(10L)).thenReturn(Optional.of(inventory));
+        when(inventoryRepository.lockById(10L)).thenReturn(Optional.of(inventory));
         when(inventoryRepository.save(any(Inventory.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(productRepository.findById(1L)).thenReturn(Optional.of(product));
@@ -81,6 +82,7 @@ class InventoryWorkflowTest {
     void adjustRejectsMissingOrNegativeActualQuantity() {
         Inventory inventory = inventory(10L, 1L, 10, 3);
         when(inventoryRepository.findById(10L)).thenReturn(Optional.of(inventory));
+        when(inventoryRepository.lockById(10L)).thenReturn(Optional.of(inventory));
 
         assertThrows(IllegalArgumentException.class, () -> service.adjustInventory(10L, null));
 

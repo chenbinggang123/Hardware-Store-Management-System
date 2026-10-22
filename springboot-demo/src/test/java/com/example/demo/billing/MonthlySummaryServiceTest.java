@@ -39,6 +39,11 @@ class MonthlySummaryServiceTest {
         assertThat(ledger.get("paymentAmount")).isEqualTo("50.00");
         assertThat(ledger.get("owingCount")).isEqualTo(1L);
         assertThat(((Map<?, ?>) ((List<?>) summary.get("factories")).get(0)).get("factoryName")).isEqualTo("甲厂");
+        BillingDocument returned=document("CONFIRMED","10.00");returned.setContentJson("{\"documentType\":\"RETURN\"}");
+        when(documents.findByStatusInAndDocumentNumberStartingWith(any(),eq("KD-202610")))
+                .thenReturn(List.of(document("CONFIRMED","105.60"),returned));
+        Map<?,?> net=(Map<?,?>)new MonthlySummaryService(documents,ledgers).summary("2026-10").get("billing");
+        assertThat(net.get("amount")).isEqualTo("95.60");
     }
 
     private BillingDocument document(String status, String total) {

@@ -2,8 +2,6 @@ const ledgerStore = require('../../utils/factory-ledger')
 const api = require('../../utils/api')
 
 const TYPES = [
-  { value: 'PURCHASE', label: '拿货' },
-  { value: 'RETURN', label: '退货' },
   { value: 'PAYMENT', label: '收款' }
 ]
 
@@ -12,9 +10,13 @@ function blankItem() { return { productName: '', specification: '', unit: '件',
 Page({
   data: {
     ledgerId: '', ledger: null, types: TYPES, typeNames: TYPES.map((item) => item.label), typeIndex: 0,
-    form: { type: 'PURCHASE', date: ledgerStore.today(), receiptNo: '', paymentAmount: '', remark: '', items: [blankItem()] }, saving: false
+    form: { type: 'PAYMENT', date: ledgerStore.today(), receiptNo: '', paymentAmount: '', remark: '', items: [blankItem()] }, saving: false
   },
   onLoad(options) {
+    if (options.type !== 'PAYMENT') {
+      wx.redirectTo({ url: `/pages/billing-editor/index?ledgerId=${encodeURIComponent(options.id || '')}&documentType=${options.type === 'RETURN' ? 'RETURN' : 'PURCHASE'}` })
+      return
+    }
     const typeIndex = Math.max(0, TYPES.findIndex((item) => item.value === options.type))
     this.setData({ ledgerId: options.id || '', typeIndex, 'form.type': TYPES[typeIndex].value })
     api.getFactoryLedger(options.id, ledgerStore.currentMonth()).then((ledger) => {

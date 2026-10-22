@@ -52,6 +52,7 @@ public class InventoryController {
 
     @PatchMapping("/{id}/adjust")
     public ApiResponse<Inventory> adjustInventory(@PathVariable Long id, @RequestBody InventoryAdjustRequest request) {
+        request.setOperatorId(com.example.demo.common.CurrentOperator.require());
         return ApiResponse.ok("库存调整成功", inventoryService.adjustInventory(id, request));
     }
 

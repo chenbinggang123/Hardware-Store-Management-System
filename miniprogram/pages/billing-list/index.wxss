@@ -4,3 +4,16 @@
 .record-total { flex: 0 0 auto; color: #18231E; font-size: 30rpx; font-weight: 760; font-variant-numeric: tabular-nums; }
 .record-end { padding: 24rpx 0 40rpx; color: #89938E; font-size: 22rpx; text-align: center; }
 .tag-neutral { color: #5E6B65; background: #E8ECEA; }
+.record-footer { display:flex; align-items:center; flex-wrap:wrap; justify-content:space-between; gap:12rpx; }
+.record-actions { display:flex; gap:24rpx; color:#21634B; font-size:26rpx; }
+.record-actions > view { min-height:88rpx; display:flex; align-items:center; }
+.record-actions .record-delete { color:#B33A32; }
+.record-filters { display: flex; gap: 8rpx; margin-bottom: 8rpx; }
+.record-filter { flex: 1; min-height: 88rpx; display: flex; align-items: center; justify-content: center; color: #4C5E53; font-size: 28rpx; border-radius: 12rpx; }
+.record-filter.active { color: #20513B; background: #DDEBDF; font-weight: 650; }
+.draft-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8rpx 20rpx; margin-bottom: 12rpx; font-size: 26rpx; color: #365B47; }
+.draft-toolbar > view { min-height: 88rpx; display: flex; align-items: center; }
+.draft-toolbar .record-delete { color: #B33A32; }
+.draft-toolbar [aria-disabled="true"] { opacity: .55; }
+.draft-check { display: inline-block; padding: 4rpx 12rpx; margin-right: 12rpx; border-radius: 8rpx; background: #E9EEEA; color: #4C5E53; font-size: 24rpx; vertical-align: middle; }
+.draft-check.checked { color: #FFFFFF; background: #30694B; }

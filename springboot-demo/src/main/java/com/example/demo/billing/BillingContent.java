@@ -12,6 +12,8 @@ public class BillingContent {
     private String customerName;
     /** Factory ledger the user picked; the document is posted there only after it is saved. */
     private Long ledgerId;
+    private String documentType = "PURCHASE";
+    private String sourceDocumentNumber;
     private String date;
     private String remark;
     /** Readable source evidence; never used as a calculated or confirmed amount. */

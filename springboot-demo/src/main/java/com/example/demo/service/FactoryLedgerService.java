@@ -41,6 +41,8 @@ public class FactoryLedgerService {
     private final FactoryLedgerTransactionRepository transactionRepository;
     private final FactoryLedgerSettlementRepository settlementRepository;
     private final OperationLogRepository operationLogRepository;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.example.demo.billing.BillingDocumentRepository billingDocuments;
 
     public FactoryLedgerService(
             FactoryLedgerRepository ledgerRepository,
@@ -71,6 +73,7 @@ public class FactoryLedgerService {
         totals.put("purchaseAmount", yuan(purchaseCents));
         totals.put("balanceAmount", yuan(balanceCents));
         totals.put("pendingCount", pendingCount);
+        totals.put("totalDueAmount", yuan(rows.stream().mapToLong(row -> number(row.get("totalDueCents"))).sum()));
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("month", month.toString());
@@ -87,9 +90,11 @@ public class FactoryLedgerService {
                 .findByLedgerIdOrderByTransactionDateDescCreateTimeDesc(ledgerId);
         Map<String, Object> result = ledgerView(ledger);
         result.put("month", month.toString());
+        putCurrentAmount(result, ledger, allTransactions);
         result.put("summary", calculateSummary(ledger, allTransactions, month));
         result.put("transactions", allTransactions.stream()
                 .filter(transaction -> YearMonth.from(transaction.getTransactionDate()).equals(month))
+                .filter(transaction -> !"REVERSED".equals(transaction.getStatus()) && transaction.getReversalOfId() == null)
                 .map(this::transactionView)
                 .toList());
         return result;
@@ -321,9 +326,23 @@ public class FactoryLedgerService {
 
     private Map<String, Object> summaryView(FactoryLedger ledger, YearMonth month) {
         Map<String, Object> result = ledgerView(ledger);
-        result.putAll(calculateSummary(ledger,
-                transactionRepository.findByLedgerIdOrderByTransactionDateDescCreateTimeDesc(ledger.getId()), month));
+        List<FactoryLedgerTransaction> transactions = transactionRepository.findByLedgerIdOrderByTransactionDateDescCreateTimeDesc(ledger.getId());
+        result.putAll(calculateSummary(ledger, transactions, month));
+        putCurrentAmount(result, ledger, transactions);
         return result;
+    }
+
+    /** 当前累计余额不随翻阅月份变化；各工厂的预付金额不抵消其他工厂欠款。 */
+    private void putCurrentAmount(Map<String,Object> result, FactoryLedger ledger, List<FactoryLedgerTransaction> transactions) {
+        LocalDate today = LocalDate.now();
+        long balance = ledger.getOpeningBalanceCents() == null || (ledger.getStartDate() != null && ledger.getStartDate().isAfter(today)) ? 0 : ledger.getOpeningBalanceCents();
+        for (FactoryLedgerTransaction transaction : transactions) {
+            if (!transaction.getTransactionDate().isAfter(today)) balance += transactionDelta(transaction);
+        }
+        result.put("totalDueCents", Math.max(balance, 0));
+        result.put("totalDueAmount", yuan(Math.max(balance, 0)));
+        result.put("creditCents", Math.max(-balance, 0));
+        result.put("creditAmount", yuan(Math.max(-balance, 0)));
     }
 
     private Map<String, Object> calculateSummary(FactoryLedger ledger, List<FactoryLedgerTransaction> transactions, YearMonth month) {
@@ -411,6 +430,10 @@ public class FactoryLedgerService {
         result.put("content", transactionContent(transaction));
         result.put("remark", transaction.getRemark());
         result.put("source", transaction.getSource());
+        if ("BILLING".equals(transaction.getSource()) && billingDocuments != null && transaction.getReceiptNo() != null) {
+            billingDocuments.findByDocumentNumber(transaction.getReceiptNo().replaceFirst("-R\\d+$", ""))
+                    .ifPresent(document -> result.put("documentId", document.getId()));
+        }
         result.put("createdAt", transaction.getCreateTime());
         return result;
     }

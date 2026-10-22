@@ -30,6 +30,8 @@ import java.util.stream.Collectors;
 @Service
 @Transactional(readOnly = true)
 public class CatalogService {
+    private com.example.demo.billing.BillingProductUsageRepository billingUsages;
+    @org.springframework.beans.factory.annotation.Autowired public void setBillingUsages(com.example.demo.billing.BillingProductUsageRepository usages) { this.billingUsages=usages; }
     private final ProductRepository productRepository;
     private final InventoryRepository inventoryRepository;
     private final SalesOrderRepository salesOrderRepository;
@@ -46,6 +48,9 @@ public class CatalogService {
     }
 
     public CatalogPageView list(String view, String keyword, int page, int size) {
+        return list(view,keyword,"",page,size);
+    }
+    public CatalogPageView list(String view, String keyword, String factory, int page, int size) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 50);
         String wantedView = StringUtils.hasText(view) ? view.trim().toLowerCase(Locale.ROOT) : "frequent";
@@ -58,6 +63,7 @@ public class CatalogService {
                 .collect(Collectors.toMap(Inventory::getProductId, Function.identity(), (left, right) -> left));
         Map<Long, Activity> activities = activities();
         List<CatalogItemView> all = products.stream()
+                .filter(product -> factory==null||factory.isBlank()||factory.equalsIgnoreCase(safe(product.getSourceFactory()).trim()))
                 .filter(product -> matches(product, keyword))
                 .map(product -> view(product, inventories.get(product.getId()), activities.get(product.getId())))
                 .toList();
@@ -88,6 +94,14 @@ public class CatalogService {
 
     private Map<Long, Activity> activities() {
         Map<Long, Activity> result = new HashMap<>();
+        if(billingUsages!=null)for(var usage:billingUsages.findAll()) {
+            if(usage.getCandidateKey()==null||!usage.getCandidateKey().startsWith("product:"))continue;
+            try {
+                var activity=result.computeIfAbsent(Long.valueOf(usage.getCandidateKey().substring(8)),ignored->new Activity());
+                activity.count+=Math.toIntExact(Math.min(usage.getUseCount()==null?0:usage.getUseCount(),Integer.MAX_VALUE));
+                activity.lastUsedAt=latest(activity.lastUsedAt,usage.getLastUsedTime());
+            }catch(NumberFormatException ignored){}
+        }
         for (SalesOrder order : salesOrderRepository.findAll()) {
             LocalDateTime time = latest(order.getOrderTime(), order.getCreateTime());
             for (SalesOrderItem item : safeSalesItems(order.getItems())) {
@@ -116,11 +130,11 @@ public class CatalogService {
         String state = !recorded ? "UNKNOWN" : quantity <= 0 ? "OUT_OF_STOCK" : quantity <= threshold ? "LOW" : "IN_STOCK";
         Activity current = activity == null ? new Activity() : activity;
         return new CatalogItemView(product.getId(), product.getName(), product.getBarcode(), product.getSpec(),
-                product.getUnit(), product.getRetailPrice(), product.getWholesalePrice(), product.getOldCustomerPrice(),
+                product.getUnit(), product.getRetailPrice(), product.getCostPrice(), product.getWholesalePrice(), product.getOldCustomerPrice(),
                 product.getSourceFactory(), product.getImageUrl(), recorded ? inventory.getId() : null,
                 quantity, threshold, recorded && StringUtils.hasText(inventory.getLocationId()) ? inventory.getLocationId() : product.getLocationId(),
                 state, recorded, recorded && quantity <= threshold, current.lastSoldAt, current.lastPurchasedAt,
-                latest(current.lastSoldAt, current.lastPurchasedAt), current.count, reasons);
+                latest(latest(current.lastSoldAt, current.lastPurchasedAt), current.lastUsedAt), current.count, reasons);
     }
 
     private boolean matches(Product product, String keyword) {
@@ -145,6 +159,7 @@ public class CatalogService {
     }
 
     private static class Activity {
+        private LocalDateTime lastUsedAt;
         private LocalDateTime lastSoldAt;
         private LocalDateTime lastPurchasedAt;
         private int count;

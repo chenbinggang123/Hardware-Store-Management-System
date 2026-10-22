@@ -14,12 +14,16 @@ public class BillingController {
     public BillingController(BillingService service,BillingImportService importer,BillingLedgerService ledger){this.service=service;this.importer=importer;this.ledger=ledger;}
     @GetMapping("/imports/{outputId}") public ApiResponse<?> importPreview(@PathVariable Long outputId,HttpServletRequest r){return ApiResponse.ok(importer.preview(owner(r),outputId));}
     @GetMapping("/products") public ApiResponse<?> search(@RequestParam(defaultValue="") String keyword,HttpServletRequest r){return ApiResponse.ok(service.candidates(owner(r),keyword));}
-    @GetMapping("/records") public ApiResponse<?> records(@RequestParam(defaultValue="") String keyword,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size,HttpServletRequest r){return ApiResponse.ok(ledger.records(owner(r),keyword,page,size));}
+    @GetMapping("/records") public ApiResponse<?> records(@RequestParam(defaultValue="") String keyword,@RequestParam(defaultValue="") String status,@RequestParam(defaultValue="") String documentType,@RequestParam(defaultValue="") String factory,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size,HttpServletRequest r){return ApiResponse.ok(ledger.records(owner(r),keyword,status,documentType,factory,page,size));}
+    public record DraftDeletion(List<Long> ids){}
+    @DeleteMapping("/documents/drafts") public ApiResponse<?> deleteDrafts(@RequestBody DraftDeletion body,HttpServletRequest r){return ApiResponse.ok(Map.of("deleted",ledger.deleteDrafts(owner(r),body.ids())));}
     @GetMapping("/documents") public ApiResponse<?> list(HttpServletRequest r){return ApiResponse.ok(service.list(owner(r)));}
     @PostMapping("/documents") public ApiResponse<?> create(@RequestBody BillingContent c,HttpServletRequest r){return ApiResponse.ok(service.save(owner(r),null,c));}
     @GetMapping("/documents/{id}") public ApiResponse<?> get(@PathVariable Long id,HttpServletRequest r){return ApiResponse.ok(service.get(owner(r),id));}
     @PutMapping("/documents/{id}") public ApiResponse<?> save(@PathVariable Long id,@RequestBody BillingContent c,HttpServletRequest r){return ApiResponse.ok(service.save(owner(r),id,c));}
+    @DeleteMapping("/documents/{id}") public ApiResponse<?> delete(@PathVariable Long id,HttpServletRequest r){ledger.deleteDocument(owner(r),id);return ApiResponse.ok(Map.of("deleted",true));}
     public record Confirmation(Long version){}
+    @DeleteMapping("/ledgers/{ledgerId}/transactions/{transactionId}/document") public ApiResponse<?> deleteFromLedger(@PathVariable Long ledgerId,@PathVariable Long transactionId,HttpServletRequest r){ledger.deleteFromLedger(owner(r),ledgerId,transactionId);return ApiResponse.ok(Map.of("deleted",true));}
     @PostMapping("/documents/{id}/confirm") public ApiResponse<?> confirm(@PathVariable Long id,@RequestBody Confirmation c,HttpServletRequest r){return ApiResponse.ok(service.confirm(owner(r),id,c.version()));}
     public record LedgerPosting(Long ledgerId){}
     public record VoidRequest(String reason){}

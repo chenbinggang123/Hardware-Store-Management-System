@@ -3,8 +3,6 @@ const { openPage, showToast } = require('../../utils/router')
 
 // 不常用、只给管理员用的功能都收在这里，侧栏只保留日常要用的入口。
 const MORE_TOOLS = [
-  { mark: '月', title: '月度汇总', desc: '本月开单、各厂拿货、收款和应收', path: '/pages/monthly-summary/index' },
-  { mark: '单', title: '销售单（旧）', desc: '扣库存、记客户欠款的旧开单方式', path: '/pages/sales-orders/index' },
   { mark: '往', title: '往来账', desc: '旧的应收应付记录，只读核对用', path: '/pages/finance-ledger/index' },
   { mark: '客', title: '客户与进货厂家', desc: '维护名称、联系人和电话', path: '/pages/contacts/index' },
   { mark: '价', title: '价格变化记录', desc: '追溯进价和售价变化', path: '/pages/price-history/index' },

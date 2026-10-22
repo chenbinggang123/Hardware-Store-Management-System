@@ -1,5 +1,5 @@
 <view class="screen">
-  <view class="flow-head"><view class="flow-step-label">日常往来</view><view class="flow-title">给“{{ledger.factoryName || '这家工厂'}}”记一笔</view><view class="flow-desc">照着收据或本子逐项填写，系统会自动计算金额，保存前再次核对。</view></view>
+  <view class="flow-head"><view class="flow-step-label">日常往来</view><view class="flow-title">给“{{ledger.factoryName || '这家工厂'}}”登记收款</view><view class="flow-desc">填写本次实际收到的货款，确认后减少未收金额。</view></view>
   <view class="form-card">
     <view class="grid-2">
       <view class="form-group"><view class="form-label">记录类型</view><picker range="{{typeNames}}" value="{{typeIndex}}" bindchange="changeType"><view class="form-picker">{{typeNames[typeIndex]}} ›</view></picker></view>

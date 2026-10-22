@@ -27,6 +27,33 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class FactoryLedgerServiceTest {
+    @Test
+    void totalDueIsCurrentAndIndependentOfSelectedMonthOrManualStatus() {
+        ledger.setOpeningBalanceCents(1000L);
+        ledger.setStartDate(LocalDate.now().minusMonths(3));
+        FactoryLedgerTransaction purchase=transaction("PURCHASE",LocalDate.now().minusDays(2).toString(),5000L);
+        FactoryLedgerTransaction returned=transaction("RETURN",LocalDate.now().minusDays(1).toString(),500L);
+        FactoryLedgerTransaction paid=transaction("PAYMENT",LocalDate.now().toString(),2000L);
+        FactoryLedgerTransaction future=transaction("PURCHASE",LocalDate.now().plusDays(1).toString(),99999L);
+        when(transactionRepository.findByLedgerIdOrderByTransactionDateDescCreateTimeDesc(1L)).thenReturn(List.of(purchase,returned,paid,future));
+        assertEquals("35.00",service.get(1L,"2025-01").get("totalDueAmount"));
+        assertEquals("35.00",service.get(1L,"2026-10").get("totalDueAmount"));
+        paid.setAmountCents(8000L);
+        Map<String,Object> overpaid=service.get(1L,"2026-10");
+        assertEquals("0.00",overpaid.get("totalDueAmount"));
+        assertEquals("25.00",overpaid.get("creditAmount"));
+    }
+
+    @Test
+    void totalDoesNotOffsetOneFactoryDebtWithAnotherFactoryCredit() {
+        FactoryLedger other=ledger();other.setId(2L);other.setOpeningBalanceCents(-5000L);other.setStartDate(LocalDate.now().minusDays(1));
+        ledger.setOpeningBalanceCents(10000L);ledger.setStartDate(LocalDate.now().minusDays(1));
+        when(ledgerRepository.findAll()).thenReturn(List.of(ledger,other));
+        when(transactionRepository.findByLedgerIdOrderByTransactionDateDescCreateTimeDesc(1L)).thenReturn(List.of());
+        when(transactionRepository.findByLedgerIdOrderByTransactionDateDescCreateTimeDesc(2L)).thenReturn(List.of());
+        Map<?,?> totals=(Map<?,?>)service.list("2025-01",null).get("totals");
+        assertEquals("100.00",totals.get("totalDueAmount"));
+    }
     private FactoryLedgerRepository ledgerRepository;
     private FactoryLedgerTransactionRepository transactionRepository;
     private FactoryLedgerSettlementRepository settlementRepository;
@@ -88,10 +115,12 @@ class FactoryLedgerServiceTest {
         saved.setLedgerId(1L);
         saved.setType("PURCHASE");
         saved.setAmountCents(-10560L);
+        saved.setReversalOfId(11L);
         saved.setTransactionDate(java.time.LocalDate.parse("2026-10-21"));
         when(transactionRepository.findByLedgerIdOrderByTransactionDateDescCreateTimeDesc(1L)).thenReturn(List.of(saved, purchase));
         Map<?, ?> summary = (Map<?, ?>) service.get(1L, "2026-10").get("summary");
         assertEquals("0.00", summary.get("purchaseAmount"));
+        assertEquals(0, ((List<?>)service.get(1L,"2026-10").get("transactions")).size());
     }
 
     @Test

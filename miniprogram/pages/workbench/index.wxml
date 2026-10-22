@@ -16,8 +16,8 @@
 
   <view class="block-head"><view><view class="block-title">经营概况</view><view class="block-subtitle">当前系统数据 · 更新于 {{dashboardMeta.updatedAt}}</view></view><view class="block-link" bindtap="refreshDashboard">刷新数据</view></view>
   <view class="daily-ledger">
-    <view class="daily-row" bindtap="openPage" data-path="/pages/sales-orders/index"><view class="daily-mark">单</view><text>销售单</text><view class="daily-value">{{businessSummary.orderCount}} 笔</view><view class="daily-arrow">›</view></view>
-    <view class="daily-row" bindtap="openPage" data-path="/pages/sales-orders/index"><view class="daily-mark money">¥</view><text>销售金额</text><view class="daily-value">¥{{businessSummary.salesAmount}}</view><view class="daily-arrow">›</view></view>
+    <view class="daily-row" bindtap="openPage" data-path="/pages/billing-list/index"><view class="daily-mark">单</view><text>销售单</text><view class="daily-value">{{businessSummary.orderCount}} 笔</view><view class="daily-arrow">›</view></view>
+    <view class="daily-row" bindtap="openPage" data-path="/pages/billing-list/index"><view class="daily-mark money">¥</view><text>销售金额</text><view class="daily-value">¥{{businessSummary.salesAmount}}</view><view class="daily-arrow">›</view></view>
     <view class="daily-row warning" bindtap="openPage" data-path="/pages/inventories/index"><view class="daily-mark">货</view><text>库存预警</text><view class="daily-value">{{inventoryWarning}} 件</view><view class="daily-arrow">›</view></view>
   </view>
 

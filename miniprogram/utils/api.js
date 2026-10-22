@@ -162,7 +162,7 @@ function cleanupTerminalTemporaryAgentFiles() {
   const current = wx.getStorageSync(TEMP_AGENT_CLEANUP_KEY) || []
   const queued = Array.isArray(current) ? current.slice() : []
   return Promise.all(queued.map((item) => agentRequest(`/agent/runs/${item.runId}`)
-    .then((run) => run && ['COMPLETED', 'FAILED', 'CANCELLED', 'EXPIRED', 'PARTIAL'].includes(run.status)
+    .then((run) => run && ['COMPLETED', 'CANCELLED', 'EXPIRED'].includes(run.status)
       ? cleanupTemporaryAgentFiles(item.runId) : false)
     .catch(() => false)))
 }
@@ -348,6 +348,15 @@ module.exports = {
   getMonthlySummary(month) {
     return request('/reports/monthly-summary', { query: month ? { month } : {} })
   },
+  deleteBillingDocument(id) {
+    return request(`/billing/documents/${id}`, { method: 'DELETE' })
+  },
+  deleteLedgerBillingDocument(ledgerId, transactionId) {
+    return request(`/billing/ledgers/${ledgerId}/transactions/${transactionId}/document`, { method: 'DELETE' })
+  },
+  deleteBillingDrafts(ids) {
+    return request('/billing/documents/drafts', { method: 'DELETE', data: { ids } })
+  },
   getBillingRecords(params = {}) {
     return request('/billing/records', { query: params })
   },
@@ -509,6 +518,7 @@ module.exports = {
   getProducts(params = {}) {
     return (() => request('/products', { data: params }))()
   },
+  getCatalogSuppliers(keyword = '') { return request('/catalog/suppliers', { query: { keyword } }) },
   getCatalog(params = {}) {
     return (() => request('/catalog', { query: params }))()
   },

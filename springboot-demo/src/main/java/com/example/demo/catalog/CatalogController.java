@@ -19,8 +19,9 @@ public class CatalogController {
     @GetMapping
     public ApiResponse<CatalogPageView> list(@RequestParam(defaultValue = "frequent") String view,
                                              @RequestParam(required = false) String keyword,
+                                             @RequestParam(defaultValue = "") String factory,
                                              @RequestParam(defaultValue = "0") int page,
                                              @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.ok(service.list(view, keyword, page, size));
+        return ApiResponse.ok(service.list(view, keyword, factory, page, size));
     }
 }

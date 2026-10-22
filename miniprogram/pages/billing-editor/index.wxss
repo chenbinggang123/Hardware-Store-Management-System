@@ -159,3 +159,4 @@ page { background: #EEF2EF; color: #18231E; }
 .secondary-action { color: #245E9B; background: #E8F0F7; }
 .primary-action { color: #FFFFFF; background: #2865D7; }
 @media (max-width: 340px) { .billing-screen { padding-right: 18rpx; padding-left: 18rpx; } .billing-summary-status { display: none; } .secondary-action, .primary-action { padding: 0 14rpx; font-size: 22rpx; } .lines-card { padding-right: 14rpx; padding-left: 14rpx; } .primary-grid { grid-template-columns: 1.3fr 1fr; } .number-grid { gap: 8rpx; } .field input, .picker-field { padding-right: 10rpx; padding-left: 10rpx; font-size: 22rpx; } .remember-compact text { display: none; } }
+.local-save-note { margin: 0 0 16rpx; padding: 16rpx 20rpx; color: #365B47; background: #EDF4EE; border-radius: 12rpx; font-size: 26rpx; line-height: 1.5; }

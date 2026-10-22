@@ -10,6 +10,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.ArgumentMatchers.contains;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -82,43 +88,20 @@ class BillingLedgerServiceTest {
     }
 
     @Test
-    void reopeningReversesThenRepostingUsesARevisionNumber() throws Exception {
-        BillingDocument document = document("CONFIRMED", NUMBER, 3L);
-        when(documents.lockOwned(9L, 7L)).thenReturn(Optional.of(document));
-        FactoryLedgerTransaction first = transaction(3L, 10560L, NUMBER, 55L, "ACTIVE");
-        when(transactions.findBySourceAndReceiptNoStartingWith("BILLING", NUMBER)).thenReturn(List.of(first));
-
-        service.reopen(7L, 9L);
-
-        verify(ledgers).reverseTransaction(eq(3L), eq(55L), org.mockito.ArgumentMatchers.contains("修改单据"), eq(7L));
-        assertThat(document.getStatus()).isEqualTo("DRAFT");
-
-        // 改完重新保存后再记账：原记录已冲销，新的一笔用 单号-R2
-        first.setStatus("REVERSED");
-        document.setStatus("CONFIRMED");
-        FactoryLedgerTransaction other = transaction(3L, 100L, NUMBER + "1", 99L, "ACTIVE");
-        when(transactions.findBySourceAndReceiptNoStartingWith("BILLING", NUMBER)).thenReturn(List.of(first, other));
-        service.post(7L, 9L, null);
-        ArgumentCaptor<FactoryLedgerTransactionRequest> request = ArgumentCaptor.forClass(FactoryLedgerTransactionRequest.class);
-        verify(ledgers).addBillingTransaction(eq(3L), request.capture(), eq(7L));
-        assertThat(request.getValue().getReceiptNo()).isEqualTo(NUMBER + "-R2");
+    void postedDocumentsCanOnlyBeManagedFromLedger() throws Exception {
+        BillingDocument saved = document("CONFIRMED", NUMBER, 3L);
+        when(documents.lockOwned(9L, 7L)).thenReturn(Optional.of(saved));
+        FactoryLedgerTransaction entry = transaction(3L, 10560L, NUMBER, 55L, "ACTIVE");
+        when(transactions.findBySourceAndReceiptNoStartingWith("BILLING", NUMBER)).thenReturn(List.of(entry));
+        assertThatThrownBy(() -> service.reopen(7L, 9L)).hasMessageContaining("账本中处理");
+        assertThatThrownBy(() -> service.voidDocument(7L, 9L, "错了")).hasMessageContaining("账本中处理");
+        assertThatThrownBy(() -> service.deleteDocument(7L, 9L)).hasMessageContaining("账本中处理");
+        entry.setStatus("REVERSED");
+        assertThatThrownBy(() -> service.deleteDocument(7L, 9L)).hasMessageContaining("账本中处理");
+        verifyNoInteractions(ledgers);
+        verify(documents, never()).delete(any());
+        assertThat(saved.getStatus()).isEqualTo("CONFIRMED");
     }
-
-    @Test
-    void voidingAPostedDocumentReversesTheLedgerEntry() throws Exception {
-        BillingDocument document = document("CONFIRMED", NUMBER, 3L);
-        when(documents.lockOwned(9L, 7L)).thenReturn(Optional.of(document));
-        when(transactions.findBySourceAndReceiptNoStartingWith("BILLING", NUMBER))
-                .thenReturn(List.of(transaction(3L, 10560L, NUMBER, 55L, "ACTIVE")));
-
-        service.voidDocument(7L, 9L, "客户退单");
-
-        verify(ledgers).reverseTransaction(eq(3L), eq(55L), org.mockito.ArgumentMatchers.contains("客户退单"), eq(7L));
-        assertThat(document.getStatus()).isEqualTo("VOIDED");
-        assertThatThrownBy(() -> service.post(7L, 9L, 3L)).hasMessageContaining("先保存单据");
-        assertThatThrownBy(() -> service.reopen(7L, 9L)).hasMessageContaining("复制为新单");
-    }
-
     @Test
     void draftsAndDocumentsWithoutLedgerAreRejected() throws Exception {
         when(documents.lockOwned(9L, 7L)).thenReturn(Optional.of(document("DRAFT", null, 3L)));
@@ -128,6 +111,92 @@ class BillingLedgerServiceTest {
         when(transactions.findBySourceAndReceiptNoStartingWith("BILLING", "KD-20261021-10")).thenReturn(List.of());
         assertThatThrownBy(() -> service.post(7L, 10L, null)).hasMessageContaining("选择");
         verify(ledgers, never()).addBillingTransaction(any(), any(), any());
+    }
+
+    @Test
+    void deletingDraftRemovesItWithoutLedgerChanges() throws Exception {
+        BillingDocument draft = document("DRAFT", null, null);
+        when(documents.lockOwned(9L, 7L)).thenReturn(Optional.of(draft));
+        service.deleteDocument(7L, 9L);
+        verify(documents).delete(draft);
+        verify(documents).flush();
+        verifyNoInteractions(ledgers, transactions);
+    }
+
+    @Test
+    void deletingPostedDocumentFromLedgerReversesOnlyActiveEntries() throws Exception {
+        BillingDocument saved = document("CONFIRMED", NUMBER, 3L);
+        when(documents.lockOwned(9L, 7L)).thenReturn(Optional.of(saved));
+        when(documents.findByDocumentNumber(NUMBER)).thenReturn(Optional.of(saved));
+        FactoryLedgerTransaction active = transaction(3L, 10560L, NUMBER + "-R2", 56L, "ACTIVE");
+        when(transactions.findById(56L)).thenReturn(Optional.of(active));
+        when(transactions.findBySourceAndReceiptNoStartingWith("BILLING", NUMBER)).thenReturn(List.of(
+                transaction(3L, 10560L, NUMBER, 55L, "REVERSED"), active));
+        assertThatThrownBy(() -> service.deleteFromLedger(7L, 4L, 56L)).hasMessageContaining("不存在");
+        assertThatThrownBy(() -> service.deleteFromLedger(8L, 3L, 56L)).hasMessageContaining("无权");
+        service.deleteFromLedger(7L, 3L, 56L);
+        var sequence = inOrder(ledgers, documents);
+        sequence.verify(ledgers).reverseTransaction(eq(3L), eq(56L), contains("删除单据"), eq(7L));
+        sequence.verify(documents).delete(saved);
+        verify(ledgers, never()).reverseTransaction(eq(3L), eq(55L), any(), any());
+    }
+    @Test
+    void deletingAnotherOwnersDocumentIsRejected() {
+        when(documents.lockOwned(9L, 8L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.deleteDocument(8L, 9L)).hasMessageContaining("单据不存在");
+        verify(documents, never()).delete(any());
+        verifyNoInteractions(ledgers);
+    }
+
+    @Test
+    void failedLedgerReversalDoesNotDeleteDocument() throws Exception {
+        BillingDocument saved = document("CONFIRMED", NUMBER, 3L);
+        when(documents.lockOwned(9L, 7L)).thenReturn(Optional.of(saved));
+        when(documents.findByDocumentNumber(NUMBER)).thenReturn(Optional.of(saved));
+        FactoryLedgerTransaction active = transaction(3L, 10560L, NUMBER, 55L, "ACTIVE");
+        when(transactions.findById(55L)).thenReturn(Optional.of(active));
+        when(transactions.findBySourceAndReceiptNoStartingWith("BILLING", NUMBER)).thenReturn(List.of(active));
+        org.mockito.Mockito.doThrow(new IllegalStateException("冲销失败")).when(ledgers).reverseTransaction(eq(3L),eq(55L),any(),eq(7L));
+        assertThatThrownBy(() -> service.deleteFromLedger(7L,3L,55L)).hasMessageContaining("冲销失败");
+        verify(documents, never()).delete(any());
+    }
+    @Test
+    void batchDeletionLocksAndDeletesOnlyDistinctDrafts() throws Exception {
+        BillingDocument first = document("DRAFT", null, null);
+        BillingDocument second = document("DRAFT", null, null);
+        second.setId(10L);
+        when(documents.lockOwned(9L, 7L)).thenReturn(Optional.of(first));
+        when(documents.lockOwned(10L, 7L)).thenReturn(Optional.of(second));
+        assertThat(service.deleteDrafts(7L, List.of(10L, 9L, 9L))).isEqualTo(2);
+        verify(documents).deleteAll(List.of(first, second));
+        verifyNoInteractions(ledgers, transactions);
+    }
+
+    @Test
+    void batchDeletionRejectsSavedDocumentsWithoutPartialDeletion() throws Exception {
+        when(documents.lockOwned(9L, 7L)).thenReturn(Optional.of(document("DRAFT", null, null)));
+        when(documents.lockOwned(10L, 7L)).thenReturn(Optional.of(document("CONFIRMED", NUMBER, 3L)));
+        assertThatThrownBy(() -> service.deleteDrafts(7L, List.of(9L, 10L))).hasMessageContaining("本次没有删除");
+        verify(documents, never()).deleteAll(any());
+    }
+
+    @Test
+    void batchDeletionRejectsMissingAndEmptySelections() throws Exception {
+        assertThatThrownBy(() -> service.deleteDrafts(7L, List.of())).hasMessageContaining("请选择");
+        when(documents.lockOwned(9L, 7L)).thenReturn(Optional.of(document("DRAFT", null, null)));
+        when(documents.lockOwned(10L, 7L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.deleteDrafts(7L, List.of(9L, 10L))).hasMessageContaining("重新选择");
+        verify(documents, never()).deleteAll(any());
+    }
+
+    @Test
+    void statusFilterIsAppliedBeforePagination() {
+        var pageable = org.springframework.data.domain.PageRequest.of(1, 20);
+        when(documents.searchByStatus(7L, "客户", "DRAFT", pageable))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(), pageable, 0));
+        assertThat(service.records(7L, "客户", "DRAFT", 1, 20).get("items")).asList().isEmpty();
+        verify(documents).searchByStatus(7L, "客户", "DRAFT", pageable);
+        assertThatThrownBy(() -> service.records(7L, "", "INVALID", 0, 20)).hasMessageContaining("状态无效");
     }
 
     private BillingDocument document(String status, String number, Long ledgerId) throws Exception {
@@ -153,7 +222,7 @@ class BillingLedgerServiceTest {
 
     private FactoryLedgerTransaction transaction(Long ledgerId, long cents, String receiptNo, Long id, String status) {
         FactoryLedgerTransaction transaction = new FactoryLedgerTransaction();
-        transaction.setId(id);
+        transaction.setId(id); transaction.setSource("BILLING");
         transaction.setLedgerId(ledgerId);
         transaction.setTransactionNo("LS-" + id);
         transaction.setReceiptNo(receiptNo);

@@ -34,7 +34,7 @@
     <view class="home-section-note">点一行看明细</view>
   </view>
   <view class="home-overview">
-    <view class="home-result" bindtap="openModule" data-path="/pages/sales-orders/index">
+    <view class="home-result" bindtap="openModule" data-path="/pages/billing-list/index">
       <view class="home-result-mark">销</view>
       <view class="home-result-copy"><view class="home-result-title">今天卖了多少</view><view class="home-result-desc">查看今天的销售情况</view></view>
       <view class="home-result-value">¥{{report.sales || 0}}</view><view class="home-result-arrow">›</view>

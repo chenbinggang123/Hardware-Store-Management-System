@@ -1,5 +1,5 @@
 const api = require('../../utils/api')
-const { showToast } = require('../../utils/router')
+const { showToast, openPage } = require('../../utils/router')
 
 function createDefaultForm() {
   return {
@@ -24,28 +24,33 @@ Page({
   data: {
     id: '',
     mode: 'create',
-    saving: false,
+    saving: false, loading: false, loadError: '', saveError: '', moreOpen: false,
     uploadingImage: false,
     originalImageUrl: '',
     pendingImageUrl: '',
     form: createDefaultForm()
   },
 
-  onLoad(options) {
-    const mode = options.mode || 'create'
+  onLoad(options = {}) {
+    const mode = options.id ? 'edit' : 'create'
     const id = options.id || ''
     this.setData({ id, mode })
-    if (id) {
-      api.getProduct(id).then((product) => {
-        this.setData({
-          form: {
-            ...createDefaultForm(),
-            ...product
-          },
-          originalImageUrl: product.imageUrl || ''
-        })
-      })
-    }
+    if (!id && options.factory) this.setData({ 'form.sourceFactory': options.factory })
+    if (id) this.loadProduct()
+  },
+
+  toggleMore() { this.setData({ moreOpen: !this.data.moreOpen }) },
+
+  loadProduct() {
+    this.setData({ loading: true, loadError: '' })
+    return api.getProduct(this.data.id).then((product) => this.setData({ form: { ...createDefaultForm(), ...product }, originalImageUrl: product.imageUrl || '' }))
+      .catch((error) => this.setData({ loadError: error.message || '商品读取失败，请重试' }))
+      .finally(() => this.setData({ loading: false }))
+  },
+
+  openAdjust() {
+    api.ensureInventory(this.data.id).then((inventory) => openPage('/pages/inventory-adjust/index', { id: inventory.id }))
+      .catch((error) => showToast(error.message || '数量读取失败'))
   },
 
   onUnload() {
@@ -92,11 +97,12 @@ Page({
       showToast('请填写商品单位')
       return false
     }
+    if (![payload.retailPrice, payload.wholesalePrice, payload.oldCustomerPrice, payload.costPrice].every(Number.isFinite)) { showToast('请填写正确的价格'); return false }
     if (payload.retailPrice < 0 || payload.wholesalePrice < 0 || payload.oldCustomerPrice < 0 || payload.costPrice < 0) {
       showToast('价格不能小于 0')
       return false
     }
-    if (payload.stock < 0) {
+    if (!Number.isInteger(payload.stock) || payload.stock < 0) {
       showToast('库存不能小于 0')
       return false
     }
@@ -129,32 +135,18 @@ Page({
       return
     }
 
-    api.getProducts().then((products) => {
-      const duplicate = products.find((item) => {
-        return payload.barcode && `${item.barcode || ''}`.trim() === payload.barcode
-          && `${item.id}` !== `${this.data.id || ''}`
-      })
-
-      if (duplicate) {
-        showToast('商品条码已存在')
-        return
-      }
-
-      this.setData({ saving: true })
-      const action = this.data.mode === 'edit' ? api.updateProduct(this.data.id, payload) : api.saveProduct(payload)
-      action.then((savedProduct) => {
-        const original = this.data.originalImageUrl
-        if (original && original !== payload.imageUrl && String(original).startsWith('cloud://')) wx.cloud.deleteFile({ fileList: [original] }).catch(() => null)
-        this.setData({ pendingImageUrl: '', originalImageUrl: payload.imageUrl })
-        showToast('商品已保存', 'success')
-        setTimeout(() => {
-          wx.redirectTo({
-            url: `/pages/product-detail/index?id=${savedProduct.id}`
-          })
-        }, 400)
-      }).finally(() => {
-        this.setData({ saving: false })
-      })
-    })
+    this.setData({ saving: true, saveError: '' })
+    const action = this.data.id ? api.updateProduct(this.data.id, payload) : api.saveProduct(payload)
+    return action.then((savedProduct) => {
+      const original = this.data.originalImageUrl
+      if (original && original !== payload.imageUrl && String(original).startsWith('cloud://')) wx.cloud.deleteFile({ fileList: [original] }).catch(() => null)
+      this.setData({ pendingImageUrl: '', originalImageUrl: payload.imageUrl })
+      showToast('商品已保存', 'success')
+      wx.redirectTo({ url: '/pages/product-detail/index?id=' + savedProduct.id })
+    }).catch((error) => {
+      const message = error.message || error.errMsg || '保存失败，请重试'
+      this.setData({ saveError: message })
+      showToast(message)
+    }).finally(() => this.setData({ saving: false }))
   }
 })

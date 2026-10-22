@@ -13,6 +13,33 @@ import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
 
 class BillingServiceTest {
+    @Test void documentTypesAreValidatedAndReturnDraftKeepsItsType(){
+        var r=request(false);r.setDocumentType("RETURN");
+        assertThat(service.normalize(r,false).getDocumentType()).isEqualTo("RETURN");
+        r.setDocumentType(null);
+        assertThat(service.normalize(r,false).getDocumentType()).isEqualTo("PURCHASE");
+        r.setDocumentType("PAYMENT");
+        assertThatThrownBy(()->service.normalize(r,false)).hasMessageContaining("拿货单或退货单");
+    }
+    @Test void recognizedDatesAreNormalizedWithoutBlockingDrafts(){
+        for(String date:List.of("2026年10月6日","2026/10/6","2026.10.6","2026-10-06")){
+            var r=request(false);r.setDate(date);
+            assertThat(service.normalize(r,false).getDate()).isEqualTo("2026-10-06");
+        }
+    }
+    @Test void uncertainDateSurvivesDraftSaveAndMustBeCorrectedBeforeConfirmation(){
+        var r=request(false);r.setDate("2026年2月30日");r.setSourceNote("票面合计待核对");
+        var normalized=service.normalize(r,false);
+        assertThat(normalized.getDate()).isEmpty();
+        assertThat(normalized.getSourceNote()).contains("2026年2月30日","票面合计待核对","待核对");
+        var saved=service.normalize(normalized,false);
+        assertThat(saved.getDate()).isEmpty();
+        assertThat(saved.getSourceNote()).isEqualTo(normalized.getSourceNote());
+        assertThatThrownBy(()->service.normalize(saved,true)).hasMessageContaining("填写日期");
+        saved.setDate("2026-02-28");
+        assertThat(service.normalize(saved,true).getDate()).isEqualTo("2026-02-28");
+    }
+
     BillingDocumentRepository docs;BillingMemoryRepository memory;ProductRepository products;AgentWorkbookService excel;BillingProductUsageRepository usages;ProductEncyclopediaCatalog encyclopedia;BillingService service;
     @BeforeEach void setup(){docs=mock(BillingDocumentRepository.class);memory=mock(BillingMemoryRepository.class);products=mock(ProductRepository.class);excel=mock(AgentWorkbookService.class);usages=mock(BillingProductUsageRepository.class);encyclopedia=new ProductEncyclopediaCatalog();encyclopedia.load();service=new BillingService(docs,memory,products,excel,new ObjectMapper(),usages,encyclopedia);
         when(docs.saveAndFlush(any())).thenAnswer(i->{BillingDocument d=i.getArgument(0);if(d.getId()==null)d.setId(30L);d.setVersion(d.getVersion()==null?0L:d.getVersion()+1);return d;});
@@ -28,7 +55,7 @@ class BillingServiceTest {
     @Test void missingPriceAndExplicitZeroAreDifferent(){var r=request(false);r.getLines().get(0).setPrice(null);assertThat(service.normalize(r,false).getLines().get(0).getAmount()).isNull();assertThatThrownBy(()->service.normalize(r,true)).hasMessageContaining("补齐");r.getLines().get(0).setPrice(BigDecimal.ZERO);assertThat(service.normalize(r,true).getLines().get(0).getAmount()).isEqualByComparingTo("0.00");}
     @Test void rejectsNegativeOversizedOverPrecisionOrBlankUnits(){var negative=request(false);negative.getLines().get(0).setQuantity(new BigDecimal("-1"));assertThatThrownBy(()->service.normalize(negative,true)).isInstanceOf(IllegalArgumentException.class);var price=request(false);price.getLines().get(0).setPrice(new BigDecimal("1.001"));assertThatThrownBy(()->service.normalize(price,true)).hasMessageContaining("精度");var unit=request(false);unit.getLines().get(0).setUnit(" ");assertThatThrownBy(()->service.normalize(unit,true)).hasMessageContaining("补齐");}
     @Test void ownershipAndVersionProtectDraftsAndExports(){var d=save(false);assertThatThrownBy(()->service.get(2L,30L)).isInstanceOf(ResponseStatusException.class);assertThatThrownBy(()->service.excel(2L,30L)).isInstanceOf(ResponseStatusException.class);var r=request(false);r.setVersion(99L);assertThatThrownBy(()->service.save(1L,30L,r)).isInstanceOf(ResponseStatusException.class);assertThatThrownBy(()->service.confirm(1L,30L,99L)).isInstanceOf(ResponseStatusException.class);assertThat(d.getStatus()).isEqualTo("DRAFT");verifyNoInteractions(memory);}
-    @Test void confirmedDocumentsAreImmutableAndExportUsesSameSnapshot(){save(true);service.confirm(1L,30L,0L);var r=request(false);r.setVersion(1L);assertThatThrownBy(()->service.save(1L,30L,r)).hasMessageContaining("复制");when(excel.generate(isNull(),eq(1L),any())).thenReturn(Map.of("status","READY","outputId",4L));service.excel(1L,30L);var spec=ArgumentCaptor.forClass(AgentWorkbookSpec.class);verify(excel).generate(isNull(),eq(1L),spec.capture());assertThat(spec.getValue().getLayout()).isEqualTo("RECEIPT");assertThat(spec.getValue().getInfo()).anySatisfy(i->{assertThat(i.getLabel()).isEqualTo("单据名称");assertThat(i.getValue()).isEqualTo("销售单");});assertThat(spec.getValue().getSheets().get(0).getRows().get(0).toString()).contains("2.5","3.13");}
+    @Test void confirmedDocumentsAreImmutableAndExportUsesSameSnapshot(){save(true);service.confirm(1L,30L,0L);var r=request(false);r.setVersion(1L);assertThatThrownBy(()->service.save(1L,30L,r)).hasMessageContaining("复制");when(excel.generate(isNull(),eq(1L),any())).thenReturn(Map.of("status","READY","outputId",4L));service.excel(1L,30L);var spec=ArgumentCaptor.forClass(AgentWorkbookSpec.class);verify(excel).generate(isNull(),eq(1L),spec.capture());assertThat(spec.getValue().getLayout()).isEqualTo("RECEIPT");assertThat(spec.getValue().getInfo()).anySatisfy(i->{assertThat(i.getLabel()).isEqualTo("单据名称");assertThat(i.getValue()).isEqualTo("拿货单");});assertThat(spec.getValue().getSheets().get(0).getRows().get(0).toString()).contains("2.5","3.13");}
     @Test void candidatesAreOwnerScopedAndKeepAmbiguousUnitsSeparate(){var a=new BillingProductMemory();a.setId(1L);a.setName("螺栓");a.setSpecification("M12");a.setUnit("个");a.setAlias("12号螺丝");var b=new BillingProductMemory();b.setId(2L);b.setName("螺栓");b.setSpecification("M12");b.setUnit("盒");when(memory.search(eq(1L),eq("12号螺丝"),any())).thenReturn(List.of(a,b));when(products.findTop10ByNameContainingIgnoreCaseOrderByIdAsc(anyString())).thenReturn(List.of());var result=service.candidates(1L,"12号螺丝");assertThat(result).extracting(r->r.get("unit")).startsWith("个","盒");verify(memory).search(eq(1L),eq("12号螺丝"),any());}
     @Test void encyclopediaCandidatesKeepKnownTagsAndLeavePriceAndUnitForConfirmation(){when(memory.search(eq(1L),eq("活口扳手"),any())).thenReturn(List.of());when(products.findTop10ByNameContainingIgnoreCaseOrderByIdAsc(anyString())).thenReturn(List.of());var result=service.candidates(1L,"活口扳手");assertThat(result).isNotEmpty();var first=result.get(0);assertThat(first.get("name")).isEqualTo("活动扳手");assertThat(first.get("price")).isNull();assertThat(first.get("unit")).isEqualTo("");assertThat((List<?>)first.get("unitCandidates")).anySatisfy(value->assertThat(value).isEqualTo("把"));assertThat((List<?>)first.get("aliases")).anySatisfy(value->assertThat(value).isEqualTo("活口扳手"));assertThat(first.get("caution").toString()).isNotBlank();}
     @Test void blankSearchShowsAtMostFiveFrequentlyUsedCandidates(){var usage=new BillingProductUsage();usage.setOperatorId(1L);usage.setCandidateKey("encyclopedia:手动工具:活动扳手");usage.setUseCount(7L);when(usages.findTop5ByOperatorIdOrderByUseCountDescLastUsedTimeDesc(1L)).thenReturn(List.of(usage));when(memory.search(eq(1L),eq(""),any())).thenReturn(List.of());when(usages.findByOperatorIdAndCandidateKeyIn(eq(1L),any())).thenReturn(List.of());var result=service.candidates(1L,"");assertThat(result).hasSize(1);assertThat(result.get(0).get("name")).isEqualTo("活动扳手");assertThat(result.get(0).get("useCount")).isEqualTo(7L);verify(products,never()).findTop10ByNameContainingIgnoreCaseOrderByIdAsc(anyString());}

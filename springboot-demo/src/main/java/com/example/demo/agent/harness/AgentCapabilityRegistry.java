@@ -33,8 +33,8 @@ public class AgentCapabilityRegistry {
         add("finance", "create_document", "create_account_document");
         add("finance", "payment", "query_accounts", "record_account_payment");
         add("suppliers", "list", "list_suppliers");
-        add("procurement", "search", "search_source_purchase_orders");
-        add("procurement", "record", "search_source_purchase_orders", "record_source_purchase_order", "prepare_billing_document");
+        add("procurement", "search", "read_billing_documents");
+        add("procurement", "record", "read_billing_documents", "prepare_billing_document");
         add("factory_ledger", "search", "search_factory_ledgers");
         add("factory_ledger", "detail", "search_factory_ledgers", "get_factory_ledger", "get_factory_settlement_summary");
         add("factory_ledger", "write", "search_factory_ledgers", "get_factory_ledger", "create_factory_ledger", "record_factory_ledger_transaction", "update_factory_settlement_status");

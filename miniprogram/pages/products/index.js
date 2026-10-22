@@ -1,7 +1,7 @@
 const api = require('../../utils/api')
 const { openPage, showToast } = require('../../utils/router')
 
-const PENDING_PROMPT_KEY = 'agent_pending_prompt'
+const { modifyQuantity } = require('../../utils/product-quantity')
 const PAGE_SIZE = 20
 
 function activityText(item) {
@@ -10,6 +10,7 @@ function activityText(item) {
   const value = item.lastActivityAt
   if (!value) return '暂无交易记录'
   const date = String(value).slice(0, 10)
+  if (!sold && !purchased) return `最近使用 ${date}`
   if (sold && purchased) return `最近交易 ${date}`
   return `${sold ? '最近售出' : '最近进货'} ${date}`
 }
@@ -24,6 +25,7 @@ function normalizeProduct(item) {
     barcodeText: item.barcode || '--',
     specText: [item.spec, item.unit].filter(Boolean).join(' · ') || '规格未填写',
     retailPrice: item.retailPrice || 0,
+    costPrice: item.costPrice || 0,
     stockStateText,
     stockText: item.inventoryRecorded ? `${Number(item.quantity || 0)} ${item.unit || '件'}` : '未记录',
     locationText: item.locationId || '未设置',
@@ -34,13 +36,18 @@ function normalizeProduct(item) {
 
 Page({
   data: {
-    keyword: '', view: 'frequent', products: [], loading: true, loadingMore: false,
+    keyword: '', view: 'all', mode: 'products', factory: '', factories: [], products: [], loading: true, loadingMore: false,
     loadError: '', page: 0, totalPages: 0, totalElements: 0,
     summary: { totalProducts: 0, attentionCount: 0 },
     emptyTitle: '', emptyDesc: ''
   },
 
+  onLoad(options = {}) { this.setData({ factory: options.factory || '', mode: options.mode === 'factories' ? 'factories' : 'products' }) },
   onShow() { this.loadProducts(false) },
+  changeMode(event) { this.setData({ mode: event.currentTarget.dataset.mode, keyword: '' }, () => this.loadProducts(false)) },
+  openFactory(event) { openPage('/pages/products/index', { factory: event.currentTarget.dataset.factory }) },
+  openFactoryRecords() { openPage('/pages/billing-list/index', { documentType: 'PROCUREMENT', factory: this.data.factory }) },
+  openProcurement() { openPage('/pages/billing-editor/index', { documentType: 'PROCUREMENT', factory: this.data.factory }) },
   onPullDownRefresh() { this.loadProducts(false, true) },
   onReachBottom() { this.loadMore() },
 
@@ -50,10 +57,16 @@ Page({
   selectView(event) { this.setData({ view: event.currentTarget.dataset.view }, () => this.loadProducts(false)) },
 
   loadProducts(append, stopRefresh) {
+    if (this.data.mode === 'factories') {
+      this.setData({ loading: true, loadError: '' })
+      return api.getCatalogSuppliers(this.data.keyword).then((factories) => this.setData({ factories: factories || [] }))
+        .catch((error) => this.setData({ factories: [], loadError: error.message || '厂商账本加载失败' }))
+        .finally(() => { this.setData({ loading: false }); if (stopRefresh) wx.stopPullDownRefresh() })
+    }
     if (append && (this.data.loadingMore || this.data.page + 1 >= this.data.totalPages)) return Promise.resolve()
     const page = append ? this.data.page + 1 : 0
     this.setData(append ? { loadingMore: true } : { loading: true, loadError: '' })
-    return api.getCatalog({ view: this.data.view, keyword: String(this.data.keyword || '').trim(), page, size: PAGE_SIZE }).then((result) => {
+    return api.getCatalog({ view: this.data.view, keyword: String(this.data.keyword || '').trim(), factory: this.data.factory, page, size: PAGE_SIZE }).then((result) => {
       const view = result || {}
       const items = (view.items || []).map(normalizeProduct)
       const products = append ? this.data.products.concat(items) : items
@@ -75,34 +88,27 @@ Page({
   emptyCopy(count) {
     if (count) return { emptyTitle: '', emptyDesc: '' }
     if (this.data.keyword) return { emptyTitle: '没有找到商品', emptyDesc: '换个名称、条码或厂商关键词试试。' }
-    if (this.data.view === 'frequent') return { emptyTitle: '还没有常用商品', emptyDesc: '完成销售或采购后，常用商品会自动出现在这里。' }
+    if (this.data.view === 'frequent') return { emptyTitle: '还没有常用商品', emptyDesc: '已确认单据中的商品会自动记录，可切换“全部”查看。' }
     if (this.data.view === 'attention') return { emptyTitle: '暂时没有需要处理的商品', emptyDesc: '低库存、未定价或库存未记录的商品会出现在这里。' }
-    return { emptyTitle: '还没有商品', emptyDesc: '新增商品后，可以直接查询价格和库存。' }
+    return { emptyTitle: '还没有商品', emptyDesc: '在单据编辑页确认单据后，商品会自动记录在这里。' }
   },
 
   loadMore() { return this.loadProducts(true) },
   retryLoad() { this.loadProducts(false) },
   openDetail(event) { openPage('/pages/product-detail/index', { id: event.currentTarget.dataset.id }) },
-  openCreate() { openPage('/pages/product-form/index') },
+  openCreate() { openPage('/pages/product-form/index', { factory: this.data.factory }) },
   openAgent() { openPage('/pages/agent/index') },
   openEdit(event) { openPage('/pages/product-form/index', { id: event.currentTarget.dataset.id, mode: 'edit' }) },
 
-  openSale(event) {
-    const product = this.data.products.find((item) => `${item.id}` === `${event.currentTarget.dataset.id}`)
-    if (!product) return
-    // 直接打开快捷开单并带入这个商品，不再绕到小五对话
-    openPage('/pages/billing-editor/index', { productId: product.id })
-  },
 
   openAdjust(event) {
-    const inventoryId = event.currentTarget.dataset.inventoryId
-    if (inventoryId) return openPage('/pages/inventory-adjust/index', { id: inventoryId })
-    // 还没有库存记录的商品：先自动建一条，再进入盘点
-    const productId = event.currentTarget.dataset.id
-    if (!productId) return showToast('没找到这个商品')
-    api.ensureInventory(productId)
-      .then((inventory) => openPage('/pages/inventory-adjust/index', { id: inventory.id }))
-      .catch(() => showToast('库存记录创建失败，请重试'))
+    if (this.adjustingQuantity) return
+    const product = this.data.products.find((item) => String(item.id) === String(event.currentTarget.dataset.id))
+    if (!product) return
+    this.adjustingQuantity = true
+    modifyQuantity(product).then((saved) => { if (saved) { showToast('数量已更新', 'success'); this.loadProducts(false) } })
+      .catch((error) => showToast(error.message || '数量修改失败'))
+      .finally(() => { this.adjustingQuantity = false })
   },
 
   manageProduct(event) {

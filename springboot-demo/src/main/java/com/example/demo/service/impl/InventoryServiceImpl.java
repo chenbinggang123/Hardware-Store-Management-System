@@ -118,7 +118,7 @@ public class InventoryServiceImpl implements InventoryService {
         if (request.getActualQuantity() < 0) {
             throw new IllegalArgumentException("实际库存数量不能小于 0");
         }
-        Inventory inventory = getInventoryById(id)
+        Inventory inventory = inventoryRepository.lockById(id)
                 .orElseThrow(() -> new IllegalArgumentException("库存记录不存在，无法盘点调整"));
         int beforeQuantity = defaultInteger(inventory.getQuantity());
         int afterQuantity = defaultInteger(request.getActualQuantity());

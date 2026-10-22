@@ -8,6 +8,7 @@ function currentMonth() {
 
 Page({
   data: { month: currentMonth(), summary: null, loading: true },
+  onLoad(options = {}) { if (/^\d{4}-\d{2}$/.test(options.month || '')) this.setData({ month: options.month }) },
 
   onShow() { this.load() },
   onPullDownRefresh() { this.load().finally(() => wx.stopPullDownRefresh()) },
@@ -30,6 +31,5 @@ Page({
   },
 
   openRecords() { openPage('/pages/billing-list/index') },
-  openSettlements() { openPage('/pages/factory-settlements/index', { month: this.data.month }) },
-  openOldReports() { openPage('/pages/report-center/index') }
+  openLedgers() { openPage('/pages/factory-ledgers/index') }
 })

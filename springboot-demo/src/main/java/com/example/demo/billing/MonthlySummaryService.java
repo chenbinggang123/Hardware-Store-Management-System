@@ -39,12 +39,23 @@ public class MonthlySummaryService {
         int billedCount = 0;
         int voidedCount = 0;
         for (BillingDocument document : billed) {
+            if (StringUtils.hasText(document.getContentJson())) {
+                try { if ("PROCUREMENT".equals(new com.fasterxml.jackson.databind.ObjectMapper().readTree(document.getContentJson()).path("documentType").asText())) continue; }
+                catch (com.fasterxml.jackson.core.JsonProcessingException e) { throw new IllegalStateException("汇总单据内容无法读取", e); }
+            }
             if ("VOIDED".equals(document.getStatus())) {
                 voidedCount++;
                 continue;
             }
             billedCount++;
-            if (document.getTotalAmount() != null) billedAmount = billedAmount.add(document.getTotalAmount());
+            if (document.getTotalAmount() != null) {
+                boolean returned = false;
+                if (StringUtils.hasText(document.getContentJson())) {
+                    try { returned = "RETURN".equals(new com.fasterxml.jackson.databind.ObjectMapper().readTree(document.getContentJson()).path("documentType").asText()); }
+                    catch (com.fasterxml.jackson.core.JsonProcessingException e) { throw new IllegalStateException("汇总单据内容无法读取", e); }
+                }
+                billedAmount = returned ? billedAmount.subtract(document.getTotalAmount()) : billedAmount.add(document.getTotalAmount());
+            }
         }
 
         Map<String, Object> ledgerList = ledgers.list(month.toString(), null);
@@ -81,6 +92,7 @@ public class MonthlySummaryService {
         ledger.put("returnAmount", yuan(returned));
         ledger.put("paymentAmount", yuan(payment));
         ledger.put("balanceAmount", yuan(balance));
+        ledger.put("totalDueAmount", yuan(rows.stream().mapToLong(row -> number(row.get("totalDueCents"))).sum()));
         ledger.put("owingCount", factories.stream().filter(row -> number(row.get("balanceCents")) > 0).count());
 
         Map<String, Object> result = new LinkedHashMap<>();

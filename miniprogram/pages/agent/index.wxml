@@ -229,6 +229,7 @@
     <view class="attachment-menu" wx:if="{{attachmentMenuOpen}}" catchtap="preventClose">
       <view class="attachment-menu-title">添加到当前对话</view>
       <view class="attachment-menu-grid">
+        <view class="attachment-option" role="button" aria-label="选择已开单据或草稿" bindtap="chooseBillingDocument"><view class="attachment-option-icon document"><view></view></view><text>开单记录</text></view>
         <view class="attachment-option" role="button" aria-label="拍照" bindtap="chooseCamera"><view class="attachment-option-icon camera"><view></view></view><text>拍照</text></view>
         <view class="attachment-option" role="button" aria-label="从相册选择图片" bindtap="chooseAlbum"><view class="attachment-option-icon album"><view></view></view><text>相册</text></view>
         <view class="attachment-option" role="button" aria-label="从微信选择表格 Word 或 PDF" bindtap="chooseDocument"><view class="attachment-option-icon document"><view></view></view><text>微信文件</text></view>
@@ -247,10 +248,11 @@
       </view>
       <view class="uploading-line" wx:if="{{uploading}}">正在上传并识别附件…</view>
     </view>
+    <view class="composer-attachments" wx:if="{{billingReference || billingLoading}}"><view class="attachment-card"><view class="attachment-copy"><view class="attachment-name">{{billingLoading ? '正在读取单据…' : (billingReference.number || '开单草稿')}}</view><view class="attachment-meta">{{billingReference.content.customerName}} · 发送后小五可读取完整明细</view></view><view wx:if="{{!billingLoading}}" class="attachment-remove" role="button" aria-label="移除单据" bindtap="removeBillingReference">×</view></view></view>
     <view class="composer-row">
       <view class="attach-button {{attachmentMenuOpen ? 'active' : ''}}" role="button" aria-label="添加照片或文件" aria-expanded="{{attachmentMenuOpen}}" bindtap="toggleAttachmentMenu"><view></view><view></view></view>
       <textarea class="composer-input" aria-label="给小五发送消息" value="{{input}}" focus="{{inputFocus}}" bindblur="blurQuestion" bindinput="updateInput" auto-height maxlength="500" placeholder="说一件事，或先加附件" disabled="{{sending || resolving || uploading || savingAttachmentId || (run && run.status === 'WAITING_APPROVAL')}}" />
-      <view class="send-hit" role="button" aria-label="发送消息" aria-disabled="{{(!input && !pendingAttachments.length) || sending || resolving || uploading || savingAttachmentId || (run && run.status === 'WAITING_APPROVAL')}}" bindtap="send"><view class="send-button {{(!input && !pendingAttachments.length) || sending || resolving || uploading || savingAttachmentId || (run && run.status === 'WAITING_APPROVAL') ? 'disabled' : ''}}"><view class="send-glyph"></view></view></view>
+      <view class="send-hit" role="button" aria-label="发送消息" aria-disabled="{{(!input && !pendingAttachments.length && !billingReference) || billingLoading || sending || resolving || uploading || savingAttachmentId || (run && run.status === 'WAITING_APPROVAL')}}" bindtap="send"><view class="send-button {{(!input && !pendingAttachments.length && !billingReference) || billingLoading || sending || resolving || uploading || savingAttachmentId || (run && run.status === 'WAITING_APPROVAL') ? 'disabled' : ''}}"><view class="send-glyph"></view></view></view>
     </view>
   </view>
 </view>

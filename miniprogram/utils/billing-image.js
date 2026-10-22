@@ -188,13 +188,13 @@ function render(page, content, options = {}) {
     context.lineJoin = 'miter'
 
     left(context, text(content.companyName, '本店名称未填写'), MARGIN, 34, 420, 31, 'bold', 2)
-    font(context, 36, 'bold'); context.textAlign = 'center'; context.textBaseline = 'top'; context.fillText('销 售 单', WIDTH / 2, 30)
+    font(context, 36, 'bold'); context.textAlign = 'center'; context.textBaseline = 'top'; context.fillText(content.documentType === 'PROCUREMENT' ? '采 购 单' : (content.documentType === 'RETURN' ? '退 货 单' : '拿 货 单'), WIDTH / 2, 30)
     font(context, 17); context.textAlign = 'right'; context.fillText(`单号：${text(options.number, '草稿')}`, WIDTH - MARGIN, 42)
     line(context, MARGIN, 91, WIDTH - MARGIN, 91, 2)
     left(context, `联系电话：${text(content.phone, '未填写')}`, MARGIN, 107, 440)
     left(context, `单据日期：${text(content.date, '未填写')}`, WIDTH - 345, 107, 315)
     line(context, MARGIN, 141, WIDTH - MARGIN, 141)
-    left(context, `购货单位：${text(content.customerName, '未填写')}`, MARGIN, 155, 500, 20)
+    left(context, `${content.documentType === 'PROCUREMENT' ? '源头厂商' : '购货单位'}：${text(content.customerName, '未填写')}`, MARGIN, 155, 500, 20)
     left(context, `备注：${text(content.remark, '无')}`, 615, 155, WIDTH - MARGIN - 615, 19, 'normal', 2)
 
     let y = 212
@@ -220,7 +220,7 @@ function render(page, content, options = {}) {
     line(context, MARGIN, y, WIDTH - MARGIN, y); line(context, MARGIN, y + 58, WIDTH - MARGIN, y + 58, 2)
     y += 75
     if (content.remark) y += left(context, `整单备注：${content.remark}`, MARGIN, y, TABLE_WIDTH, 18, 'normal', 3) + 12
-    left(context, '金额按最终确认的数量与单价计算；本单尚未登记销售、欠款或库存。', MARGIN, y, TABLE_WIDTH, 17)
+    left(context, content.documentType === 'PROCUREMENT' ? '金额按确认明细计算；已确认采购单会同步商品资料与进货数量。' : '金额按最终确认的数量与单价计算。', MARGIN, y, TABLE_WIDTH, 17)
     y += 44
     left(context, '经手人：________________', MARGIN, y, 420, 19)
     font(context, 19); context.textAlign = 'right'; context.textBaseline = 'top'; context.fillText('客户签收：________________', WIDTH - MARGIN, y)

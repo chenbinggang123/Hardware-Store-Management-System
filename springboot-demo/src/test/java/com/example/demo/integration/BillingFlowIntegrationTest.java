@@ -34,6 +34,69 @@ class BillingFlowIntegrationTest {
     @Autowired private BillingService billing;
     @Autowired private BillingLedgerService billingLedger;
     @Autowired private FactoryLedgerService factoryLedgers;
+    @Autowired private com.example.demo.billing.BillingDocumentRepository documents;
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void returnDocumentReducesBalanceAndDeletedDocumentDisappearsFromBook() {
+        FactoryLedgerCreateRequest request=new FactoryLedgerCreateRequest();
+        request.setFactoryName("退货测试"+UUID.randomUUID());
+        Long ledgerId=((Number)factoryLedgers.create(request,OWNER).get("id")).longValue();
+        BillingContent content=new BillingContent();content.setDocumentType("RETURN");content.setLedgerId(ledgerId);
+        content.setDate(java.time.LocalDate.now().toString());
+        BillingContent.Line line=new BillingContent.Line();line.setName("螺丝");line.setUnit("个");line.setQuantity(new BigDecimal("2"));line.setPrice(new BigDecimal("5"));
+        content.setLines(List.of(line));
+        Map<String,Object> draft=billing.save(OWNER,null,content);
+        Long id=((Number)draft.get("id")).longValue();
+        billing.confirm(OWNER,id,(Long)draft.get("version"));
+        billingLedger.post(OWNER,id,ledgerId);
+        assertThat(balance(ledgerId)).isEqualByComparingTo("-10.00");
+        List<Map<String,Object>> entries=(List<Map<String,Object>>)factoryLedgers.get(ledgerId,null).get("transactions");
+        assertThat(entries).hasSize(1);
+        assertThat(entries.get(0).get("type")).isEqualTo("RETURN");
+        assertThat(entries.get(0).get("documentId")).isEqualTo(id);
+        billingLedger.deleteFromLedger(OWNER,ledgerId,((Number)entries.get(0).get("id")).longValue());
+        assertThat(balance(ledgerId)).isEqualByComparingTo("0.00");
+        assertThat((List<?>)factoryLedgers.get(ledgerId,null).get("transactions")).isEmpty();
+    }
+
+    @Test
+    void filtersAndBatchDraftCleanupUseTheWholeDatabaseResult() {
+        String customer = "筛选测试" + UUID.randomUUID().toString().substring(0, 8);
+        List<Long> ids = new java.util.ArrayList<>();
+        try {
+            for (int i = 0; i < 3; i++) {
+                BillingContent content = new BillingContent();
+                content.setRequestKey(UUID.randomUUID().toString());
+                content.setCustomerName(customer);
+                content.setDate(java.time.LocalDate.now().toString());
+                BillingContent.Line line = new BillingContent.Line();
+                line.setName("筛选商品"); line.setUnit("个");
+                line.setQuantity(BigDecimal.ONE); line.setPrice(BigDecimal.ONE);
+                content.setLines(List.of(line));
+                Map<String, Object> draft = billing.save(OWNER, null, content);
+                Long id = (Long) draft.get("id");
+                ids.add(id);
+                if (i > 0) billing.confirm(OWNER, id, (Long) draft.get("version"));
+                if (i == 2) billingLedger.voidDocument(OWNER, id, "筛选测试");
+            }
+            for (String status : List.of("DRAFT", "CONFIRMED", "VOIDED")) {
+                Map<String, Object> filtered = billingLedger.records(OWNER, customer, status, 0, 1);
+                assertThat(((Number) filtered.get("total")).longValue()).isEqualTo(1);
+                assertThat(filtered.get("items")).asList().hasSize(1);
+            }
+            assertThat(((Number) billingLedger.records(OWNER, customer, "", 0, 1).get("total")).longValue()).isEqualTo(3);
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> billingLedger.deleteDrafts(OWNER, ids))
+                    .hasMessageContaining("本次没有删除");
+            assertThat(billing.get(OWNER, ids.get(0)).get("status")).isEqualTo("DRAFT");
+            assertThat(billingLedger.deleteDrafts(OWNER, List.of(ids.get(0)))).isEqualTo(1);
+            assertThat(((Number) billingLedger.records(OWNER, customer, "DRAFT", 0, 20).get("total")).longValue()).isZero();
+            assertThat(billing.get(OWNER, ids.get(1)).get("status")).isEqualTo("CONFIRMED");
+            assertThat(billing.get(OWNER, ids.get(2)).get("status")).isEqualTo("VOIDED");
+        } finally {
+            documents.deleteAllById(ids);
+        }
+    }
 
     @Test
     @SuppressWarnings("unchecked")
@@ -71,17 +134,16 @@ class BillingFlowIntegrationTest {
         assertThat(billingLedger.post(OWNER, documentId, null).get("posted")).isEqualTo(true);
         assertThat(balance(ledgerId)).isEqualByComparingTo("105.60");
 
-        billingLedger.reopen(OWNER, documentId);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> billingLedger.deleteDocument(OWNER, documentId)).hasMessageContaining("账本中处理");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> billingLedger.reopen(OWNER, documentId)).hasMessageContaining("账本中处理");
+        Map<String, Object> managed = billingLedger.records(OWNER, customer, 0, 20);
+        assertThat(((List<Map<String,Object>>)managed.get("items")).get(0).get("ledgerManaged")).isEqualTo(true);
+        Map<String,Object> book = factoryLedgers.get(ledgerId,null);
+        List<Map<String,Object>> entries = (List<Map<String,Object>>)book.get("transactions");
+        Long transactionId = ((Number)entries.get(0).get("id")).longValue();
+        billingLedger.deleteFromLedger(OWNER,ledgerId,transactionId);
         assertThat(balance(ledgerId)).isEqualByComparingTo("0.00");
-        Map<String, Object> reopened = billing.get(OWNER, documentId);
-        BillingContent changed = (BillingContent) reopened.get("content");
-        changed.getLines().get(0).setQuantity(new BigDecimal("50"));
-        changed.setVersion((Long) reopened.get("version"));
-        reopened = billing.save(OWNER, documentId, changed);
-        billing.confirm(OWNER, documentId, (Long) reopened.get("version"));
-        Map<String, Object> reposted = billingLedger.post(OWNER, documentId, null);
-        assertThat(reposted.get("reversed")).isEqualTo(false);
-        assertThat(balance(ledgerId)).isEqualByComparingTo("132.00");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> billing.get(OWNER,documentId)).hasMessageContaining("单据不存在");
         assertThat(confirmed.get("number")).isNotNull();
     }
 

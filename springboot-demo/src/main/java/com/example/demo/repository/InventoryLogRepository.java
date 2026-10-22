@@ -9,5 +9,6 @@ import java.util.List;
  * 库存日志数据访问接口
  */
 public interface InventoryLogRepository extends JpaRepository<InventoryLog, Long> {
+    List<InventoryLog> findByRelatedOrderIdAndChangeTypeIn(Long documentId, java.util.Collection<String> types);
     List<InventoryLog> findByProductIdOrderByCreateTimeDesc(Long productId);
 }

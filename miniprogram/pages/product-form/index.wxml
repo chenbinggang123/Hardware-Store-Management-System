@@ -1,84 +1,23 @@
-<view class="screen">
-  <view class="hero-card">
-    <view class="hero-eyebrow">PRODUCT FORM</view>
-    <view class="hero-title">{{mode === 'edit' ? '编辑商品' : '新增商品'}}</view>
-    <view class="hero-subtitle">把名称、条码、价格、库存都补齐，商品模块就能支撑后续联动。</view>
-  </view>
-
-  <view class="form-card">
-    <view class="form-section-title">基础信息</view>
-    <view class="form-group">
-      <view class="form-label">商品名称 *</view>
-      <input class="form-input" value="{{form.name}}" data-key="name" bindinput="updateField" placeholder="请输入商品名称" />
+<view class="screen product-form">
+  <view class="product-heading"><view class="product-title">{{id ? '编辑商品资料' : '手动补录商品'}}</view><view class="product-note">日常商品由已确认单据自动记录，这里只需补充或修正。</view></view>
+  <view class="empty-state" wx:if="{{loading || loadError}}"><text>{{loading ? '正在读取商品…' : loadError}}</text><view wx:if="{{loadError}}" bindtap="loadProduct">重新加载</view></view>
+  <block wx:else>
+    <view class="compact-card">
+      <view class="compact-field"><text>商品名称</text><input value="{{form.name}}" data-key="name" bindinput="updateField" placeholder="必填" /></view>
+      <view class="compact-grid"><view class="compact-field"><text>规格</text><input value="{{form.spec}}" data-key="spec" bindinput="updateField" placeholder="例如 M6×20" /></view><view class="compact-field"><text>单位</text><input value="{{form.unit}}" data-key="unit" bindinput="updateField" placeholder="必填" /></view></view>
+      <view class="compact-field"><text>源头厂商</text><input value="{{form.sourceFactory}}" data-key="sourceFactory" bindinput="updateField" placeholder="选填，按厂商归入进货账本" /></view>
+      <view class="compact-grid"><view class="compact-field"><text>进价</text><input type="digit" value="{{form.costPrice}}" data-key="costPrice" bindinput="updateField" placeholder="选填" /></view><view class="compact-field"><text>售价</text><input type="digit" value="{{form.retailPrice}}" data-key="retailPrice" bindinput="updateField" placeholder="选填" /></view></view>
+      <view class="compact-field" wx:if="{{!id}}"><text>当前数量</text><input type="number" value="{{form.stock}}" data-key="stock" bindinput="updateField" placeholder="选填，默认 0" /></view>
+      <view class="compact-more" wx:if="{{id}}" bindtap="openAdjust">修改当前数量 ›</view>
     </view>
-    <view class="form-group">
-      <view class="form-label">条码</view>
-      <input class="form-input" value="{{form.barcode}}" data-key="barcode" bindinput="updateField" placeholder="选填，没有条码系统会自动编号" />
+    <view class="compact-more" bindtap="toggleMore">{{moreOpen ? '收起其他资料' : '其他资料（条码、库位、图片等）'}}</view>
+    <view class="compact-card" wx:if="{{moreOpen}}">
+      <view class="compact-field"><text>条码</text><input value="{{form.barcode}}" data-key="barcode" bindinput="updateField" placeholder="留空自动编号" /></view>
+      <view class="compact-grid"><view class="compact-field"><text>批发价</text><input type="digit" value="{{form.wholesalePrice}}" data-key="wholesalePrice" bindinput="updateField" placeholder="选填" /></view><view class="compact-field"><text>老客户价</text><input type="digit" value="{{form.oldCustomerPrice}}" data-key="oldCustomerPrice" bindinput="updateField" placeholder="选填" /></view></view>
+      <view class="compact-grid"><view class="compact-field"><text>库位</text><input value="{{form.locationId}}" data-key="locationId" bindinput="updateField" placeholder="例如 A-01" /></view><view class="compact-field"><text>单位换算</text><input value="{{form.unitConvert}}" data-key="unitConvert" bindinput="updateField" placeholder="例如 1箱=12件" /></view></view>
+      <view class="compact-image"><image wx:if="{{form.imageUrl}}" src="{{form.imageUrl}}" mode="aspectFill" /><view bindtap="chooseImage">{{uploadingImage ? '上传中…' : (form.imageUrl ? '更换图片' : '添加商品图片')}}</view><view wx:if="{{form.imageUrl}}" bindtap="removeImage">移除</view></view>
     </view>
-    <view class="form-group">
-      <view class="form-label">规格</view>
-      <input class="form-input" value="{{form.spec}}" data-key="spec" bindinput="updateField" placeholder="例如 16oz / 680W / 20mm" />
-    </view>
-    <view class="form-group">
-      <view class="form-label">单位 *</view>
-      <input class="form-input" value="{{form.unit}}" data-key="unit" bindinput="updateField" placeholder="例如 把 / 台 / 根" />
-    </view>
-    <view class="form-group">
-      <view class="form-label">单位换算</view>
-      <input class="form-input" value="{{form.unitConvert}}" data-key="unitConvert" bindinput="updateField" placeholder="例如 1箱=12件" />
-    </view>
-    <view class="form-group">
-      <view class="form-label">源头厂商</view>
-      <input class="form-input" value="{{form.sourceFactory}}" data-key="sourceFactory" bindinput="updateField" placeholder="请输入源头厂商" />
-    </view>
-    <view class="form-group">
-      <view class="form-label">商品图片</view>
-      <view class="product-image-editor">
-        <image class="product-image-preview" wx:if="{{form.imageUrl}}" src="{{form.imageUrl}}" mode="aspectFill" />
-        <view class="product-image-empty" wx:else><text>图</text><text>拍包装或商品外观，查找时更容易辨认</text></view>
-        <view class="product-image-actions"><view class="btn btn-outline btn-sm" bindtap="chooseImage">{{uploadingImage ? '上传中…' : form.imageUrl ? '更换图片' : '拍照或选择'}}</view><view class="btn btn-ghost btn-sm" wx:if="{{form.imageUrl}}" bindtap="removeImage">移除</view></view>
-      </view>
-    </view>
-  </view>
-
-  <view class="form-card">
-    <view class="form-section-title">价格信息</view>
-    <view class="form-group">
-      <view class="form-label">零售价</view>
-      <input class="form-input" type="digit" value="{{form.retailPrice}}" data-key="retailPrice" bindinput="updateField" placeholder="请输入零售价" />
-    </view>
-    <view class="form-group">
-      <view class="form-label">批发价</view>
-      <input class="form-input" type="digit" value="{{form.wholesalePrice}}" data-key="wholesalePrice" bindinput="updateField" placeholder="请输入批发价" />
-    </view>
-    <view class="form-group">
-      <view class="form-label">老客户价</view>
-      <input class="form-input" type="digit" value="{{form.oldCustomerPrice}}" data-key="oldCustomerPrice" bindinput="updateField" placeholder="请输入老客户价" />
-    </view>
-    <view class="form-group">
-      <view class="form-label">进价</view>
-      <input class="form-input" type="digit" value="{{form.costPrice}}" data-key="costPrice" bindinput="updateField" placeholder="请输入进价" />
-    </view>
-  </view>
-
-  <view class="form-card">
-    <view class="form-section-title">库存与状态</view>
-    <view class="form-group" wx:if="{{!id}}">
-      <view class="form-label">期初库存</view>
-      <input class="form-input" type="number" value="{{form.stock}}" data-key="stock" bindinput="updateField" placeholder="现在店里有多少，以后改数量请用盘点" />
-    </view>
-    <view class="form-group">
-      <view class="form-label">库位</view>
-      <input class="form-input" value="{{form.locationId}}" data-key="locationId" bindinput="updateField" placeholder="例如 A-01" />
-    </view>
-  </view>
-
-  <view class="banner banner-info">
-    <text class="banner-icon">💡</text>
-    <view><view class="banner-title">填写建议</view><view class="banner-desc">名称、条码、规格、单位是必填项。保存后商品默认可用于查询和开单，无需维护上下架。</view></view>
-  </view>
-
-  <view class="bottom-actions">
-    <view class="btn btn-primary btn-block" bindtap="submit">{{saving ? '保存中...' : '保存商品'}}</view>
-  </view>
+    <view class="product-error" wx:if="{{saveError}}">{{saveError}}</view>
+    <button class="btn btn-primary btn-block" disabled="{{saving || uploadingImage}}" bindtap="submit">{{saving ? '保存中…' : '保存商品'}}</button>
+  </block>
 </view>

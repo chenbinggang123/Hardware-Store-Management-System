@@ -1,6 +1,8 @@
 const api = require('../../utils/api')
 const { fileView, openAgentFile } = require('../../utils/agent-files')
 const { renderAndSave } = require('../../utils/billing-image')
+const localDraft = require('../../utils/billing-local-draft')
+const { openPage } = require('../../utils/router')
 
 function today() {
   const date = new Date()
@@ -71,9 +73,11 @@ function formView(content) {
     phone: source.phone || '',
     customerName: source.customerName || '',
     ledgerId: source.ledgerId || null,
-    date: source.date || today(),
+    documentType: ['RETURN', 'PROCUREMENT'].includes(source.documentType) ? source.documentType : 'PURCHASE',
+    date: source.date === undefined || source.date === null ? today() : source.date,
     remark: source.remark || '',
-    sourceNote: source.sourceNote || ''
+    sourceNote: source.sourceNote || '',
+    sourceDocumentNumber: source.sourceDocumentNumber || ''
   }
 }
 
@@ -99,23 +103,84 @@ Page({
     loading: true, error: '', busy: false, mode: 'preview', dirty: false,
     documentId: null, document: null, form: formView(), lines: [lineView({ ...blankLine(), expanded: true }, 0)],
     totalText: '0.00', incompleteCount: 1, reviewCount: 4, reviewLineCount: 1, searchKeyword: '', candidates: [], searching: false,
-    headerOpen: false, reviewOnly: false,
+    headerOpen: false, reviewOnly: false, localSaveText: '',
     ledgers: [], ledgerNames: ['不记入账本'], ledgerIndex: 0, ledgerName: '', ledgerPosting: null, ledgerBusy: false,
     candidateTitle: '最近常用', activeLineIndex: null, evidenceOpen: false,
     statusText: '', actionError: '', actionRetry: '', actionRetryText: '', imageBusy: false, generatedFile: null
   },
 
-  onLoad(options) {
+  onLoad(options = {}) {
     const id = Number(options.id)
-    if (id) this.loadDocument(id)
+    this.localStorageKey = localDraft.key(id)
+    this.newRequestKey = `mini-billing-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    if (id) { this.setData({ documentId: id }); this.loadDocument(id) }
     else this.setData({ loading: false, mode: 'edit' }, () => {
-      this.recalculate()
-      if (options.productId) this.prefillProduct(options.productId)
-      if (options.copyFrom) this.copyFrom(options.copyFrom)
+      this.offerLocalDraft(() => {
+        if (options.ledgerId) this.setData({ 'form.ledgerId': Number(options.ledgerId) })
+        if (['RETURN', 'PROCUREMENT'].includes(options.documentType)) this.setData({ 'form.documentType': options.documentType, headerOpen: options.documentType === 'PROCUREMENT' })
+        if (options.factory) this.setData({ 'form.customerName': options.factory, headerOpen: true })
+        this.recalculate()
+        if (options.productId) this.prefillProduct(options.productId)
+        if (options.copyFrom) this.copyFrom(options.copyFrom)
+      })
     })
     this.searchProducts('')
     this.loadLedgers()
   },
+
+  updateDraft(values, callback) {
+    this.setData(values, callback)
+    this.persistLocalDraft()
+  },
+  changeDocumentType(event) {
+    if (this.data.document && this.data.document.status !== 'DRAFT') return
+    const type = event.currentTarget.dataset.type
+    this.updateDraft({ 'form.documentType': type, ...(type === 'PROCUREMENT' ? { 'form.ledgerId': null, ledgerIndex: 0, ledgerName: '', headerOpen: true } : {}), dirty: true })
+  },
+
+  persistLocalDraft() {
+    if (!this.data.dirty || !this.localStorageKey) return
+    const saved = localDraft.write(this.localStorageKey, {
+      form: this.data.form, lines: this.data.lines,
+      document: this.data.document, requestKey: this.newRequestKey
+    })
+    this.setData({ localSaveText: saved ? '已暂存到本机，尚未保存到开单记录' : '本机暂存失败，请先保存草稿再离开' })
+    if (!this.leaveAlertEnabled && wx.enableAlertBeforeUnload) {
+      wx.enableAlertBeforeUnload({ message: '单据尚未保存，请确认已暂存或先保存草稿。' })
+      this.leaveAlertEnabled = true
+    }
+  },
+
+  offerLocalDraft(startFresh) {
+    if (this.recoveryOffered) return
+    this.recoveryOffered = true
+    const saved = localDraft.read(this.localStorageKey)
+    if (!saved) { if (startFresh) startFresh(); return }
+    const current = this.data.document
+    const changed = current && (!saved.document || current.version !== saved.document.version || current.status !== 'DRAFT')
+    return wx.showModal({
+      title: changed ? '发现未保存的本机内容' : '继续上次未完成的开单？',
+      content: changed ? '服务器上的单据已更新。恢复后将作为新单保存，避免覆盖已有单据。' : '本机保留了上次填写的客户和商品明细。可以继续填写，也可以丢弃暂存。',
+      confirmText: changed ? '恢复为新单' : '继续填写', cancelText: '丢弃暂存'
+    }).then((choice) => {
+      if (!choice.confirm) {
+        localDraft.remove(this.localStorageKey)
+        if (startFresh) startFresh()
+        return
+      }
+      if ((!changed || !saved.document) && saved.requestKey) this.newRequestKey = saved.requestKey
+      this.updateDraft({
+        form: formView(saved.form), lines: (saved.lines.length ? saved.lines : [blankLine()]).map((line, index) => lineView({ ...line, nameFocus: false, quantityFocus: false, priceFocus: false }, index)),
+        document: changed ? null : (current || saved.document || null),
+        documentId: changed ? null : ((current || saved.document || {}).id || null),
+        mode: 'edit', dirty: true, statusText: '已恢复上次未保存的内容'
+      }, () => { this.recalculate(); this.syncLedgerIndex(false) })
+    }).catch(() => {
+      this.setData({ localSaveText: '暂存仍保留，请重新进入后恢复' })
+    })
+  },
+
+  onHide() { this.persistLocalDraft() },
 
   // 复制为新单：带入原单的客户和商品，日期改为今天，保存后是一张新单号的单据。
   copyFrom(sourceId) {
@@ -123,8 +188,8 @@ Page({
       const content = (source && source.content) || {}
       const lines = (content.lines && content.lines.length ? content.lines : [blankLine()])
         .map((line) => ({ ...line, expanded: false }))
-      this.setData({
-        form: { ...formView(content), date: today() },
+      this.updateDraft({
+        form: { ...formView(content), date: today(), sourceDocumentNumber: '' },
         lines: lines.map(lineView),
         dirty: true,
         statusText: `从 ${source.number || '原单'} 复制，尚未保存`
@@ -142,6 +207,7 @@ Page({
 
   // 修改已保存的单据：退回草稿继续改。已记账的会先冲销，改完点“保存并记账”重新记一笔。
   reopenDocument() {
+    if (this.data.ledgerPosting) return wx.showToast({ title: '已进入账本，请到账本处理', icon: 'none' })
     const document = this.data.document
     if (!document || document.status !== 'CONFIRMED' || this.data.busy) return
     const posted = this.data.ledgerPosting && !this.data.ledgerPosting.reversed
@@ -163,6 +229,7 @@ Page({
 
   // 作废：单据标为作废；如果已记入厂家账本，后端会自动红字冲销。
   voidDocument() {
+    if (this.data.ledgerPosting) return wx.showToast({ title: '已进入账本，请到账本处理', icon: 'none' })
     const document = this.data.document
     if (!document || document.status !== 'CONFIRMED' || this.data.busy) return
     const posted = this.data.ledgerPosting && !this.data.ledgerPosting.reversed
@@ -194,7 +261,7 @@ Page({
         price: product.retailPrice === null || product.retailPrice === undefined ? '' : product.retailPrice,
         quantity: '1', candidateKey: `product:${product.id}`, referenceSource: '商品库', remember: true, expanded: true
       }, 0)
-      this.setData({ lines: [line], dirty: true }, () => {
+      this.updateDraft({ lines: [line], dirty: true }, () => {
         this.recalculate()
         this.focusLineField(0, 'quantity')
       })
@@ -210,6 +277,7 @@ Page({
   },
 
   syncLedgerIndex(autoMatch) {
+    if (this.data.form.documentType === 'PROCUREMENT') return
     const ledgers = this.data.ledgers
     if (!ledgers.length) return // 账本列表还没加载完，保留单据里已选的账本
     let ledgerId = this.data.form.ledgerId
@@ -219,7 +287,7 @@ Page({
       if (matched) ledgerId = matched.id
     }
     const index = ledgers.findIndex((item) => item.id === ledgerId)
-    this.setData({
+    this.updateDraft({
       'form.ledgerId': index >= 0 ? ledgerId : null,
       ledgerIndex: index >= 0 ? index + 1 : 0,
       ledgerName: index >= 0 ? ledgers[index].factoryName : ''
@@ -234,7 +302,7 @@ Page({
       dirty: true, statusText: '有修改尚未保存'
     }
     if (ledger && !String(this.data.form.customerName || '').trim()) update['form.customerName'] = ledger.factoryName
-    this.setData(update)
+    this.updateDraft(update)
   },
 
   loadLedgerPosting(id) {
@@ -248,6 +316,7 @@ Page({
   postToLedger(documentId) {
     const id = Number(documentId) || Number(this.data.documentId)
     const ledgerId = this.data.form.ledgerId
+    if (this.data.form.documentType === 'PROCUREMENT') return Promise.resolve(null)
     if (!id || !ledgerId || this.data.ledgerBusy) return Promise.resolve(null)
     this.setData({ ledgerBusy: true, statusText: '正在记入厂家账本…' })
     return api.postBillingToLedger(id, ledgerId).then((posting) => {
@@ -270,12 +339,22 @@ Page({
     this.setData({ 'form.ledgerId': ledger.id, ledgerIndex: index, ledgerName: ledger.factoryName }, () => this.postToLedger())
   },
 
-  onUnload() { clearTimeout(this.searchTimer) },
+  onUnload() { clearTimeout(this.searchTimer); this.persistLocalDraft() },
 
   loadDocument(id) {
     this.setData({ loading: true, error: '' })
-    api.getBillingDocument(id).then((document) => this.showDocument(document, true))
-      .catch((error) => this.setData({ error: errorText(error, '单据加载失败，请稍后重试') }))
+    return api.getBillingDocument(id).then((document) => {
+      this.showDocument(document, true)
+      return this.offerLocalDraft()
+    })
+      .catch((error) => {
+        const saved = localDraft.read(this.localStorageKey)
+        if (saved && !this.recoveryOffered) {
+          this.setData({ error: '', document: saved.document || null })
+          return this.offerLocalDraft(() => this.setData({ error: errorText(error, '单据加载失败，请稍后重试') }))
+        }
+        this.setData({ error: errorText(error, '单据加载失败，请稍后重试') })
+      })
       .finally(() => this.setData({ loading: false }))
   },
 
@@ -284,6 +363,8 @@ Page({
   },
 
   showDocument(document, fresh) {
+    if (this.leaveAlertEnabled && wx.disableAlertBeforeUnload) wx.disableAlertBeforeUnload()
+    this.leaveAlertEnabled = false
     const content = document.content || {}
     const confirmed = document.status === 'CONFIRMED' || document.status === 'VOIDED'
     // 保存草稿后保留当前展开的行；重新打开的草稿直接进入紧凑核对视图，已保存单据进入预览。
@@ -297,7 +378,7 @@ Page({
       lines: lines.map(lineView),
       mode: confirmed ? 'preview' : (fresh ? 'edit' : this.data.mode),
       reviewOnly: fresh ? false : this.data.reviewOnly,
-      dirty: false,
+      dirty: false, localSaveText: '',
       statusText: document.status === 'VOIDED' ? `已作废 · ${document.number}` : (document.status === 'CONFIRMED' ? `已保存 · ${document.number}` : `草稿 #${document.id} · 已保存`)
     }, () => {
       this.recalculate()
@@ -336,13 +417,13 @@ Page({
 
   changeForm(event) {
     const field = event.currentTarget.dataset.field
-    this.setData({ [`form.${field}`]: event.detail.value, dirty: true, actionError: '', actionRetry: '', actionRetryText: '', statusText: '有修改尚未保存' }, () => {
+    this.updateDraft({ [`form.${field}`]: event.detail.value, dirty: true, actionError: '', actionRetry: '', actionRetryText: '', statusText: '有修改尚未保存' }, () => {
       if (field === 'customerName' && !this.data.form.ledgerId) this.syncLedgerIndex(true)
     })
   },
 
   changeDate(event) {
-    this.setData({ 'form.date': event.detail.value, dirty: true, actionError: '', actionRetry: '', actionRetryText: '', statusText: '有修改尚未保存' })
+    this.updateDraft({ 'form.date': event.detail.value, dirty: true, actionError: '', actionRetry: '', actionRetryText: '', statusText: '有修改尚未保存' })
   },
 
   changeLine(event) {
@@ -351,7 +432,7 @@ Page({
     const lines = this.data.lines.slice()
     const learnIdentity = ['name', 'specification', 'unit'].includes(field) && String(event.detail.value || '').trim()
     lines[index] = { ...lines[index], [field]: event.detail.value, remember: learnIdentity ? true : lines[index].remember }
-    this.setData({ lines, dirty: true, actionError: '', actionRetry: '', actionRetryText: '', statusText: '有修改尚未保存' }, () => this.recalculate())
+    this.updateDraft({ lines, dirty: true, actionError: '', actionRetry: '', actionRetryText: '', statusText: '有修改尚未保存' }, () => this.recalculate())
     if (field === 'name') {
       this.setData({ activeLineIndex: index, searchKeyword: event.detail.value || '' })
       clearTimeout(this.searchTimer)
@@ -398,14 +479,14 @@ Page({
     const index = Number(event.currentTarget.dataset.index)
     const lines = this.data.lines.slice()
     lines[index] = { ...lines[index], unit: event.currentTarget.dataset.unit, remember: true }
-    this.setData({ lines, dirty: true, statusText: '有修改尚未保存' }, () => this.recalculate())
+    this.updateDraft({ lines, dirty: true, statusText: '有修改尚未保存' }, () => this.recalculate())
   },
 
   toggleRemember(event) {
     const index = Number(event.currentTarget.dataset.index)
     const lines = this.data.lines.slice()
     lines[index] = { ...lines[index], remember: event.detail.value }
-    this.setData({ lines, dirty: true, statusText: '有修改尚未保存' })
+    this.updateDraft({ lines, dirty: true, statusText: '有修改尚未保存' })
   },
 
   toggleLineRemark(event) {
@@ -417,7 +498,7 @@ Page({
 
   addLine() {
     const index = this.data.lines.length
-    this.setData({ lines: this.data.lines.concat(lineView(blankLine(), index)), dirty: true }, () => {
+    this.updateDraft({ lines: this.data.lines.concat(lineView(blankLine(), index)), dirty: true }, () => {
       this.recalculate()
       this.focusLineField(index, 'name')
     })
@@ -430,7 +511,7 @@ Page({
     const copy = lineView({ ...source, quantity: '1', remark: '', remarkOpen: false, sourceAmount: '', amountMismatch: false, remember: true }, index + 1)
     const lines = this.data.lines.slice()
     lines.splice(index + 1, 0, copy)
-    this.setData({ lines: lines.map(lineView), dirty: true, statusText: '已复制商品，请填写数量' }, () => {
+    this.updateDraft({ lines: lines.map(lineView), dirty: true, statusText: '已复制商品，请填写数量' }, () => {
       this.recalculate()
       this.focusLineField(index + 1, 'quantity')
     })
@@ -439,7 +520,7 @@ Page({
   removeLine(event) {
     if (this.data.lines.length === 1) return wx.showToast({ title: '至少保留一行商品', icon: 'none' })
     const remove = Number(event.currentTarget.dataset.index)
-    this.setData({ lines: this.data.lines.filter((_, index) => index !== remove).map(lineView), dirty: true }, () => this.recalculate())
+    this.updateDraft({ lines: this.data.lines.filter((_, index) => index !== remove).map(lineView), dirty: true }, () => this.recalculate())
   },
 
   recalculate() {
@@ -474,7 +555,15 @@ Page({
     this.setData({ searching: true })
     api.searchBillingProducts(keyword).then((candidates) => {
       if (requestId !== this.searchRequestId) return
-      this.setData({ candidates: candidates || [], candidateTitle: keyword.trim() ? '匹配商品' : '最近常用' })
+      let rows = candidates || []
+      if (this.data.form.documentType === 'PROCUREMENT') {
+        const factory = this.data.form.customerName.trim()
+        rows = rows.filter((item) => !factory || !item.factory || item.factory === factory).map((item) => ({
+          ...item, price: item.costPrice === undefined ? null : item.costPrice,
+          source: item.sourceType === 'PRODUCT' ? ((item.factory || '商品库') + ' · 进价参考') : (item.source + ' · 请填写进价')
+        }))
+      }
+      this.setData({ candidates: rows, candidateTitle: keyword.trim() ? '匹配商品' : '最近常用' })
     }).catch(() => {
       if (requestId === this.searchRequestId) this.setData({ candidates: [] })
     }).finally(() => {
@@ -494,9 +583,10 @@ Page({
     const existing = target >= 0 ? this.data.lines[target] : blankLine()
     const unitCandidates = Array.isArray(candidate.unitCandidates) ? candidate.unitCandidates.filter(Boolean) : []
     const resolvedUnit = candidate.unit || (unitCandidates.length === 1 ? unitCandidates[0] : existing.unit) || ''
+    const selectedPrice = this.data.form.documentType === 'PROCUREMENT' ? candidate.costPrice : candidate.price
     const line = lineView({
       ...existing, name: candidate.name || existing.name || '', specification: candidate.specification || existing.specification || '',
-      unit: resolvedUnit, price: candidate.price === null || candidate.price === undefined ? existing.price || '' : candidate.price,
+      unit: resolvedUnit, price: selectedPrice === null || selectedPrice === undefined ? existing.price || '' : selectedPrice,
       quantity: existing.quantity || '1', alias: candidate.alias || '', candidateKey: candidate.candidateKey || '',
       referenceSource: candidate.source || '', referenceCategory: candidate.category || '',
       referenceAliases: candidate.aliases || [], unitCandidates,
@@ -505,7 +595,7 @@ Page({
     const lines = this.data.lines.slice()
     if (target >= 0) lines[target] = line
     else lines.push(line)
-    this.setData({ lines, searchKeyword: '', candidates: [], activeLineIndex: null, dirty: true, statusText: '名称、规格、单位和已有价格已自动带入' }, () => {
+    this.updateDraft({ lines, searchKeyword: '', candidates: [], activeLineIndex: null, dirty: true, statusText: '名称、规格、单位和已有价格已自动带入' }, () => {
       this.recalculate()
       this.focusLineField(target >= 0 ? target : lines.length - 1, 'quantity')
     })
@@ -526,7 +616,7 @@ Page({
     }).then((product) => {
       const lines = this.data.lines.slice()
       lines[index] = lineView({ ...lines[index], candidateKey: `product:${product.id}`, referenceSource: '商品库' }, index)
-      this.setData({ lines, dirty: true })
+      this.updateDraft({ lines, dirty: true })
       wx.showToast({ title: '已加入商品库', icon: 'success' })
     }).catch((error) => wx.showToast({ title: errorText(error, '加入失败'), icon: 'none', duration: 3000 }))
       .finally(() => { this.addingProduct = false })
@@ -538,7 +628,7 @@ Page({
     return {
       ...this.data.form,
       version: this.data.document ? this.data.document.version : null,
-      requestKey: this.data.document ? null : `mini-billing-${Date.now()}`,
+      requestKey: this.data.document ? null : this.newRequestKey,
       lines: this.data.lines.map((line) => ({
         ...line,
         index: undefined, amountText: undefined, unitChoices: undefined,
@@ -555,11 +645,21 @@ Page({
 
   saveDraft() {
     if (this.data.busy) return Promise.resolve(null)
+    const payload = this.payload()
+    const submitted = JSON.stringify(payload)
     this.setData({ busy: true, actionError: '', actionRetry: '', actionRetryText: '', statusText: '正在保存…' })
     const task = this.data.documentId
-      ? api.saveBillingDocument(this.data.documentId, this.payload())
-      : api.createBillingDocument(this.payload())
+      ? api.saveBillingDocument(this.data.documentId, payload)
+      : api.createBillingDocument(payload)
     return task.then((document) => {
+      const editedWhileSaving = JSON.stringify(this.payload()) !== submitted
+      localDraft.remove(this.localStorageKey)
+      this.localStorageKey = localDraft.key(document.id)
+      if (editedWhileSaving) {
+        this.updateDraft({ document, documentId: document.id, dirty: true, statusText: '保存期间有新修改，已暂存，请再次保存' })
+        wx.showToast({ title: '新修改已保留，请再次保存', icon: 'none' })
+        return null
+      }
       this.showDocument(document, false)
       wx.showToast({ title: '草稿已保存', icon: 'success' })
       return document
@@ -588,6 +688,10 @@ Page({
       this.setData({ actionError: message, actionRetry: '', actionRetryText: '' })
       return wx.showToast({ title: message, icon: 'none', duration: 3000 })
     }
+    if (this.data.form.documentType === 'PROCUREMENT' && !this.data.form.customerName.trim()) {
+      this.setData({ headerOpen: true, mode: 'edit', actionError: '请填写源头厂商，进货会记入这家厂商的账本' })
+      return wx.showToast({ title: '请填写源头厂商', icon: 'none' })
+    }
     this.setData({ actionError: '', actionRetry: '', actionRetryText: '' })
     // 底部“保存并导出”就是唯一确认，不再弹二次确认框；单据不登记销售、欠款或库存。
     return Promise.resolve().then(() => {
@@ -597,7 +701,7 @@ Page({
         return api.confirmBillingDocument(draft.id, draft.version).then((document) => {
           this.showDocument(document, true)
           // 选了厂家账本就顺手记账；记账失败不影响单据，可以重试。
-          const posting = this.data.form.ledgerId ? this.postToLedger(document.id) : Promise.resolve(null)
+          const posting = this.data.form.documentType !== 'PROCUREMENT' && this.data.form.ledgerId ? this.postToLedger(document.id) : Promise.resolve(null)
           return posting.then(() => this.chooseExportFormat(document.id))
         }).catch((error) => {
           const message = errorText(error, '单据保存失败')

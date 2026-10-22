@@ -11,6 +11,7 @@ public record CatalogItemView(
         String spec,
         String unit,
         BigDecimal retailPrice,
+        BigDecimal costPrice,
         BigDecimal wholesalePrice,
         BigDecimal oldCustomerPrice,
         String sourceFactory,

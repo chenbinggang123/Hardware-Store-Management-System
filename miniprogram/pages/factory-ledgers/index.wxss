@@ -26,4 +26,6 @@
 .book-money { min-width: 184rpx; align-items: flex-end; text-align: right; }
 .book-money > text:first-child, .book-status { color: #66746E; font-size: 21rpx; }
 .book-amount { margin: 5rpx 0; color: #17231E; font-size: 30rpx; font-weight: 800; }
+.ledger-monthly { margin-top: 18rpx; padding: 22rpx 20rpx; display: flex; align-items: center; justify-content: space-between; gap: 16rpx; border: 1rpx solid #CED8D3; border-radius: 10rpx; background: #FFF; color: #245E9B; font-size: 24rpx; }
+.monthly-title { color: #17231E; font-size: 28rpx; font-weight: 700; }.monthly-note { margin-top: 6rpx; color: #52605A; font-size: 23rpx; }.ledger-monthly > text { flex-shrink: 0; }
 @media (max-width: 340px) { .book-row { grid-template-columns: 40rpx minmax(0,1fr); } .book-money { grid-column: 2; padding-top: 0; align-items: flex-start; text-align: left; } }

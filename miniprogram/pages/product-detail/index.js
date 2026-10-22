@@ -1,4 +1,5 @@
 const api = require('../../utils/api')
+const { modifyQuantity } = require('../../utils/product-quantity')
 const { openPage, showToast } = require('../../utils/router')
 
 function normalizeProduct(product, inventory) {
@@ -89,12 +90,11 @@ Page({
   },
 
   openInventoryAdjust() {
-    const product = this.data.product
-    if (!product) return
-    if (product.inventoryId) return openPage('/pages/inventory-adjust/index', { id: product.inventoryId })
-    api.ensureInventory(product.id)
-      .then((inventory) => openPage('/pages/inventory-adjust/index', { id: inventory.id }))
-      .catch(() => showToast('库存记录创建失败，请重试'))
+    if (!this.data.product || this.adjustingQuantity) return
+    this.adjustingQuantity = true
+    modifyQuantity(this.data.product).then((saved) => { if (saved) this.loadDetail() })
+      .catch((error) => showToast(error.message || '数量修改失败'))
+      .finally(() => { this.adjustingQuantity = false })
   },
 
   openInventoryLogs() {

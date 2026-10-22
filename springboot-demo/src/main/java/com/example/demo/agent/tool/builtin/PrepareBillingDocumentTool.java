@@ -18,7 +18,8 @@ public class PrepareBillingDocumentTool implements AgentTool {
         line.put("quantity",Map.of("type",List.of("number","null"),"description","原始数量，未知留空，最多6位小数"));
         line.put("price",Map.of("type",List.of("number","null"),"description","原始单价，未知留空，最多2位小数"));
         Map<String,Object> props=new LinkedHashMap<>();
-        for(String key:List.of("companyName","phone","customerName","date","remark","sourceNote"))props.put(key,Map.of("type",List.of("string","null")));
+        for(String key:List.of("companyName","phone","customerName","date","remark","sourceNote","sourceDocumentNumber"))props.put(key,Map.of("type",List.of("string","null")));
+        props.put("documentType",Map.of("type","string","enum",List.of("PURCHASE","RETURN","PROCUREMENT"),"description","拿货单用PURCHASE，客户退货用RETURN，从源头厂商采购进货用PROCUREMENT；采购单customerName填写源头厂商"));
         props.put("lines",Map.of("type","array","minItems",1,"maxItems",200,"items",Map.of("type","object","additionalProperties",false,"properties",line,"required",List.of("name"))));
         return new AgentToolDefinition("prepare_billing_document","先准备商品单据草稿，保留来源金额和待核对信息。在开单页手动修改、核对后再选择导出图片或 Excel；不会登记销售、欠款或库存。",AgentToolRisk.R1_DRAFT,
             Map.of("type","object","additionalProperties",false,"properties",props,"required",List.of("lines")),"送到开单页修改");

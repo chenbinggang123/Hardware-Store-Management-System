@@ -18,7 +18,7 @@ public class AgentToolRegistry {
      * 可用 AGENT_RETIRED_TOOLS 覆盖（逗号分隔，留空表示全部启用）。
      */
     static final String DEFAULT_RETIRED_TOOLS = "create_sales_draft,update_sales_draft,commit_sales_draft,get_sales_draft,"
-            + "create_account_document,record_account_payment,query_accounts,change_product_status";
+            + "create_account_document,record_account_payment,query_accounts,change_product_status,record_source_purchase_order";
 
     private final Map<String, AgentTool> tools = new LinkedHashMap<>();
 

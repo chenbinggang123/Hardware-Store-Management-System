@@ -66,12 +66,12 @@
       <view class="detail-item"><view class="detail-label">预警线</view><view class="detail-value">{{product.warningThreshold}}</view></view>
       <view class="detail-item"><view class="detail-label">库位</view><view class="detail-value">{{product.locationText}}</view></view>
     </view>
-    <view class="inventory-actions" wx:if="{{product.inventoryRecorded}}"><view class="btn btn-primary btn-sm" bindtap="openInventoryAdjust">盘点库存</view><view class="btn btn-secondary btn-sm" bindtap="openInventoryLogs">查看流水</view></view>
+    <view class="inventory-actions" ><view class="btn btn-primary btn-sm" bindtap="openInventoryAdjust">修改数量</view><view class="btn btn-secondary btn-sm" bindtap="openInventoryLogs">查看流水</view></view>
     <view class="banner banner-warning" wx:if="{{product.lowStock}}" style="margin-top: 16rpx;">
       <text class="banner-icon">!</text>
       <view><view class="banner-title">库存预警</view><view class="banner-desc">当前库存已进入低库存区间，建议尽快补货。</view></view>
     </view>
-    <view class="banner" wx:elif="{{!product.inventoryRecorded}}" style="margin-top: 16rpx;"><view><view class="banner-title">库存未记录</view><view class="banner-desc">编辑并保存商品后会自动建立库存记录。</view></view></view>
+    <view class="banner" wx:elif="{{!product.inventoryRecorded}}" style="margin-top: 16rpx;"><view><view class="banner-title">库存未记录</view><view class="banner-desc">确认采购单会自动增加数量，也可以直接修改当前数量。</view></view></view>
   </view>
 </view>
 

@@ -3,9 +3,9 @@ const { normalizeTask, taskRoute, taskSummary } = require('../../utils/excel-vie
 const { openPage } = require('../../utils/router')
 
 const quickActions = [
-  { title: '开销售单', desc: '选客户和商品', mark: '单', tone: 'blue', path: '/pages/sales-form/index' },
+  { title: '开销售单', desc: '选客户和商品', mark: '单', tone: 'blue', path: '/pages/billing-editor/index' },
   { title: '查商品', desc: '看价格和库存', mark: '查', tone: 'green', path: '/pages/products/index' },
-  { title: '采购入库', desc: '登记采购到货', mark: '入', tone: 'amber', path: '/pages/purchase-orders/index' },
+  { title: '采购进货', desc: '登记采购到货', mark: '入', tone: 'amber', path: '/pages/products/index?mode=factories' },
   { title: '库存盘点', desc: '核对实际数量', mark: '盘', tone: 'purple', path: '/pages/inventories/index' }
 ]
 
@@ -14,7 +14,7 @@ const toolActions = [
   { title: '客户与供应商', desc: '查看联系人和往来资料', mark: '人', path: '/pages/contacts/index' },
   { title: '价格变化记录', desc: '追溯进价和售价变化', mark: '价', path: '/pages/price-history/index' },
   { title: '经营报表', desc: '查看和导出经营数据', mark: '表', path: '/pages/report-center/index' },
-  { title: '采购单据', desc: '查看采购、到货和入库', mark: '购', path: '/pages/purchase-orders/index' }
+  { title: '采购单据', desc: '查看采购、到货和入库', mark: '购', path: '/pages/products/index?mode=factories' }
 ]
 
 function timeLabel() {

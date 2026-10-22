@@ -2,14 +2,14 @@ const { openPage } = require('../../utils/router')
 const api = require('../../utils/api')
 
 const directActions = [
-  { title: '开销售单', mark: '单', tone: 'sales', desc: '选客户和商品', path: '/pages/sales-form/index' },
+  { title: '开销售单', mark: '单', tone: 'sales', desc: '选客户和商品', path: '/pages/billing-editor/index' },
   { title: '查商品', mark: '查', tone: 'search', desc: '看价格和库存', path: '/pages/products/index' },
-  { title: '采购入库', mark: '入', tone: 'stock-in', desc: '到货后登记', path: '/pages/purchase-orders/index' },
+  { title: '采购进货', mark: '入', tone: 'stock-in', desc: '到货后登记', path: '/pages/products/index?mode=factories' },
   { title: '库存盘点', mark: '盘', tone: 'count', desc: '核对实际数量', path: '/pages/inventories/index' }
 ]
 
 const moreFunctions = [
-  { title: '采购', mark: '采', path: '/pages/purchase-orders/index' },
+  { title: '采购', mark: '采', path: '/pages/products/index?mode=factories' },
   { title: '客户', mark: '客', path: '/pages/customers/index' },
   { title: '供应商', mark: '供', path: '/pages/suppliers/index' },
   { title: '报表', mark: '表', path: '/pages/report-center/index' },
