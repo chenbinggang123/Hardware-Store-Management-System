@@ -37,3 +37,35 @@
 .factory-actions > view { min-height:88rpx; display:flex; align-items:center; }
 .factory-row { padding:24rpx; margin:16rpx 0; background:#FFF; border:1rpx solid #D6DEDA; border-radius:14rpx; }
 .catalog-head > .btn { flex: 0 0 auto; min-width: 96rpx; white-space: nowrap; }
+
+/* 按源头厂商筛选：默认“全部厂商”，横向滑动选一家 */
+.factory-chips { margin-top: 18rpx; white-space: nowrap; display: flex; }
+.factory-chip { display: inline-flex; align-items: center; flex-shrink: 0; min-height: 68rpx; margin-right: 14rpx; padding: 0 24rpx; border: 1rpx solid #CED8D3; border-radius: 34rpx; background: #FFF; color: #33443C; font-size: 26rpx; }
+.factory-chip text { margin-left: 8rpx; color: #7A8882; font-size: 22rpx; }
+.factory-chip.active { border-color: #245E9B; background: #E8F1F8; color: #245E9B; font-weight: 700; }
+.factory-chip.active text { color: #245E9B; }
+/* ===== 2026-10 紧凑版：筛选用下拉，一行一个商品 ===== */
+.catalog-screen { padding-top: 14rpx; }
+.catalog-head { align-items: center; padding: 0; }
+.catalog-title { margin-top: 0; font-size: 34rpx; }
+.catalog-count { margin-left: 12rpx; color: #66746E; font-size: 22rpx; font-weight: 500; }
+.catalog-tools { padding: 10rpx 0; border-top: 0; }
+.pick.on { border-color: #245E9B; color: #245E9B; background: #E8F1F8; font-weight: 700; }
+.pick-badge { min-width: 26rpx; height: 26rpx; padding: 0 6rpx; display: inline-flex; align-items: center; justify-content: center; border-radius: 13rpx; color: #A33E32; background: #FCE9E4; font-size: 18rpx; box-sizing: border-box; }
+.factory-links { display: flex; gap: 18rpx; color: #245E9B; font-size: 23rpx; font-weight: 700; }
+.catalog-list { border-radius: 10rpx; border: 1rpx solid #D6DEDA; }
+.catalog-row { display: flex; align-items: center; gap: 10rpx; padding: 12rpx 14rpx; }
+.catalog-summary { flex: 1; min-width: 0; min-height: 0; align-items: center; gap: 12rpx; }
+.product-thumb { width: 60rpx; height: 60rpx; border-radius: 10rpx; }
+.product-thumb.placeholder { font-size: 24rpx; }
+.catalog-name { font-size: 26rpx; }
+.catalog-spec { margin-top: 2rpx; font-size: 21rpx; }
+.catalog-price { margin-top: 2rpx; font-size: 22rpx; font-weight: 700; }
+.catalog-price text { margin-left: 8rpx; font-size: 22rpx; }
+.catalog-alert { margin-top: 2rpx; font-size: 20rpx; }
+.catalog-side { flex: 0 0 auto; width: 128rpx; display: flex; flex-direction: column; align-items: stretch; gap: 4rpx; }
+.catalog-stock { color: #17231E; font-size: 24rpx; font-weight: 800; text-align: center; white-space: nowrap; }
+.catalog-stock.warn { color: #A83F32; }
+.catalog-side .catalog-action { min-height: 46rpx; border-radius: 8rpx; color: #245E9B; border-color: #B9D0E2; background: #E8F1F8; font-size: 22rpx; }
+.catalog-more { min-height: 36rpx; display: flex; align-items: center; justify-content: center; color: #66746E; font-size: 21rpx; }
+.catalog-loading-more, .catalog-end { padding: 16rpx; font-size: 20rpx; }

@@ -27,6 +27,7 @@ Page({
   data: {
     keyword: '', status: '', managing: false, selectedIds: [], bulkDeleting: false, loadError: '',
     filters: [{ value: '', label: '全部' }, { value: 'DRAFT', label: '草稿' }, { value: 'CONFIRMED', label: '已保存' }, { value: 'VOIDED', label: '已作废' }],
+    filterNames: ['全部', '草稿', '已保存', '已作废'], filterIndex: 0,
     items: [],
     page: 0,
     totalPages: 0,
@@ -62,10 +63,17 @@ Page({
     this.setData({ keyword: '' }, () => this.load(true))
   },
 
+  // 下拉选择状态（按序号）
+  pickStatus(event) {
+    const item = this.data.filters[Number(event.detail.value)]
+    this.changeStatus({ currentTarget: { dataset: { status: item ? item.value : '' } } })
+  },
+
   changeStatus(event) {
     if (this.data.bulkDeleting) return
     clearTimeout(this.searchTimer)
-    this.setData({ status: event.currentTarget.dataset.status || '', managing: false, selectedIds: [] })
+    const status = event.currentTarget.dataset.status || ''
+    this.setData({ status, filterIndex: Math.max(0, this.data.filters.findIndex((item) => item.value === status)), managing: false, selectedIds: [] })
     this.load(true)
   },
 
@@ -73,7 +81,8 @@ Page({
     if (this.data.bulkDeleting || this.data.deletingId) return
     const managing = !this.data.managing
     clearTimeout(this.searchTimer)
-    this.setData({ managing, status: managing ? 'DRAFT' : this.data.status, selectedIds: [] })
+    const status = managing ? 'DRAFT' : this.data.status
+    this.setData({ managing, status, filterIndex: Math.max(0, this.data.filters.findIndex((item) => item.value === status)), selectedIds: [] })
     this.load(true)
   },
 

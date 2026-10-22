@@ -17,3 +17,26 @@
 .draft-toolbar [aria-disabled="true"] { opacity: .55; }
 .draft-check { display: inline-block; padding: 4rpx 12rpx; margin-right: 12rpx; border-radius: 8rpx; background: #E9EEEA; color: #4C5E53; font-size: 24rpx; vertical-align: middle; }
 .draft-check.checked { color: #FFFFFF; background: #30694B; }
+
+/* ===== 2026-10 紧凑版 ===== */
+.list-top { display: flex; align-items: center; gap: 12rpx; padding: 0 0 10rpx; }
+.list-top-title { color: #17231E; font-size: 34rpx; font-weight: 760; }
+.list-top-count { color: #66746E; font-size: 22rpx; }
+.list-top .btn { margin-left: auto; }
+.record-tools { flex-wrap: nowrap; margin-bottom: 8rpx; }
+.record-search { flex: 1; min-width: 0; height: 60rpx; margin: 0; padding: 0 14rpx; border-radius: 10rpx; }
+.record-search input { height: 58rpx; font-size: 25rpx; }
+.record-search text { font-size: 30rpx; }
+.pick.on { border-color: #245E9B; color: #245E9B; background: #E8F1F8; font-weight: 700; }
+.draft-toolbar { margin-bottom: 6rpx; font-size: 23rpx; }
+.draft-toolbar > view { min-height: 52rpx; }
+.list-card { margin-bottom: 8rpx; padding: 12rpx 16rpx; border-radius: 10rpx; }
+.list-title { font-size: 27rpx; }
+.list-meta { margin-top: 2rpx; font-size: 21rpx; }
+.record-total { font-size: 27rpx; }
+.record-footer { margin-top: 6rpx; gap: 8rpx; }
+.record-footer .tag { font-size: 20rpx; }
+.record-actions { gap: 20rpx; font-size: 22rpx; }
+.record-actions > view { min-height: 48rpx; }
+.draft-check { padding: 2rpx 10rpx; font-size: 21rpx; }
+.record-end { padding: 16rpx 0 30rpx; font-size: 20rpx; }

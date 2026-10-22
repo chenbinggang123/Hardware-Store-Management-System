@@ -55,11 +55,22 @@ public class FactoryLedgerService {
         this.operationLogRepository = operationLogRepository;
     }
 
+    public static final String KIND_CUSTOMER = "CUSTOMER";
+    public static final String KIND_SUPPLIER = "SUPPLIER";
+
     @Transactional(readOnly = true)
     public Map<String, Object> list(String monthText, String keyword) {
+        return list(monthText, keyword, null);
+    }
+
+    /** kind 为空时列出全部；CUSTOMER = 买的，SUPPLIER = 进货的。 */
+    @Transactional(readOnly = true)
+    public Map<String, Object> list(String monthText, String keyword, String kindText) {
         YearMonth month = parseMonth(monthText);
+        String kind = StringUtils.hasText(kindText) ? normalizeKind(kindText) : null;
         String normalizedKeyword = StringUtils.hasText(keyword) ? keyword.trim().toLowerCase(Locale.ROOT) : "";
         List<Map<String, Object>> rows = ledgerRepository.findAll().stream()
+                .filter(ledger -> kind == null || kind.equals(kindOf(ledger)))
                 .filter(ledger -> matchesKeyword(ledger, normalizedKeyword))
                 .sorted(Comparator.comparing(FactoryLedger::getUpdateTime, Comparator.nullsLast(Comparator.reverseOrder())))
                 .map(ledger -> summaryView(ledger, month))
@@ -77,6 +88,7 @@ public class FactoryLedgerService {
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("month", month.toString());
+        result.put("kind", kind);
         result.put("ledgers", rows);
         result.put("totals", totals);
         return result;
@@ -95,9 +107,31 @@ public class FactoryLedgerService {
         result.put("transactions", allTransactions.stream()
                 .filter(transaction -> YearMonth.from(transaction.getTransactionDate()).equals(month))
                 .filter(transaction -> !"REVERSED".equals(transaction.getStatus()) && transaction.getReversalOfId() == null)
-                .map(this::transactionView)
+                .map(transaction -> transactionView(transaction, kindOf(ledger)))
                 .toList());
         return result;
+    }
+
+    /** 采购单记账时用：按源头厂商名称找到“进货的”账本，没有就自动建一本。 */
+    public FactoryLedger findOrCreateSupplierLedger(String factoryName, Long operatorId) {
+        if (!StringUtils.hasText(factoryName)) {
+            throw new IllegalArgumentException("请填写源头厂商");
+        }
+        String name = factoryName.trim();
+        return sameName(name, KIND_SUPPLIER).orElseGet(() -> {
+            FactoryLedgerCreateRequest request = new FactoryLedgerCreateRequest();
+            request.setFactoryName(name);
+            request.setKind(KIND_SUPPLIER);
+            request.setRemark("采购进货时自动建立");
+            Long id = (Long) create(request, operatorId).get("id");
+            return requireLedger(id);
+        });
+    }
+
+    /** 这本账是“买的”还是“进货的”。 */
+    @Transactional(readOnly = true)
+    public String kindOf(Long ledgerId) {
+        return kindOf(requireLedger(ledgerId));
     }
 
     public Map<String, Object> create(FactoryLedgerCreateRequest request, Long operatorId) {
@@ -105,8 +139,9 @@ public class FactoryLedgerService {
             throw new IllegalArgumentException("请填写工厂名称");
         }
         String factoryName = request.getFactoryName().trim();
-        if (ledgerRepository.findByFactoryNameIgnoreCase(factoryName).isPresent()) {
-            throw new IllegalArgumentException("这家工厂已经有账本");
+        String kind = normalizeKind(request.getKind());
+        if (sameName(factoryName, kind).isPresent()) {
+            throw new IllegalArgumentException(KIND_SUPPLIER.equals(kind) ? "这家厂商已经有进货账本" : "这家工厂已经有账本");
         }
         int settlementDay = request.getSettlementDay() == null ? 31 : request.getSettlementDay();
         if (settlementDay < 1 || settlementDay > 31) {
@@ -123,10 +158,11 @@ public class FactoryLedgerService {
         ledger.setOpeningBalanceCents(toCents(request.getOpeningBalance()));
         ledger.setRemark(trim(request.getRemark()));
         ledger.setStatus("ACTIVE");
+        ledger.setKind(kind);
         ledger.setCreateTime(now);
         ledger.setUpdateTime(now);
         FactoryLedger saved = ledgerRepository.save(ledger);
-        audit(operatorId, "CREATE", "新建工厂账本：" + saved.getFactoryName());
+        audit(operatorId, "CREATE", (KIND_SUPPLIER.equals(kind) ? "新建进货账本：" : "新建工厂账本：") + saved.getFactoryName());
         return ledgerView(saved);
     }
 
@@ -158,7 +194,8 @@ public class FactoryLedgerService {
         result.put("ledgerNo", prepared.ledger().getLedgerNo());
         result.put("factoryName", prepared.ledger().getFactoryName());
         result.put("type", request.getType());
-        result.put("typeLabel", transactionTypeLabel(request.getType()));
+        String kind = kindOf(prepared.ledger());
+        result.put("typeLabel", transactionTypeLabel(request.getType(), kind));
         result.put("date", prepared.date());
         result.put("receiptNo", prepared.receiptNo());
         result.put("items", prepared.items());
@@ -169,7 +206,7 @@ public class FactoryLedgerService {
         result.put("balanceAfterCents", balanceAfterCents);
         result.put("balanceAfter", yuan(balanceAfterCents));
         result.put("remark", trim(request.getRemark()));
-        result.put("effect", transactionTypeLabel(request.getType()) + " ¥" + yuan(prepared.amountCents())
+        result.put("effect", transactionTypeLabel(request.getType(), kind) + " ¥" + yuan(prepared.amountCents())
                 + "，账本余额将从 ¥" + yuan(balanceBeforeCents) + " 变为 ¥" + yuan(balanceAfterCents));
         return result;
     }
@@ -203,8 +240,8 @@ public class FactoryLedgerService {
         ledger.setUpdateTime(now);
         ledgerRepository.save(ledger);
         String settledStatus = ensureSettlement(ledgerId, YearMonth.from(saved.getTransactionDate()).toString(), operatorId);
-        audit(operatorId, request.getType(), transactionTypeLabel(request.getType()) + "：" + ledger.getFactoryName() + " ¥" + yuan(amountCents));
-        Map<String, Object> view = transactionView(saved);
+        audit(operatorId, request.getType(), transactionTypeLabel(request.getType(), kindOf(ledger)) + "：" + ledger.getFactoryName() + " ¥" + yuan(amountCents));
+        Map<String, Object> view = transactionView(saved, kindOf(ledger));
         if (!"PENDING_SUMMARY".equals(settledStatus)) {
             // 已对过账的月份又记了一笔：不再把结账状态重置回“待汇总”，但提醒用户重新核对。
             view.put("warning", YearMonth.from(saved.getTransactionDate()) + " 已经“" + settlementStatusLabel(settledStatus) + "”，这笔会改变该月金额，请重新核对");
@@ -249,9 +286,9 @@ public class FactoryLedgerService {
         ledger.setUpdateTime(now);
         ledgerRepository.save(ledger);
         ensureSettlement(ledgerId, YearMonth.from(saved.getTransactionDate()).toString(), operatorId);
-        audit(operatorId, "REVERSE", "冲销" + transactionTypeLabel(original.getType()) + "：" + ledger.getFactoryName()
+        audit(operatorId, "REVERSE", "冲销" + transactionTypeLabel(original.getType(), kindOf(ledger)) + "：" + ledger.getFactoryName()
                 + " ¥" + yuan(original.getAmountCents()) + "，原因：" + why);
-        return transactionView(saved);
+        return transactionView(saved, kindOf(ledger));
     }
 
     /** 修改账本资料：工厂改名、换联系人、停用。金额和流水不在这里改。 */
@@ -261,8 +298,10 @@ public class FactoryLedgerService {
             throw new IllegalArgumentException("请填写工厂名称");
         }
         String factoryName = request.getFactoryName().trim();
-        ledgerRepository.findByFactoryNameIgnoreCase(factoryName)
+        ledgerRepository.findAllByFactoryNameIgnoreCase(factoryName).stream()
+                .filter(other -> kindOf(other).equals(kindOf(ledger)))
                 .filter(other -> !other.getId().equals(ledgerId))
+                .findFirst()
                 .ifPresent(other -> { throw new IllegalArgumentException("已经有同名的工厂账本"); });
         if (request.getSettlementDay() != null && (request.getSettlementDay() < 1 || request.getSettlementDay() > 31)) {
             throw new IllegalArgumentException("结账日必须在 1 到 31 之间");
@@ -298,7 +337,9 @@ public class FactoryLedgerService {
                     .setScale(0, RoundingMode.HALF_UP).longValue()).sum();
         }
         if (amountCents <= 0) {
-            throw new IllegalArgumentException("PAYMENT".equals(request.getType()) ? "请填写收款金额" : "请至少填写一件有效商品");
+            throw new IllegalArgumentException("PAYMENT".equals(request.getType())
+                    ? (KIND_SUPPLIER.equals(kindOf(ledger)) ? "请填写付款金额" : "请填写收款金额")
+                    : "请至少填写一件有效商品");
         }
         return new PreparedTransaction(
                 ledger,
@@ -402,18 +443,20 @@ public class FactoryLedgerService {
         result.put("openingBalanceCents", ledger.getOpeningBalanceCents());
         result.put("remark", ledger.getRemark());
         result.put("ledgerStatus", ledger.getStatus());
+        result.put("kind", kindOf(ledger));
+        result.put("kindLabel", KIND_SUPPLIER.equals(kindOf(ledger)) ? "进货的" : "买的");
         result.put("createdAt", ledger.getCreateTime());
         result.put("updatedAt", ledger.getUpdateTime());
         return result;
     }
 
-    private Map<String, Object> transactionView(FactoryLedgerTransaction transaction) {
+    private Map<String, Object> transactionView(FactoryLedgerTransaction transaction, String kind) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("id", transaction.getId());
         result.put("transactionNo", transaction.getTransactionNo());
         result.put("ledgerId", transaction.getLedgerId());
         result.put("type", transaction.getType());
-        result.put("typeLabel", transactionTypeLabel(transaction.getType()));
+        result.put("typeLabel", transactionTypeLabel(transaction.getType(), kind));
         result.put("date", transaction.getTransactionDate());
         result.put("receiptNo", transaction.getReceiptNo());
         result.put("items", transaction.getItems());
@@ -427,7 +470,7 @@ public class FactoryLedgerService {
         result.put("reversed", "REVERSED".equals(transaction.getStatus()));
         result.put("isReversal", transaction.getReversalOfId() != null);
         result.put("reversible", !"REVERSED".equals(transaction.getStatus()) && transaction.getReversalOfId() == null);
-        result.put("content", transactionContent(transaction));
+        result.put("content", transactionContent(transaction, kind));
         result.put("remark", transaction.getRemark());
         result.put("source", transaction.getSource());
         if ("BILLING".equals(transaction.getSource()) && billingDocuments != null && transaction.getReceiptNo() != null) {
@@ -508,8 +551,8 @@ public class FactoryLedgerService {
         return "PURCHASE".equals(type) ? amountCents : -amountCents;
     }
 
-    private String transactionContent(FactoryLedgerTransaction transaction) {
-        if ("PAYMENT".equals(transaction.getType())) return "登记收款";
+    private String transactionContent(FactoryLedgerTransaction transaction, String kind) {
+        if ("PAYMENT".equals(transaction.getType())) return KIND_SUPPLIER.equals(kind) ? "登记付款" : "登记收款";
         return transaction.getItems().stream()
                 .map(item -> item.getProductName()
                         + (StringUtils.hasText(item.getSpecification()) ? " " + item.getSpecification() : "")
@@ -517,8 +560,30 @@ public class FactoryLedgerService {
                 .reduce((left, right) -> left + "；" + right).orElse("商品明细");
     }
 
-    private String transactionTypeLabel(String type) {
+    private String transactionTypeLabel(String type, String kind) {
+        if (KIND_SUPPLIER.equals(kind)) {
+            // 进货的账本：PURCHASE = 我们进货（欠厂商更多），RETURN = 退货给厂商，PAYMENT = 我们付款。
+            return switch (type) { case "PURCHASE" -> "进货"; case "RETURN" -> "退货"; case "PAYMENT" -> "付款"; default -> "调整"; };
+        }
         return switch (type) { case "PURCHASE" -> "拿货"; case "RETURN" -> "退货"; case "PAYMENT" -> "收款"; default -> "调整"; };
+    }
+
+    private String kindOf(FactoryLedger ledger) {
+        return KIND_SUPPLIER.equals(ledger.getKind()) ? KIND_SUPPLIER : KIND_CUSTOMER;
+    }
+
+    private String normalizeKind(String value) {
+        if (!StringUtils.hasText(value)) return KIND_CUSTOMER;
+        String kind = value.trim().toUpperCase(Locale.ROOT);
+        if (!KIND_CUSTOMER.equals(kind) && !KIND_SUPPLIER.equals(kind)) {
+            throw new IllegalArgumentException("账本类型只能是“买的”或“进货的”");
+        }
+        return kind;
+    }
+
+    private java.util.Optional<FactoryLedger> sameName(String factoryName, String kind) {
+        List<FactoryLedger> found = ledgerRepository.findAllByFactoryNameIgnoreCase(factoryName);
+        return found == null ? java.util.Optional.empty() : found.stream().filter(ledger -> kind.equals(kindOf(ledger))).findFirst();
     }
 
     private String settlementStatusLabel(String status) {

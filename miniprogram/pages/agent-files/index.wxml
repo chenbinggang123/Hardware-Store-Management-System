@@ -1,14 +1,9 @@
 <view class="screen files-screen">
-  <view class="files-head"><view><view class="files-title">文件</view><view class="files-subtitle">原件、处理任务和生成结果，按最近操作统一查看</view></view><view class="files-head-actions"><view class="files-count">{{counts.total}} 个</view><view class="add-file {{uploading ? 'disabled' : ''}}" role="button" aria-label="手动新增文件" aria-disabled="{{uploading}}" bindtap="addFile">{{uploading ? '上传中…' : '＋ 新增'}}</view></view></view>
+  <view class="files-head"><view><view class="files-title">文件</view></view><view class="files-head-actions"><view class="files-count">{{counts.total}} 个</view><view class="add-file {{uploading ? 'disabled' : ''}}" role="button" aria-label="手动新增文件" aria-disabled="{{uploading}}" bindtap="addFile">{{uploading ? '上传中…' : '＋ 新增'}}</view></view></view>
 
   <view class="file-tools">
     <view class="search-box"><text class="search-icon">查</text><input class="search-input" aria-label="搜索文件" placeholder="搜索文件名或用途" value="{{keyword}}" bindinput="onKeywordInput" /><view class="search-clear" wx:if="{{keyword}}" role="button" aria-label="清除搜索" bindtap="clearKeyword">×</view></view>
-    <view class="file-tabs" role="tablist" aria-label="文件处理状态">
-      <view class="file-tab {{state === 'ALL' ? 'active' : ''}}" role="tab" aria-selected="{{state === 'ALL'}}" data-state="ALL" bindtap="selectState">全部 {{counts.total}}</view>
-      <view class="file-tab {{state === 'PENDING' ? 'active' : ''}}" role="tab" aria-selected="{{state === 'PENDING'}}" data-state="PENDING" bindtap="selectState">待处理 {{counts.pending}}</view>
-      <view class="file-tab {{state === 'COMPLETED' ? 'active' : ''}}" role="tab" aria-selected="{{state === 'COMPLETED'}}" data-state="COMPLETED" bindtap="selectState">已完成 {{counts.completed}}</view>
-      <view class="file-tab {{state === 'FAILED' ? 'active' : ''}}" role="tab" aria-selected="{{state === 'FAILED'}}" data-state="FAILED" bindtap="selectState">失败 {{counts.failed}}</view>
-    </view>
+    <picker range="{{['全部 ' + counts.total, '待处理 ' + counts.pending, '已完成 ' + counts.completed, '失败 ' + counts.failed]}}" value="{{state === 'PENDING' ? 1 : (state === 'COMPLETED' ? 2 : (state === 'FAILED' ? 3 : 0))}}" bindchange="pickState"><view class="pick {{state !== 'ALL' ? 'on' : ''}}">{{state === 'PENDING' ? '待处理' : (state === 'COMPLETED' ? '已完成' : (state === 'FAILED' ? '失败' : '全部'))}}</view></picker>
   </view>
 
   <view class="loading-state" wx:if="{{loading && !items.length}}">正在读取文件…</view>
@@ -18,7 +13,7 @@
     <view class="files-row state-{{item.state}}" wx:for="{{visible}}" wx:key="key" role="button" aria-label="{{item.openText}}：{{item.name}}" data-key="{{item.key}}" bindtap="openItem">
       <view class="files-mark kind-{{item.kind}}">{{item.mark}}</view>
       <view class="files-main"><view class="files-name">{{item.name}}</view><view class="files-meta">{{item.purpose}}<text wx:if="{{item.sizeText}}"> · {{item.sizeText}}</text><text wx:if="{{item.manualUpload}}"> · 手动添加</text></view><view class="files-relation" wx:if="{{item.relationText}}">{{item.relationText}}</view><view class="files-foot"><view class="files-status {{item.stateTone}}">{{item.stateText}}</view><text>{{item.timeText}}</text></view><view class="files-error" wx:if="{{item.errorMessage}}">{{item.errorMessage}}</view></view>
-      <view class="files-actions"><view class="files-mini-action" role="button" aria-label="整理{{item.name}}的用途和关联" data-key="{{item.key}}" catchtap="organizeFile">{{item.organized ? '资料' : '整理'}}</view><view class="files-mini-action" wx:if="{{item.kind === 'OUTPUT' && item.ready && item.fileType === 'xlsx'}}" role="button" aria-label="编辑表格{{item.name}}" data-key="{{item.key}}" catchtap="quickEditFile">编辑表格</view><view class="files-mini-action" wx:if="{{item.kind === 'OUTPUT' && item.ready}}" role="button" aria-label="让小五修改{{item.name}}" data-key="{{item.key}}" catchtap="modifyFile">小五改</view><view class="files-mini-action danger" wx:if="{{item.kind === 'OUTPUT' && item.ready}}" role="button" aria-label="删除{{item.name}}" data-key="{{item.key}}" catchtap="deleteFile">{{deletingKey === item.key ? '删除中' : '删除'}}</view></view>
+      <view class="files-actions"><view class="files-mini-action" role="button" aria-label="{{item.name}}的操作" data-key="{{item.key}}" catchtap="fileActions">{{deletingKey === item.key ? '删除中' : '操作'}}</view></view>
       <view class="files-open">{{openingKey === item.key ? '打开中…' : '›'}}</view>
     </view>
   </view>

@@ -39,3 +39,19 @@
 .error-state { margin-top: 28rpx; padding: 40rpx 32rpx; border-radius: 20rpx; background: #FFF; text-align: center; color: #66746E; font-size: 24rpx; line-height: 1.6; }
 .error-state-title { margin-bottom: 8rpx; color: #17231E; font-size: 28rpx; font-weight: 700; }
 .error-state .btn { margin-top: 24rpx; }
+
+/* ===== 2026-10 紧凑版 ===== */
+.files-head { padding: 0 0 8rpx; }
+.files-head-actions { flex-direction: row; align-items: center; }
+.files-title { font-size: 34rpx; }
+.file-tools { padding: 8rpx 0 10rpx; border-top: 0; display: flex; align-items: center; gap: 10rpx; }
+.file-tools .search-box { flex: 1; min-width: 0; }
+.pick.on { border-color: #245E9B; color: #245E9B; background: #E8F1F8; font-weight: 700; }
+.files-row { min-height: 0; gap: 12rpx; padding: 14rpx 14rpx 14rpx 20rpx; }
+.files-mark { width: 48rpx; height: 48rpx; font-size: 18rpx; }
+.files-name { font-size: 25rpx; }
+.files-meta { margin-top: 2rpx; font-size: 21rpx; }
+.files-relation { margin-top: 2rpx; font-size: 20rpx; }
+.files-foot { margin-top: 4rpx; font-size: 19rpx; }
+.files-actions { align-self: center; }
+.files-mini-action { min-height: 46rpx; font-size: 21rpx; }

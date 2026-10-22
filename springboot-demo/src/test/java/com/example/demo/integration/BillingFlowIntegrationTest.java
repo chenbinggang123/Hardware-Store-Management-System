@@ -147,6 +147,82 @@ class BillingFlowIntegrationTest {
         assertThat(confirmed.get("number")).isNotNull();
     }
 
+    @Test
+    @SuppressWarnings("unchecked")
+    void procurementGoesIntoSupplierLedgerSeparateFromCustomerLedger() {
+        String factory = "进货测试厂" + UUID.randomUUID().toString().substring(0, 6);
+        // 同一家厂既买我们的货、又卖货给我们：“买的”和“进货的”各有一本账。
+        FactoryLedgerCreateRequest customerRequest = new FactoryLedgerCreateRequest();
+        customerRequest.setFactoryName(factory);
+        Long customerLedgerId = ((Number) factoryLedgers.create(customerRequest, OWNER).get("id")).longValue();
+
+        BillingContent content = new BillingContent();
+        content.setDocumentType("PROCUREMENT");
+        content.setCustomerName(factory);
+        content.setSourceDocumentNumber("YD-" + UUID.randomUUID().toString().substring(0, 8));
+        content.setDate(java.time.LocalDate.now().toString());
+        BillingContent.Line line = new BillingContent.Line();
+        line.setName("进货测试螺母" + UUID.randomUUID().toString().substring(0, 4)); line.setUnit("个");
+        line.setQuantity(new BigDecimal("10")); line.setPrice(new BigDecimal("1.5"));
+        content.setLines(List.of(line));
+        Map<String, Object> draft = billing.save(OWNER, null, content);
+        Long id = ((Number) draft.get("id")).longValue();
+        billing.confirm(OWNER, id, (Long) draft.get("version"));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> billingLedger.post(OWNER, id, customerLedgerId))
+                .hasMessageContaining("进货的");
+        Map<String, Object> posting = billingLedger.post(OWNER, id, null);
+        assertThat(posting.get("posted")).isEqualTo(true);
+        Long supplierLedgerId = ((Number) posting.get("ledgerId")).longValue();
+        assertThat(supplierLedgerId).isNotEqualTo(customerLedgerId);
+        assertThat(factoryLedgers.kindOf(supplierLedgerId)).isEqualTo(FactoryLedgerService.KIND_SUPPLIER);
+        assertThat(balance(supplierLedgerId)).isEqualByComparingTo("15.00");
+        assertThat(balance(customerLedgerId)).isEqualByComparingTo("0.00");
+
+        Map<String, Object> book = factoryLedgers.get(supplierLedgerId, null);
+        assertThat(book.get("kindLabel")).isEqualTo("进货的");
+        List<Map<String, Object>> entries = (List<Map<String, Object>>) book.get("transactions");
+        assertThat(entries).hasSize(1);
+        assertThat(entries.get(0).get("typeLabel")).isEqualTo("进货");
+
+        List<Map<String, Object>> suppliers = (List<Map<String, Object>>) factoryLedgers.list(null, factory, "SUPPLIER").get("ledgers");
+        List<Map<String, Object>> customers = (List<Map<String, Object>>) factoryLedgers.list(null, factory, "CUSTOMER").get("ledgers");
+        assertThat(suppliers).extracting(row -> row.get("id")).containsExactly(supplierLedgerId);
+        assertThat(customers).extracting(row -> row.get("id")).containsExactly(customerLedgerId);
+
+        // 拿货单不能记进“进货的”账本
+        BillingContent sale = new BillingContent();
+        sale.setDate(java.time.LocalDate.now().toString());
+        BillingContent.Line saleLine = new BillingContent.Line();
+        saleLine.setName("导柱"); saleLine.setUnit("个"); saleLine.setQuantity(BigDecimal.ONE); saleLine.setPrice(BigDecimal.TEN);
+        sale.setLines(List.of(saleLine));
+        Map<String, Object> saleDraft = billing.save(OWNER, null, sale);
+        Long saleId = ((Number) saleDraft.get("id")).longValue();
+        billing.confirm(OWNER, saleId, (Long) saleDraft.get("version"));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> billingLedger.post(OWNER, saleId, supplierLedgerId))
+                .hasMessageContaining("买的");
+
+        // 从进货账本删掉这张采购单：应付归零
+        billingLedger.deleteFromLedger(OWNER, supplierLedgerId, ((Number) entries.get(0).get("id")).longValue());
+        assertThat(balance(supplierLedgerId)).isEqualByComparingTo("0.00");
+        billingLedger.deleteDocument(OWNER, saleId);
+        removeTestProducts("进货测试螺母%");
+    }
+
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+    /** 采购单会新建商品和库存，测试库不回滚，用完删掉，免得影响库存预警类的统计。 */
+    private void removeTestProducts(String namePattern) {
+        List<Long> ids = jdbc.queryForList("SELECT id FROM product WHERE name LIKE ?", Long.class, namePattern);
+        for (Long productId : ids) {
+            for (String table : List.of("inventory_log", "inventory", "product_price_history", "billing_product_memory", "billing_product_usage")) {
+                try { jdbc.update("DELETE FROM " + table + " WHERE product_id = ?", productId); }
+                catch (org.springframework.dao.DataAccessException ignored) { /* 表里没有 product_id 列 */ }
+            }
+            jdbc.update("DELETE FROM product WHERE id = ?", productId);
+        }
+    }
+
     private BigDecimal balance(Long ledgerId) {
         Map<?, ?> summary = (Map<?, ?>) factoryLedgers.get(ledgerId, null).get("summary");
         return new BigDecimal(String.valueOf(summary.get("balanceAmount")));

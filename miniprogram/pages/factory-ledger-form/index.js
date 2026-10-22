@@ -2,17 +2,23 @@ const ledgerStore = require('../../utils/factory-ledger')
 const api = require('../../utils/api')
 
 Page({
-  data: { id: '', form: { factoryName: '', contactPerson: '', phone: '', startDate: ledgerStore.today(), openingBalance: '0', settlementDay: '31', remark: '' }, saving: false },
+  data: { id: '', kind: 'CUSTOMER', form: { factoryName: '', contactPerson: '', phone: '', startDate: ledgerStore.today(), openingBalance: '0', settlementDay: '31', remark: '' }, saving: false },
 
   // 带 id 进来就是修改资料：只改名称、联系人、电话、结账日和备注，期初余额和流水不在这里改。
   onLoad(options) {
     const id = options.id || ''
-    if (!id) return
+    if (!id) {
+      const kind = options.kind === 'SUPPLIER' ? 'SUPPLIER' : 'CUSTOMER'
+      this.setData({ kind })
+      if (kind === 'SUPPLIER') wx.setNavigationBarTitle({ title: '新建进货账本' })
+      return
+    }
     this.setData({ id })
     wx.setNavigationBarTitle({ title: '修改账本资料' })
     api.getFactoryLedger(id).then((ledger) => {
       if (!ledger) return
       this.setData({
+        kind: ledger.kind === 'SUPPLIER' ? 'SUPPLIER' : 'CUSTOMER',
         form: {
           ...this.data.form,
           factoryName: ledger.factoryName || '',
@@ -34,13 +40,13 @@ Page({
     if (!form.factoryName.trim()) { wx.showToast({ title: '请填写工厂名称', icon: 'none' }); return }
     if (this.data.id) return this.saveEdit()
     wx.showModal({
-      title: '确认建立这本账？',
-      content: `${form.factoryName}\n联系人：${form.contactPerson || '未填写'}\n期初未结：¥${Number(form.openingBalance || 0).toFixed(2)}`,
+      title: this.data.kind === 'SUPPLIER' ? '确认建立进货账本？' : '确认建立这本账？',
+      content: `${form.factoryName}\n联系人：${form.contactPerson || '未填写'}\n${this.data.kind === 'SUPPLIER' ? '期初我们欠' : '期初未结'}：¥${Number(form.openingBalance || 0).toFixed(2)}`,
       confirmText: '确认新建',
       success: (result) => {
         if (!result.confirm) return
         this.setData({ saving: true })
-        api.createFactoryLedger(form).then((ledger) => {
+        api.createFactoryLedger({ ...form, kind: this.data.kind }).then((ledger) => {
           wx.showToast({ title: '账本已建立', icon: 'success' })
           setTimeout(() => wx.redirectTo({ url: `/pages/factory-ledger-detail/index?id=${encodeURIComponent(ledger.id)}` }), 350)
         }).catch((error) => {

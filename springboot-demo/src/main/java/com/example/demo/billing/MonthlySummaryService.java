@@ -58,7 +58,8 @@ public class MonthlySummaryService {
             }
         }
 
-        Map<String, Object> ledgerList = ledgers.list(month.toString(), null);
+        // 月度汇总只算“买的”账本（应收），进货的应付不能混进来。
+        Map<String, Object> ledgerList = ledgers.list(month.toString(), null, com.example.demo.service.FactoryLedgerService.KIND_CUSTOMER);
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> rows = (List<Map<String, Object>>) ledgerList.getOrDefault("ledgers", List.of());
         long purchase = 0, returned = 0, payment = 0, balance = 0;

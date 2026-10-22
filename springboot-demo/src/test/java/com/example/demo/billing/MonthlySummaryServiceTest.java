@@ -21,7 +21,7 @@ class MonthlySummaryServiceTest {
         FactoryLedgerService ledgers = mock(FactoryLedgerService.class);
         when(documents.findByStatusInAndDocumentNumberStartingWith(any(), eq("KD-202610")))
                 .thenReturn(List.of(document("CONFIRMED", "105.60"), document("CONFIRMED", "20.00"), document("VOIDED", "50.00")));
-        when(ledgers.list("2026-10", null)).thenReturn(Map.of("ledgers", List.of(
+        when(ledgers.list("2026-10", null, "CUSTOMER")).thenReturn(Map.of("ledgers", List.of(
                 Map.of("id", 1L, "factoryName", "甲厂", "purchaseCents", 10560L, "returnCents", 0L, "paymentCents", 5000L,
                         "balanceCents", 18410L, "purchaseAmount", "105.60", "balanceAmount", "184.10", "statusLabel", "未对账"),
                 Map.of("id", 2L, "factoryName", "乙厂", "purchaseCents", 0L, "returnCents", 0L, "paymentCents", 0L,

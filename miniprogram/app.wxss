@@ -1194,3 +1194,18 @@ page { background: #F3F5F2; color: #17231E; font-size: 30rpx; }
 .history-date, .history-type, .history-source, .filter-chip, .selection-note {
   font-size: 24rpx !important;
 }
+
+/* ===== 2026-10 紧凑版（全局）：按钮和搜索框变小，把屏幕留给商品和单据 ===== */
+.btn { min-height: 66rpx; padding: 0 22rpx; border-radius: 10rpx; font-size: 26rpx; }
+.btn-sm { min-height: 54rpx; padding: 0 18rpx; border-radius: 10rpx; font-size: 24rpx; }
+.btn-block { min-height: 76rpx; }
+.btn-primary { box-shadow: none; }
+.search-box { min-height: 68rpx; padding: 0 16rpx; border-width: 1rpx; border-radius: 10rpx; }
+.search-input { height: 66rpx; font-size: 26rpx; }
+.empty-state { padding: 36rpx 24rpx; }
+/* 下拉选择（按序号选）：代替一排排的选择按钮，样子是“当前值 ▾” */
+.pick { display: inline-flex; align-items: center; gap: 6rpx; min-height: 54rpx; padding: 0 14rpx; box-sizing: border-box; border: 1rpx solid #CED8D3; border-radius: 10rpx; background: #FFF; color: #17231E; font-size: 24rpx; white-space: nowrap; }
+.pick::after { content: '▾'; color: #66746E; font-size: 20rpx; }
+.pick-label { color: #66746E; font-size: 22rpx; }
+.pick-row { display: flex; align-items: center; gap: 10rpx; flex-wrap: wrap; }
+.pick-row .search-box { flex: 1; min-width: 300rpx; }

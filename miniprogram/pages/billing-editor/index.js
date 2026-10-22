@@ -106,6 +106,8 @@ Page({
     headerOpen: false, reviewOnly: false, localSaveText: '',
     ledgers: [], ledgerNames: ['不记入账本'], ledgerIndex: 0, ledgerName: '', ledgerPosting: null, ledgerBusy: false,
     candidateTitle: '最近常用', activeLineIndex: null, evidenceOpen: false,
+    typeNames: ['拿货单', '退货单', '采购单'], lineActionNames: ['备注', '复制这一行', '删除这一行'],
+    fixAllNames: ['修改这张单', '复制为新单', '作废'], fixCopyNames: ['复制为新单'],
     statusText: '', actionError: '', actionRetry: '', actionRetryText: '', imageBusy: false, generatedFile: null
   },
 
@@ -132,6 +134,38 @@ Page({
     this.setData(values, callback)
     this.persistLocalDraft()
   },
+  // 下拉选择（按序号）：单据类型
+  pickDocumentType(event) {
+    const type = ['PURCHASE', 'RETURN', 'PROCUREMENT'][Number(event.detail.value)] || 'PURCHASE'
+    this.changeDocumentType({ currentTarget: { dataset: { type } } })
+  },
+
+  // 下拉选择：单位候选
+  pickUnit(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    const line = this.data.lines[index]
+    const unit = line && line.unitChoices ? line.unitChoices[Number(event.detail.value)] : ''
+    if (unit) this.chooseUnit({ currentTarget: { dataset: { index, unit } } })
+  },
+
+  // 下拉选择：这一行的操作（备注 / 复制 / 删除）
+  pickLineAction(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    const target = { currentTarget: { dataset: { index } } }
+    const action = Number(event.detail.value)
+    if (action === 0) this.toggleLineRemark(target)
+    if (action === 1) this.duplicateLine(target)
+    if (action === 2) this.removeLine(target)
+  },
+
+  // 下拉选择：已保存单据的处理（修改 / 复制 / 作废）
+  pickFixAction(event) {
+    const name = (event.currentTarget.dataset.list === 'all' ? this.data.fixAllNames : this.data.fixCopyNames)[Number(event.detail.value)]
+    if (name === '修改这张单') this.reopenDocument()
+    if (name === '复制为新单') this.copyAsNew()
+    if (name === '作废') this.voidDocument()
+  },
+
   changeDocumentType(event) {
     if (this.data.document && this.data.document.status !== 'DRAFT') return
     const type = event.currentTarget.dataset.type
@@ -270,7 +304,8 @@ Page({
 
   // 厂家账本：开单时选一家，保存单据后自动记为这家的“拿货”。
   loadLedgers() {
-    return api.getFactoryLedgers({}).then((result) => {
+    // 拿货单/退货单只记“买的”账本；采购单由后端按源头厂商自动记入“进货的”账本。
+    return api.getFactoryLedgers({ kind: 'CUSTOMER' }).then((result) => {
       const ledgers = ((result && result.ledgers) || []).map((item) => ({ id: item.id, factoryName: item.factoryName }))
       this.setData({ ledgers, ledgerNames: ['不记入账本'].concat(ledgers.map((item) => item.factoryName)) }, () => this.syncLedgerIndex(true))
     }).catch(() => {})
@@ -315,10 +350,10 @@ Page({
 
   postToLedger(documentId) {
     const id = Number(documentId) || Number(this.data.documentId)
-    const ledgerId = this.data.form.ledgerId
-    if (this.data.form.documentType === 'PROCUREMENT') return Promise.resolve(null)
-    if (!id || !ledgerId || this.data.ledgerBusy) return Promise.resolve(null)
-    this.setData({ ledgerBusy: true, statusText: '正在记入厂家账本…' })
+    const procurement = this.data.form.documentType === 'PROCUREMENT'
+    const ledgerId = procurement ? null : this.data.form.ledgerId
+    if (!id || (!procurement && !ledgerId) || this.data.ledgerBusy) return Promise.resolve(null)
+    this.setData({ ledgerBusy: true, statusText: procurement ? '正在记入进货账本…' : '正在记入厂家账本…' })
     return api.postBillingToLedger(id, ledgerId).then((posting) => {
       this.setData({ ledgerPosting: posting && posting.posted ? posting : null, actionError: '', actionRetry: '', actionRetryText: '', statusText: `已记入 ${posting.factoryName} 的账本` })
       wx.showToast({ title: `已记入 ${posting.factoryName}`, icon: 'success' })
@@ -701,7 +736,8 @@ Page({
         return api.confirmBillingDocument(draft.id, draft.version).then((document) => {
           this.showDocument(document, true)
           // 选了厂家账本就顺手记账；记账失败不影响单据，可以重试。
-          const posting = this.data.form.documentType !== 'PROCUREMENT' && this.data.form.ledgerId ? this.postToLedger(document.id) : Promise.resolve(null)
+          // 采购单一律记入这家厂商“进货的”账本（没有会自动建）。
+          const posting = this.data.form.documentType === 'PROCUREMENT' || this.data.form.ledgerId ? this.postToLedger(document.id) : Promise.resolve(null)
           return posting.then(() => this.chooseExportFormat(document.id))
         }).catch((error) => {
           const message = errorText(error, '单据保存失败')

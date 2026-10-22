@@ -13,7 +13,7 @@ const DRAWER_ROUTES = Object.freeze({
   billingList: '/pages/billing-list/index',
   files: '/pages/agent-files/index',
   sales: '/pages/billing-list/index',
-  purchases: '/pages/products/index?mode=factories',
+  purchases: '/pages/factory-ledgers/index?kind=SUPPLIER',
   inventory: '/pages/inventories/index',
   finance: '/pages/finance-ledger/index',
   customers: '/pages/customers/index',

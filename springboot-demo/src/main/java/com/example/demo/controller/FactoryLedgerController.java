@@ -31,8 +31,9 @@ public class FactoryLedgerController {
     @GetMapping
     public ApiResponse<Map<String, Object>> list(
             @RequestParam(required = false) String month,
-            @RequestParam(required = false) String keyword) {
-        return ApiResponse.ok("工厂账本查询成功", factoryLedgerService.list(month, keyword));
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String kind) {
+        return ApiResponse.ok("工厂账本查询成功", factoryLedgerService.list(month, keyword, kind));
     }
 
     @PostMapping

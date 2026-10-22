@@ -9,7 +9,7 @@ function blankItem() { return { productName: '', specification: '', unit: '件',
 
 Page({
   data: {
-    ledgerId: '', ledger: null, types: TYPES, typeNames: TYPES.map((item) => item.label), typeIndex: 0,
+    ledgerId: '', ledger: null, supplier: false, types: TYPES, typeNames: TYPES.map((item) => item.label), typeIndex: 0,
     form: { type: 'PAYMENT', date: ledgerStore.today(), receiptNo: '', paymentAmount: '', remark: '', items: [blankItem()] }, saving: false
   },
   onLoad(options) {
@@ -20,7 +20,10 @@ Page({
     const typeIndex = Math.max(0, TYPES.findIndex((item) => item.value === options.type))
     this.setData({ ledgerId: options.id || '', typeIndex, 'form.type': TYPES[typeIndex].value })
     api.getFactoryLedger(options.id, ledgerStore.currentMonth()).then((ledger) => {
-      if (ledger) this.setData({ ledger })
+      if (!ledger) return
+      const supplier = ledger.kind === 'SUPPLIER'
+      if (supplier) wx.setNavigationBarTitle({ title: '登记付款' })
+      this.setData({ ledger, supplier, typeNames: supplier ? ['付款'] : TYPES.map((item) => item.label) })
     }).catch(() => wx.showToast({ title: '账本信息加载失败', icon: 'none' }))
   },
   changeType(event) { const index = Number(event.detail.value); this.setData({ typeIndex: index, 'form.type': TYPES[index].value }) },
@@ -38,8 +41,8 @@ Page({
     const amount = form.type === 'PAYMENT'
       ? Number(form.paymentAmount || 0)
       : form.items.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unitPrice || 0), 0)
-    if (!(amount > 0)) { wx.showToast({ title: form.type === 'PAYMENT' ? '请填写收款金额' : '请填写商品、数量和单价', icon: 'none' }); return }
-    const typeLabel = TYPES[this.data.typeIndex].label
+    if (!(amount > 0)) { wx.showToast({ title: form.type === 'PAYMENT' ? (this.data.supplier ? '请填写付款金额' : '请填写收款金额') : '请填写商品、数量和单价', icon: 'none' }); return }
+    const typeLabel = this.data.typeNames[this.data.typeIndex]
     wx.showModal({
       title: `确认记入${typeLabel} ¥${amount.toFixed(2)}？`,
       content: `${this.data.ledger ? this.data.ledger.factoryName : ''}\n日期：${form.date}\n收据：${form.receiptNo || '未填写'}\n确认后将更新账本余额。`,

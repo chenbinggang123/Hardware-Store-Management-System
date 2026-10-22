@@ -128,7 +128,7 @@ public class BillingLedgerService {
             throw new IllegalArgumentException("请先保存单据，再记入厂家账本");
         }
         BillingContent content = content(document);
-        if ("PROCUREMENT".equals(content.getDocumentType())) throw new IllegalArgumentException("采购进货已记入源头厂商的进货记录，无需记入拿货账本");
+        boolean procurement = "PROCUREMENT".equals(content.getDocumentType());
         Long ledgerId = requestedLedgerId != null ? requestedLedgerId : content.getLedgerId();
 
         Optional<FactoryLedgerTransaction> existing = posted(document);
@@ -139,8 +139,19 @@ public class BillingLedgerService {
             }
             return view(existing);
         }
+        if (ledgerId == null && procurement) {
+            // 采购单不用选账本：按源头厂商记入“进货的”账本，没有就自动建一本。
+            ledgerId = ledgers.findOrCreateSupplierLedger(content.getCustomerName(), owner).getId();
+        }
         if (ledgerId == null) {
             throw new IllegalArgumentException("请选择要记入的厂家账本");
+        }
+        boolean supplierLedger = FactoryLedgerService.KIND_SUPPLIER.equals(ledgers.kindOf(ledgerId));
+        if (procurement && !supplierLedger) {
+            throw new IllegalArgumentException("采购单要记入“进货的”账本");
+        }
+        if (!procurement && supplierLedger) {
+            throw new IllegalArgumentException("拿货单和退货单要记入“买的”账本");
         }
 
         ledgers.addBillingTransaction(ledgerId, request(document, content), owner);
@@ -261,6 +272,8 @@ public class BillingLedgerService {
                         "删除单据 " + document.getDocumentNumber(), owner);
             }
         }
+        // 采购单删除时把加过的库存一并退回。
+        if (productSync != null) productSync.reverse(owner, document.getId());
         documents.delete(document);
         documents.flush();
     }
@@ -272,7 +285,8 @@ public class BillingLedgerService {
         // 同一张单据改过后再记账，用修订号区分，避开“同一账本收据号不能重复”的限制。
         int revisions = postings(document).size();
         request.setReceiptNo(revisions == 0 ? document.getDocumentNumber() : document.getDocumentNumber() + "-R" + (revisions + 1));
-        String remark = ("RETURN".equals(content.getDocumentType()) ? "退货单 " : "拿货单 ") + document.getDocumentNumber();
+        String remark = ("RETURN".equals(content.getDocumentType()) ? "退货单 "
+                : "PROCUREMENT".equals(content.getDocumentType()) ? "采购单 " : "拿货单 ") + document.getDocumentNumber();
         if (StringUtils.hasText(content.getRemark())) {
             remark += " · " + content.getRemark().trim();
         }

@@ -26,6 +26,8 @@ public class FactoryLedger {
     private Long openingBalanceCents;
     private String remark;
     private String status;
+    /** CUSTOMER = 买的（工厂来拿货，我们应收）；SUPPLIER = 进货的（我们向源头厂商进货，我们应付）。 */
+    private String kind;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

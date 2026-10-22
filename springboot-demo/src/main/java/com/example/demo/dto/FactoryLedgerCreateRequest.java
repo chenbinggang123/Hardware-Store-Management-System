@@ -14,4 +14,6 @@ public class FactoryLedgerCreateRequest {
     private Integer settlementDay;
     private BigDecimal openingBalance;
     private String remark;
+    /** CUSTOMER（买的，默认）或 SUPPLIER（进货的）。 */
+    private String kind;
 }

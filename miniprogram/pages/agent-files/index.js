@@ -95,6 +95,25 @@ Page({
   },
 
   selectState(event) { this.setData({ state: event.currentTarget.dataset.state }, () => this.applyFilter()) },
+  // 下拉选择状态（按序号）
+  pickState(event) {
+    const state = ['ALL', 'PENDING', 'COMPLETED', 'FAILED'][Number(event.detail.value)] || 'ALL'
+    this.selectState({ currentTarget: { dataset: { state } } })
+  },
+  // 每个文件只留一个“操作”，点开按序号选要做什么
+  fileActions(event) {
+    const key = event.currentTarget.dataset.key
+    const item = this.data.items.find((entry) => entry.key === key)
+    if (!item) return
+    const target = { currentTarget: { dataset: { key } } }
+    const actions = [{ name: item.organized ? '查看资料' : '整理用途', run: () => this.organizeFile(target) }]
+    if (item.kind === 'OUTPUT' && item.ready && item.fileType === 'xlsx') actions.push({ name: '编辑表格', run: () => this.quickEditFile(target) })
+    if (item.kind === 'OUTPUT' && item.ready) actions.push({ name: '让小五修改', run: () => this.modifyFile(target) })
+    if (item.kind === 'OUTPUT' && item.ready) actions.push({ name: '删除', run: () => this.deleteFile(target) })
+    wx.showActionSheet({ itemList: actions.map((action) => action.name) })
+      .then((result) => { const action = actions[result.tapIndex]; if (action) action.run() })
+      .catch(() => {})
+  },
   onKeywordInput(event) { this.setData({ keyword: event.detail.value }, () => this.applyFilter()) },
   clearKeyword() { this.setData({ keyword: '' }, () => this.applyFilter()) },
   retryLoad() { this.loadFiles() },
