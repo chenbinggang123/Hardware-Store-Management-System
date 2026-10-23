@@ -16,6 +16,7 @@ public class PrepareBillingDocumentTool implements AgentTool {
         Map<String,Object> line=new LinkedHashMap<>();
         for(String key:List.of("name","specification","unit","remark","sourceAmount"))line.put(key,Map.of("type",List.of("string","null")));
         line.put("quantity",Map.of("type",List.of("number","null"),"description","原始数量，未知留空，最多6位小数"));
+        line.put("unit",Map.of("type",List.of("string","null"),"description","计量单位不得是11、1等纯数字；识别为数字时留空，原文写入remark并标注单位待核对，不能猜成个或支"));
         line.put("price",Map.of("type",List.of("number","null"),"description","原始单价，未知留空，最多2位小数"));
         Map<String,Object> props=new LinkedHashMap<>();
         for(String key:List.of("companyName","phone","customerName","date","remark","sourceNote","sourceDocumentNumber"))props.put(key,Map.of("type",List.of("string","null")));
@@ -26,7 +27,7 @@ public class PrepareBillingDocumentTool implements AgentTool {
     }
     private BillingContent content(Map<String,Object> args){var c=mapper.convertValue(args,BillingContent.class);if(c==null)throw new IllegalArgumentException("开单内容不能为空");c.setRequestKey(null);c.setVersion(null);
         c.setCompanyName(RecognizedTextSanitizer.clean(c.getCompanyName()));c.setPhone(RecognizedTextSanitizer.clean(c.getPhone()));c.setCustomerName(RecognizedTextSanitizer.clean(c.getCustomerName()));c.setRemark(RecognizedTextSanitizer.clean(c.getRemark()));c.setSourceNote(RecognizedTextSanitizer.clean(c.getSourceNote()));
-        if(c.getLines()!=null)for(var line:c.getLines())if(line!=null){line.setName(RecognizedTextSanitizer.clean(line.getName()));line.setSpecification(RecognizedTextSanitizer.clean(line.getSpecification()));line.setUnit(RecognizedTextSanitizer.clean(line.getUnit()));line.setRemark(RecognizedTextSanitizer.clean(line.getRemark()));line.setSourceAmount(RecognizedTextSanitizer.clean(line.getSourceAmount()));line.setRemember(false);line.setAlias(null);}return billing.normalize(c,false);}
+        if(c.getLines()!=null)for(var line:c.getLines())if(line!=null){line.setName(RecognizedTextSanitizer.clean(line.getName()));line.setSpecification(RecognizedTextSanitizer.clean(line.getSpecification()));line.setUnit(RecognizedTextSanitizer.clean(line.getUnit()));line.setRemark(RecognizedTextSanitizer.clean(line.getRemark()));line.setSourceAmount(RecognizedTextSanitizer.clean(line.getSourceAmount()));line.setRemember(false);line.setAlias(null);}HandwrittenItemContinuation.repair(c);return billing.normalize(c,false);}
     /** 草稿只进入开单页，不登记销售、欠款、库存或商品记忆；用户在开单页点“保存并生成”才是唯一确认。 */
     @Override public boolean draftWithoutApproval(){return true;}
     @Override public boolean completesRun(){return true;}

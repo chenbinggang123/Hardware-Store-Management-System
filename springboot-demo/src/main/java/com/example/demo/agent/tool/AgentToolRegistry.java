@@ -15,10 +15,12 @@ public class AgentToolRegistry {
     /**
      * 已停用的工具：开单只用快捷开单，记账只用工厂账本，商品不再有上下架。
      * 保留代码便于以后恢复，但不再交给模型，避免同一句话被记进两套账。
-     * 可用 AGENT_RETIRED_TOOLS 覆盖（逗号分隔，留空表示全部启用）。
+     * 可用 agent.tools.retired 覆盖（逗号分隔，留空表示全部启用）。
      */
     static final String DEFAULT_RETIRED_TOOLS = "create_sales_draft,update_sales_draft,commit_sales_draft,get_sales_draft,"
-            + "create_account_document,record_account_payment,query_accounts,change_product_status,record_source_purchase_order";
+            + "create_account_document,record_account_payment,query_accounts,change_product_status,record_source_purchase_order,"
+            + "record_factory_ledger_transaction,update_factory_settlement_status,get_factory_settlement_summary,"
+            + "get_daily_finance_summary,get_customer_sales_summary,search_source_purchase_orders";
 
     private final Map<String, AgentTool> tools = new LinkedHashMap<>();
 

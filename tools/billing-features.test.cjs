@@ -8,6 +8,7 @@ const miniRoot = path.join(__dirname, '../miniprogram')
 function setup(pageName, overrides = {}, storage = new Map()) {
   if (!storage.has('auth_session')) storage.set('auth_session', { user: { id: 7 } })
   let modalChoice = true, modal, alert = false
+  const opened = []
   const wx = {
     getStorageSync: (key) => storage.get(key),
     setStorageSync: (key, value) => storage.set(key, structuredClone(value)),
@@ -27,7 +28,7 @@ function setup(pageName, overrides = {}, storage = new Map()) {
     require(name) {
       if (name === '../../utils/api') return api
       if (name === '../../utils/billing-local-draft') return localModule.exports
-      return { openPage() {}, showToast() {} }
+      return { openPage: (...args) => opened.push(args), showToast() {} }
     }
   })
   page.data = structuredClone(page.data)
@@ -39,9 +40,73 @@ function setup(pageName, overrides = {}, storage = new Map()) {
     }
     if (callback) callback()
   }
-  return { page, storage, wx, api, local: localModule.exports, choose(value) { modalChoice = value }, get modal() { return modal }, get alert() { return alert } }
+  return { page, storage, wx, api, opened, local: localModule.exports, choose(value) { modalChoice = value }, get modal() { return modal }, get alert() { return alert } }
 }
 const tick = () => new Promise(setImmediate)
+test('saved document clears even a late native leave alert and ignores trailing input', () => {
+  const state = setup('billing-editor')
+  let pendingEnable, disabled=0
+  state.wx.enableAlertBeforeUnload = options => { pendingEnable = options }
+  state.wx.disableAlertBeforeUnload = () => { disabled++ }
+  state.page.localStorageKey = state.local.key(null)
+  changeCustomer(state.page,'测试厂')
+  assert(pendingEnable)
+  state.page.showDocument({id:9,status:'CONFIRMED',number:'KD-9',content:{customerName:'测试厂',lines:[]}},true)
+  const before=disabled;pendingEnable.success();assert(disabled>before)
+  state.page.changeLine({currentTarget:{dataset:{index:0,field:'unit'}},detail:{value:'个'}})
+  assert.equal(state.page.data.dirty,false)
+  state.page.onHide();assert.equal(state.page.leaveAlertEnabled,false)
+})
+test('posted ledger link opens its actual ledger and historical document month', () => {
+  const state=setup('billing-editor')
+  state.page.data.ledgerPosting={ledgerId:12,date:'2026-09-11',transactionNo:'LS-9'}
+  state.page.openPostedLedger()
+  assert.equal(state.opened[0][0],'/pages/factory-ledger-detail/index')
+  assert.equal(state.opened[0][1].id,12)
+  assert.equal(state.opened[0][1].month,'2026-09')
+  assert.equal(state.opened[0][1].transactionNo,'LS-9')
+})
+test('unverified posting response never becomes a successful ledger state', async () => {
+  const state=setup('billing-editor',{postBillingToLedger:async()=>({posted:false})})
+  state.page.data.form.ledgerId=12
+  await state.page.postToLedger(9)
+  assert.equal(state.page.data.ledgerPosting,null)
+  assert.equal(state.page.data.actionRetry,'ledger')
+})
+test('clearing a unit does not restore stale name focus and enter moves to its price', () => {
+  const {page} = setup('billing-editor')
+  page.data.lines=[{...page.data.lines[0],name:'钻头',unit:'11',quantity:'100',price:'4'}]
+  page.focusLineField(0,'name')
+  const unitEvent={currentTarget:{dataset:{index:0,field:'unit'}},detail:{value:''}}
+  page.focusLineInput(unitEvent)
+  page.changeLine(unitEvent)
+  assert.equal(page.data.lines[0].nameFocus,false)
+  assert.equal(page.data.lines[0].unitFocus,true)
+  assert.equal(page.data.lines[0].unit,'')
+  page.changeLine({...unitEvent,detail:{value:'个'}})
+  assert.equal(page.data.lines[0].unitFocus,true)
+  page.confirmLineField(unitEvent)
+  assert.equal(page.data.lines[0].priceFocus,true)
+  assert.equal(page.data.lines[0].nameFocus,false)
+  assert.equal(page.data.lines[0].unitFocus,false)
+  assert.equal(page.payload().lines[0].unitFocus,undefined)
+})
+test('draft total updates after quantity and price changes and includes all lines', () => {
+  const {page}=setup('billing-editor')
+  page.data.lines=[{...page.data.lines[0],name:'甲',unit:'个',quantity:'100',price:'4'}, {...page.data.lines[0],name:'乙',unit:'支',quantity:'2',price:'3.5'}]
+  page.recalculate();assert.equal(page.data.totalText,'407.00')
+  page.changeLine({currentTarget:{dataset:{index:0,field:'price'}},detail:{value:'5'}})
+  assert.equal(page.data.totalText,'507.00')
+  page.changeLine({currentTarget:{dataset:{index:1,field:'quantity'}},detail:{value:''}})
+  assert.equal(page.data.totalText,'500.00')
+})
+test('numeric units stay incomplete while real units containing digits remain valid', () => {
+  const {page} = setup('billing-editor')
+  page.data.lines = [{...page.data.lines[0],name:'钻头',unit:'11',quantity:'1',price:'2'}]
+  page.recalculate();assert.equal(page.data.incompleteCount,1)
+  page.data.lines[0].unit='１ １';page.recalculate();assert.equal(page.data.incompleteCount,1)
+  page.data.lines[0].unit='mm2';page.recalculate();assert.equal(page.data.incompleteCount,0)
+})
 test('posted documents cannot be deleted or reopened outside their ledger', () => {
   let deleted = false
   const list = setup('billing-list', { deleteBillingDocument: async () => { deleted = true } })

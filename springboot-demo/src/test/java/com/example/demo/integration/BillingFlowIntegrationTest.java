@@ -35,6 +35,15 @@ class BillingFlowIntegrationTest {
     @Autowired private BillingLedgerService billingLedger;
     @Autowired private FactoryLedgerService factoryLedgers;
     @Autowired private com.example.demo.billing.BillingDocumentRepository documents;
+    @Autowired private com.example.demo.agent.tool.builtin.QueryProcurementReceiptsTool receiptQuery;
+    @Autowired private com.example.demo.agent.tool.AgentToolRegistry toolRegistry;
+
+    @Test
+    void runtimeToolsFollowCurrentWorkflow() {
+        var names=toolRegistry.definitions().stream().map(com.example.demo.agent.tool.AgentToolDefinition::getName).toList();
+        assertThat(names).contains("query_procurement_receipts","record_ledger_payment","read_monthly_summary","read_billing_documents");
+        assertThat(names).doesNotContain("record_factory_ledger_transaction","get_daily_finance_summary","get_customer_sales_summary","update_factory_settlement_status","create_sales_draft");
+    }
 
     @Test
     @SuppressWarnings("unchecked")
@@ -172,6 +181,17 @@ class BillingFlowIntegrationTest {
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> billingLedger.post(OWNER, id, customerLedgerId))
                 .hasMessageContaining("进货的");
         Map<String, Object> posting = billingLedger.post(OWNER, id, null);
+        Map<?,?> received=(Map<?,?>)receiptQuery.execute(new com.example.demo.agent.tool.AgentToolContext(1L,OWNER),Map.of("date",java.time.LocalDate.now().toString()));
+        List<Map<?,?>> receivedItems=new java.util.ArrayList<>((List<Map<?,?>>)received.get("items"));
+        for(int page=1;page<((Number)received.get("totalPages")).intValue();page++){
+            Map<?,?> next=(Map<?,?>)receiptQuery.execute(new com.example.demo.agent.tool.AgentToolContext(1L,OWNER),Map.of("date",java.time.LocalDate.now().toString(),"page",page));
+            receivedItems.addAll((List<Map<?,?>>)next.get("items"));
+        }
+        assertThat(receivedItems).anySatisfy(row->{
+            assertThat(row.get("name")).isEqualTo(line.getName());
+            assertThat(row.get("receivedQuantity")).isEqualTo(10L);
+            assertThat(row.get("documentIds")).asList().contains(id);
+        });
         assertThat(posting.get("posted")).isEqualTo(true);
         Long supplierLedgerId = ((Number) posting.get("ledgerId")).longValue();
         assertThat(supplierLedgerId).isNotEqualTo(customerLedgerId);

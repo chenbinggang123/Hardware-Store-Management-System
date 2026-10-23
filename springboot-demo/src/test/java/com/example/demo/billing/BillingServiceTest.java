@@ -13,6 +13,23 @@ import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
 
 class BillingServiceTest {
+    @Test void numericUnitsBecomeReviewableBlanksAndCannotBeConfirmed(){
+        for(String unit:List.of("11","1","１ １","1.5","1/2")){
+            var r=request(false);r.getLines().get(0).setUnit(unit);
+            r.getLines().get(0).setUnitCandidates(List.of("11","个","mm²"));
+            var normalized=service.normalize(r,false);
+            var line=normalized.getLines().get(0);
+            assertThat(line.getUnit()).isEmpty();assertThat(line.getReferenceCaution()).contains("单位原文："+unit,"待确认");
+            assertThat(line.getQuantity()).isEqualByComparingTo("2.5");assertThat(line.getPrice()).isEqualByComparingTo("1.25");
+            assertThat(line.getUnitCandidates()).containsExactly("个","mm²");
+            assertThatThrownBy(()->service.normalize(r,true)).hasMessageContaining("单位不能是数字");
+            assertThatThrownBy(()->service.normalize(normalized,true)).hasMessageContaining("补齐");
+        }
+        for(String unit:List.of("个","支","mm","m²","mm2")){
+            var r=request(false);r.getLines().get(0).setUnit(unit);
+            assertThat(service.normalize(r,true).getLines().get(0).getUnit()).isEqualTo(unit);
+        }
+    }
     @Test void documentTypesAreValidatedAndReturnDraftKeepsItsType(){
         var r=request(false);r.setDocumentType("RETURN");
         assertThat(service.normalize(r,false).getDocumentType()).isEqualTo("RETURN");

@@ -14,6 +14,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AgentCapabilityRegistryTest {
+    @Test void currentRoutesExposeReceiptsAndUnifiedFinanceInsteadOfRetiredSales() {
+        var registry=new AgentCapabilityRegistry();
+        var tools=List.of(definition("query_procurement_receipts"),definition("read_billing_documents"),definition("read_monthly_summary"),definition("get_daily_finance_summary"));
+        assertTrue(registry.catalog(tools).contains("inventory.receipts"));
+        assertTrue(registry.catalog(tools).contains("finance.summary"));
+        assertTrue(!registry.catalog(tools).contains("get_daily_finance_summary"));
+        assertEquals(List.of("query_procurement_receipts","read_billing_documents"),List.copyOf(registry.toolsFor(List.of(new AgentRoutingResult.Selection("inventory","receipts")),tools)));
+    }
     @Test
     void procurementRouteCanPrepareEditableDocumentWithoutPostingPurchase() {
         AgentCapabilityRegistry registry = new AgentCapabilityRegistry();

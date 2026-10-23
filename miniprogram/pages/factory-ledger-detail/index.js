@@ -23,7 +23,7 @@ function documentsOf(ledger) {
 Page({
   data: { id: '', month: ledgerStore.currentMonth(), ledger: null, supplier: false, documents: [], visibleDocuments: [], type: '', expandedId: null, summaryOpen: false, loading: true, error: '',
     filters: CUSTOMER_FILTERS, filterNames: CUSTOMER_FILTERS.map(item => item.label), filterIndex: 0 },
-  onLoad(options) { this.setData({ id: options.id || '', month: options.month || ledgerStore.currentMonth() }) },
+  onLoad(options) { this.targetTransactionNo = options.transactionNo; this.setData({ id: options.id || '', month: options.month || ledgerStore.currentMonth() }) },
   onShow() { this.loadData() },
   onPullDownRefresh() { this.loadData().finally(() => wx.stopPullDownRefresh()) },
   onMonthChange(event) { this.setData({ month: event.detail.value, expandedId: null }, () => this.loadData()) },
@@ -32,6 +32,8 @@ Page({
     return api.getFactoryLedger(this.data.id, this.data.month).then(ledger => {
       if (!ledger) throw new Error('账本不存在')
       const documents = documentsOf(ledger)
+      const target = this.targetTransactionNo && documents.find(item => item.transactionNo === this.targetTransactionNo)
+      if (target) { this.setData({ expandedId: target.id }); this.targetTransactionNo = null }
       const supplier = ledger.kind === 'SUPPLIER'
       if (supplier) wx.setNavigationBarTitle({ title: '进货账本' })
       const filters = supplier ? SUPPLIER_FILTERS : CUSTOMER_FILTERS

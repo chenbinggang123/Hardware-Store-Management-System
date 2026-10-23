@@ -136,7 +136,14 @@ public class BillingService {
             ++index;if(line==null)throw new IllegalArgumentException("明细行不能为空");
             line.setName(text(line.getName(),100));line.setSpecification(text(line.getSpecification(),80));line.setUnit(text(line.getUnit(),16));line.setAlias(text(line.getAlias(),100));line.setRemark(text(line.getRemark(),120));line.setSourceAmount(text(line.getSourceAmount(),100));
             line.setCandidateKey(text(line.getCandidateKey(),255));line.setReferenceSource(text(line.getReferenceSource(),80));line.setReferenceCategory(text(line.getReferenceCategory(),80));line.setReferenceCaution(text(line.getReferenceCaution(),240));
-            line.setReferenceAliases(textList(line.getReferenceAliases(),12,80));line.setUnitCandidates(textList(line.getUnitCandidates(),12,16));
+            if(numericUnit(line.getUnit())) {
+                if(complete)throw new IllegalArgumentException("第"+index+"行单位不能是数字，请核对原单据");
+                String evidence="单位原文："+line.getUnit()+"，疑似识别错误，待确认";
+                line.setReferenceCaution(text(evidence+"；"+line.getReferenceCaution(),240));
+                line.setRemark(text(evidence+"；"+line.getRemark(),120));
+                line.setUnit("");line.setRemember(false);
+            }
+            line.setReferenceAliases(textList(line.getReferenceAliases(),12,80));line.setUnitCandidates(textList(line.getUnitCandidates(),12,16).stream().filter(unit -> !numericUnit(unit)).toList());
             number(line.getQuantity(),6,"数量");number(line.getPrice(),2,"单价");
             if(line.getQuantity()!=null&&line.getQuantity().signum()<=0)throw new IllegalArgumentException("第"+index+"行数量应大于0");
             if(complete&&"PROCUREMENT".equals(c.getDocumentType())&&line.getQuantity()!=null&&line.getQuantity().stripTrailingZeros().scale()>0)throw new IllegalArgumentException("第"+index+"行采购库存数量须为整数，请调整计量单位后保存");
@@ -146,6 +153,11 @@ public class BillingService {
         }
         if(total(c).compareTo(new BigDecimal("9999999999.99"))>0)throw new IllegalArgumentException("单据总额过大");
         return c;
+    }
+    private static boolean numericUnit(String value) {
+        if(value==null)return false;
+        String normalized=java.text.Normalizer.normalize(value,java.text.Normalizer.Form.NFKC).replaceAll("\\s", "");
+        return normalized.matches("[+\\-0-9.,/]+") && normalized.matches(".*[0-9].*");
     }
     private static void number(BigDecimal value,int scale,String label) {if(value!=null&&(value.signum()<0||value.stripTrailingZeros().scale()>scale||value.abs().compareTo(new BigDecimal("999999999"))>0))throw new IllegalArgumentException(label+"超出范围或精度，不能自动取整");}
     private BigDecimal total(BillingContent c) {return c.getLines().stream().map(BillingContent.Line::getAmount).filter(Objects::nonNull).reduce(BigDecimal.ZERO,BigDecimal::add).setScale(2,RoundingMode.HALF_UP);}

@@ -386,7 +386,7 @@ public class TencentDocumentOcrClient implements DocumentOcrClient {
 
     private List<String> reviewWarnings() {
         return List.of(
-                "OCR结果仅生成待审核草稿，商品名称和单位必须保留原文，不得按常识擅自改写",
+                "OCR结果仅生成待审核草稿，商品名称和单位必须保留原文，不得按常识擅自改写；连续同组只写规格的行可依据上一明确商品名补全名称，但须保留本行原文并标注名称沿用待确认，不复制数量、价格或单位",
                 "数量、单价、行金额和合计需要显示给用户核对；验算金额是审核参考，不能静默覆盖OCR原值",
                 "金额格按十万千百十元角分排列；例如OCR原文504若与28×1.8吻合，应展示为50.40元而不是504元");
     }

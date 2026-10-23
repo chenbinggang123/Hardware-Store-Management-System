@@ -22,22 +22,17 @@ public class AgentCapabilityRegistry {
         add("excel", "file_tasks", "list_file_tasks", "export_file_task_to_excel");
         add("quotes", "generate", "generate_quote_files");
         add("inventory", "query", "check_inventory", "search_products");
+        add("inventory", "receipts", "query_procurement_receipts", "read_billing_documents");
         add("inventory", "adjust", "search_products", "check_inventory", "adjust_inventory");
         add("products", "search", "search_products", "search_product_encyclopedia");
         add("products", "create", "create_product");
-        add("sales", "customer_sales", "search_customers", "get_customer_sales_summary");
-        add("sales", "create_draft", "search_customers", "search_products", "create_sales_draft");
-        add("sales", "modify_draft", "get_sales_draft", "update_sales_draft");
-        add("sales", "submit_draft", "get_sales_draft", "commit_sales_draft");
-        add("finance", "summary", "get_daily_finance_summary", "query_accounts");
-        add("finance", "create_document", "create_account_document");
-        add("finance", "payment", "query_accounts", "record_account_payment");
+        add("finance", "summary", "read_monthly_summary");
         add("suppliers", "list", "list_suppliers");
         add("procurement", "search", "read_billing_documents");
         add("procurement", "record", "read_billing_documents", "prepare_billing_document");
         add("factory_ledger", "search", "search_factory_ledgers");
-        add("factory_ledger", "detail", "search_factory_ledgers", "get_factory_ledger", "get_factory_settlement_summary");
-        add("factory_ledger", "write", "search_factory_ledgers", "get_factory_ledger", "create_factory_ledger", "record_factory_ledger_transaction", "update_factory_settlement_status");
+        add("factory_ledger", "detail", "search_factory_ledgers", "get_factory_ledger", "read_billing_documents");
+        add("factory_ledger", "write", "search_factory_ledgers", "get_factory_ledger", "create_factory_ledger", "record_ledger_payment");
     }
 
     private void add(String capability, String operation, String... tools) {

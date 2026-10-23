@@ -14,9 +14,10 @@ public class ReadBillingDocumentsTool implements AgentTool {
             Map.of("type","object","additionalProperties",false,"properties",Map.of(
                     "keyword",Map.of("type","string"),"factory",Map.of("type","string"),
                     "documentType",Map.of("type","string","enum",List.of("PROCUREMENT","PURCHASE","RETURN","")),
+                    "status",Map.of("type","string","enum",List.of("DRAFT","CONFIRMED","VOIDED","")),
                     "documentId",Map.of("type","integer","minimum",1),"page",Map.of("type","integer","minimum",0)),"required",List.of()));}
     public Object execute(AgentToolContext context,Map<String,Object> args){
         if(args.get("documentId") instanceof Number id)return billing.get(context.getOperatorId(),id.longValue());
-        return records.records(context.getOperatorId(),Objects.toString(args.get("keyword"),""),"",Objects.toString(args.get("documentType"),"PROCUREMENT"),Objects.toString(args.get("factory"),""),args.get("page") instanceof Number page?page.intValue():0,20);
+        return records.records(context.getOperatorId(),Objects.toString(args.get("keyword"),""),Objects.toString(args.get("status"),""),Objects.toString(args.get("documentType"),""),Objects.toString(args.get("factory"),""),args.get("page") instanceof Number page?page.intValue():0,20);
     }
 }

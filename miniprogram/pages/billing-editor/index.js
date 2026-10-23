@@ -30,7 +30,9 @@ function money(value) {
 
 function validUnit(value) {
   const unit = String(value || '').trim()
-  return Boolean(unit) && !/^(?:1|￥|¥|元|[.·,，、-])$/.test(unit)
+  const normalized = unit.normalize('NFKC').replace(/\s/g, '')
+  const numeric = /^[+\-0-9.,/]+$/.test(normalized) && /[0-9]/.test(normalized)
+  return Boolean(unit) && !numeric && !/^(?:￥|¥|元|[.·,，、-])$/.test(unit)
 }
 
 function sourceAmountNumber(value) {
@@ -131,6 +133,7 @@ Page({
   },
 
   updateDraft(values, callback) {
+    if (this.data.document && this.data.document.status !== 'DRAFT' && values.dirty && values.document !== null) return
     this.setData(values, callback)
     this.persistLocalDraft()
   },
@@ -173,16 +176,27 @@ Page({
   },
 
   persistLocalDraft() {
-    if (!this.data.dirty || !this.localStorageKey) return
+    if (!this.data.dirty || (this.data.document && this.data.document.status !== 'DRAFT')) {
+      this.clearLeaveAlert()
+      return
+    }
+    if (!this.localStorageKey) return
     const saved = localDraft.write(this.localStorageKey, {
       form: this.data.form, lines: this.data.lines,
       document: this.data.document, requestKey: this.newRequestKey
     })
     this.setData({ localSaveText: saved ? '已暂存到本机，尚未保存到开单记录' : '本机暂存失败，请先保存草稿再离开' })
     if (!this.leaveAlertEnabled && wx.enableAlertBeforeUnload) {
-      wx.enableAlertBeforeUnload({ message: '单据尚未保存，请确认已暂存或先保存草稿。' })
       this.leaveAlertEnabled = true
+      wx.enableAlertBeforeUnload({ message: '单据尚未保存，请确认已暂存或先保存草稿。', success: () => {
+        if (!this.data.dirty || (this.data.document && this.data.document.status !== 'DRAFT')) this.clearLeaveAlert()
+      } })
     }
+  },
+
+  clearLeaveAlert() {
+    this.leaveAlertEnabled = false
+    if (wx.disableAlertBeforeUnload) wx.disableAlertBeforeUnload()
   },
 
   offerLocalDraft(startFresh) {
@@ -355,6 +369,7 @@ Page({
     if (!id || (!procurement && !ledgerId) || this.data.ledgerBusy) return Promise.resolve(null)
     this.setData({ ledgerBusy: true, statusText: procurement ? '正在记入进货账本…' : '正在记入厂家账本…' })
     return api.postBillingToLedger(id, ledgerId).then((posting) => {
+      if (!posting || !posting.posted || posting.reversed) throw new Error('账本尚未确认这张单据，请重试记账')
       this.setData({ ledgerPosting: posting && posting.posted ? posting : null, actionError: '', actionRetry: '', actionRetryText: '', statusText: `已记入 ${posting.factoryName} 的账本` })
       wx.showToast({ title: `已记入 ${posting.factoryName}`, icon: 'success' })
       return posting
@@ -397,9 +412,16 @@ Page({
     if (this.data.documentId) this.loadDocument(this.data.documentId)
   },
 
+  openPostedLedger() {
+    const posting = this.data.ledgerPosting
+    if (!posting || !posting.ledgerId) return
+    openPage('/pages/factory-ledger-detail/index', {
+      id: posting.ledgerId, month: String(posting.date || this.data.form.date).slice(0, 7), transactionNo: posting.transactionNo
+    })
+  },
+
   showDocument(document, fresh) {
-    if (this.leaveAlertEnabled && wx.disableAlertBeforeUnload) wx.disableAlertBeforeUnload()
-    this.leaveAlertEnabled = false
+    this.clearLeaveAlert()
     const content = document.content || {}
     const confirmed = document.status === 'CONFIRMED' || document.status === 'VOIDED'
     // 保存草稿后保留当前展开的行；重新打开的草稿直接进入紧凑核对视图，已保存单据进入预览。
@@ -495,6 +517,9 @@ Page({
       ...line,
       expanded: lineIndex === index,
       nameFocus: lineIndex === index && field === 'name',
+      specificationFocus: lineIndex === index && field === 'specification',
+      unitFocus: lineIndex === index && field === 'unit',
+      remarkFocus: lineIndex === index && field === 'remark',
       quantityFocus: lineIndex === index && field === 'quantity',
       priceFocus: lineIndex === index && field === 'price'
     }))
@@ -504,6 +529,7 @@ Page({
   confirmLineField(event) {
     const index = Number(event.currentTarget.dataset.index)
     const field = event.currentTarget.dataset.field
+    if (field === 'unit') return this.focusLineField(index, 'price')
     if (field === 'quantity') return this.focusLineField(index, 'price')
     if (field !== 'price') return
     if (index < this.data.lines.length - 1) return this.focusLineField(index + 1, 'name')
@@ -668,6 +694,7 @@ Page({
         ...line,
         index: undefined, amountText: undefined, unitChoices: undefined,
         nameFocus: undefined, quantityFocus: undefined, priceFocus: undefined,
+        specificationFocus: undefined, unitFocus: undefined, remarkFocus: undefined,
         nameUncertain: undefined, unitUncertain: undefined, quantityUncertain: undefined,
         priceUncertain: undefined, amountMismatch: undefined, remarkOpen: undefined, remarkToggleText: undefined,
         needsReview: undefined, expanded: undefined, inCatalog: undefined,

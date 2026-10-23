@@ -186,6 +186,8 @@ page { background: #EEF2EF; color: #18231E; }
 .line-table-head, .line-row { display: flex; align-items: center; gap: 6rpx; }
 .line-table-head { margin-top: 4rpx; padding: 8rpx 4rpx; border-bottom: 1rpx solid #E2E8E5; color: #7A8680; font-size: 21rpx; }
 .line-table-head .row-main { color: #34413C; font-weight: 700; }
+.draft-total { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12rpx; padding: 18rpx 4rpx 22rpx; border-bottom: 1rpx solid #DCE5DF; }
+.draft-total-label { color: #263B31; font-size: 28rpx; font-weight: 700; }.draft-total-value { color: #216846; font-size: 38rpx; font-weight: 800; font-variant-numeric: tabular-nums; }.draft-total-note { margin-top: 6rpx; color: #66766D; font-size: 21rpx; }
 .review-filter { min-height: 0; padding: 0; display: inline; color: #B06A08; background: none; font-size: 21rpx; }
 .line-row { min-height: 66rpx; padding: 6rpx 4rpx; font-size: 25rpx; }
 .row-name { font-weight: 600; }
