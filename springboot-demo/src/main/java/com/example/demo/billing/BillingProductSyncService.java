@@ -26,11 +26,38 @@ public class BillingProductSyncService {
         this.products=products; this.productService=productService; this.inventories=inventories; this.logs=logs; this.prices=prices;
     }
 
+    private ProductRenameService renamer;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setRenamer(ProductRenameService renamer) { this.renamer = renamer; }
+
+    /**
+     * 单据里已绑定商品库的明细改了名称（规格、单位没变），就是在纠正商品名：商品库跟着改，
+     * 其他引用这个商品的单据和账本明细也一起改。新名字已经是另一个商品时不改，按原规则匹配。
+     */
+    private void renameLinkedProduct(BillingContent.Line line) {
+        if (renamer == null || line.getCandidateKey() == null || !line.getCandidateKey().startsWith("product:")) return;
+        Long id;
+        try { id = Long.valueOf(line.getCandidateKey().substring(8)); } catch (NumberFormatException exception) { return; }
+        Product linked = products.findById(id).orElse(null);
+        if (linked == null || line.getName() == null || line.getName().trim().isEmpty()) return;
+        String newName = line.getName().trim();
+        if (newName.equalsIgnoreCase(value(linked.getName()))) return;
+        if (!value(linked.getSpec()).equalsIgnoreCase(value(line.getSpecification()))
+                || !value(linked.getUnit()).equalsIgnoreCase(value(line.getUnit()))) return;
+        if (!products.lockIdentity(newName, value(line.getSpecification()), line.getUnit()).isEmpty()) return;
+        String oldName = linked.getName();
+        linked.setName(newName);
+        products.save(linked);
+        renamer.propagate(id, oldName, newName);
+    }
+
     public void confirm(Long owner, BillingDocument document, BillingContent content) {
         boolean procurement = "PROCUREMENT".equals(content.getDocumentType());
         Map<Long, Integer> quantities = new TreeMap<>();
         int index = 0;
         for (BillingContent.Line line : content.getLines()) {
+            renameLinkedProduct(line);
             List<Product> matching = products.lockIdentity(line.getName(), value(line.getSpecification()), line.getUnit());
             String factory = procurement ? content.getCustomerName().trim() : "";
             Product product = null;

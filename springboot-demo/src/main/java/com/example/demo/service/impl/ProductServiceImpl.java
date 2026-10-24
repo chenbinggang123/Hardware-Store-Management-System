@@ -52,6 +52,14 @@ public class ProductServiceImpl implements ProductService {
         this.inventoryRepository = inventoryRepository;
     }
 
+    private com.example.demo.billing.ProductRenameService renamer;
+
+    /** 商品改名后同步到单据和账本明细。 */
+    @Autowired(required = false)
+    void setRenamer(com.example.demo.billing.ProductRenameService renamer) {
+        this.renamer = renamer;
+    }
+
     @Override
     public Product saveProduct(Product product) {
         return saveProduct(product, CurrentOperator.idOrNull());
@@ -81,11 +89,15 @@ public class ProductServiceImpl implements ProductService {
         Product existingProduct = getProductById(product.getId())
                 .orElseThrow(() -> new IllegalArgumentException("商品不存在，无法更新"));
         Product before = priceSnapshot(existingProduct);
+        String oldName = existingProduct.getName();
         mergeProduct(existingProduct, product);
         fillProductDefaults(existingProduct);
         validateProduct(existingProduct);
         ensureBarcodeAvailable(existingProduct.getBarcode(), existingProduct.getId());
         Product saved = productRepository.save(existingProduct);
+        if (renamer != null && saved.getName() != null && !saved.getName().equals(oldName)) {
+            renamer.propagate(saved.getId(), oldName, saved.getName());
+        }
         if (priceHistoryService != null) {
             priceHistoryService.recordMasterChanges(before, saved, operatorId, "MANUAL_PRODUCT_EDIT",
                     null, saved.getId(), null,

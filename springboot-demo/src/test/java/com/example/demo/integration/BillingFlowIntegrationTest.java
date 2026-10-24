@@ -343,6 +343,61 @@ class BillingFlowIntegrationTest {
         }
     }
 
+    @Autowired private com.example.demo.service.ProductService productService;
+    @Autowired private com.example.demo.repository.ProductRepository productRepository;
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void renamingTheProductRenamesEveryDocumentAndLedgerLine() {
+        String oldName = "rn" + UUID.randomUUID().toString().substring(0, 6);
+        String newName = oldName + "fix";
+        FactoryLedgerCreateRequest ledgerRequest = new FactoryLedgerCreateRequest();
+        ledgerRequest.setFactoryName("rnledger" + UUID.randomUUID().toString().substring(0, 6));
+        Long ledgerId = ((Number) factoryLedgers.create(ledgerRequest, OWNER).get("id")).longValue();
+        try {
+            BillingContent content = new BillingContent();
+            content.setDate(java.time.LocalDate.now().toString());
+            BillingContent.Line line = new BillingContent.Line();
+            line.setName(oldName); line.setUnit("x"); line.setQuantity(new BigDecimal("2")); line.setPrice(new BigDecimal("3"));
+            content.setLines(List.of(line));
+            Map<String, Object> draft = billing.save(OWNER, null, content);
+            Long id = ((Number) draft.get("id")).longValue();
+            billing.confirm(OWNER, id, (Long) draft.get("version"));
+            billingLedger.post(OWNER, id, ledgerId);
+            Long productId = jdbc.queryForObject("SELECT id FROM product WHERE name = ?", Long.class, oldName);
+
+            // product library -> documents and ledger lines
+            var product = productRepository.findById(productId).orElseThrow();
+            product.setName(newName);
+            productService.updateProduct(product, OWNER);
+            BillingContent saved = (BillingContent) billing.get(OWNER, id).get("content");
+            assertThat(saved.getLines().get(0).getName()).isEqualTo(newName);
+            String items = jdbc.queryForObject("SELECT items_json FROM factory_ledger_transaction WHERE ledger_id = ? LIMIT 1", String.class, ledgerId);
+            assertThat(items).contains(newName).doesNotContain(oldName + "\"");
+
+            // document line -> product library (a linked line whose name was corrected)
+            BillingContent second = new BillingContent();
+            second.setDate(java.time.LocalDate.now().toString());
+            BillingContent.Line fixed = new BillingContent.Line();
+            fixed.setName(newName + "2"); fixed.setUnit("x"); fixed.setQuantity(new BigDecimal("1")); fixed.setPrice(new BigDecimal("3"));
+            fixed.setCandidateKey("product:" + productId);
+            second.setLines(List.of(fixed));
+            Map<String, Object> draft2 = billing.save(OWNER, null, second);
+            Long id2 = ((Number) draft2.get("id")).longValue();
+            billing.confirm(OWNER, id2, (Long) draft2.get("version"));
+            assertThat(productRepository.findById(productId).orElseThrow().getName()).isEqualTo(newName + "2");
+            BillingContent first = (BillingContent) billing.get(OWNER, id).get("content");
+            assertThat(first.getLines().get(0).getName()).isEqualTo(newName + "2");
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM product WHERE name LIKE ?", Integer.class, oldName + "%")).isEqualTo(1);
+            billingLedger.deleteDocument(OWNER, id2);
+        } finally {
+            removeTestProducts(oldName + "%");
+            jdbc.update("DELETE FROM factory_ledger_transaction WHERE ledger_id = ?", ledgerId);
+            jdbc.update("DELETE FROM factory_ledger WHERE id = ?", ledgerId);
+            jdbc.update("DELETE FROM billing_document WHERE content_json LIKE ?", "%" + oldName + "%");
+        }
+    }
+
     @Test
     void staleUnpostedPhotosAreSweptButPostedOnesStay() {
         var old = new com.example.demo.agent.entity.AgentAttachment();
