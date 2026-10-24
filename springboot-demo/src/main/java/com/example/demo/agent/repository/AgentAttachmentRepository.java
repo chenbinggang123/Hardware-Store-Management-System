@@ -12,4 +12,5 @@ public interface AgentAttachmentRepository extends JpaRepository<AgentAttachment
     List<AgentAttachment> findByIdInAndOperatorId(List<Long> ids, Long operatorId);
     List<AgentAttachment> findByRunIdOrderByCreateTimeAsc(Long runId);
     List<AgentAttachment> findByConversationIdOrderByCreateTimeAsc(Long conversationId);
+    List<AgentAttachment> findByOperatorIdAndObjectKeyContainingAndCreateTimeBefore(Long operatorId, String keyPart, java.time.LocalDateTime before);
 }

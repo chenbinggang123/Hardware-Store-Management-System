@@ -20,10 +20,10 @@ function plainBlocks(value) {
     if (/^(?:-{2,}|_{2,}|\*{2,}|[·•。；;，,\s]+)$/.test(source)) return null
     const heading = source.match(/^#{1,6}\s+(.+)$/)
     if (heading) return { type: 'heading', text: cleanMarkdown(heading[1]) }
-    const list = source.match(/^\s*(?:[-+*·•●▪]|(\d+)[.)、])\s*(.+)$/)
+    const list = source.match(/^\s*(?:[-+*]\s+|[·•●▪]\s*|(\d+)[.)、]\s*)(.+)$/)
     if (list) return { type: 'list', marker: list[1] ? `${list[1]}.` : '•', text: cleanMarkdown(list[2]) }
     const line = cleanMarkdown(source)
-    if (/^(?:结果|重点|明细|商品明细|待确认|下一步|文件在哪看|处理结果|查询结果|合计|建议)$/.test(line)) {
+    if (/^(?:结论|提示|结果|重点|明细|商品明细|待确认|下一步|文件在哪看|处理结果|查询结果|合计|建议)$/.test(line)) {
       return { type: 'heading', text: line }
     }
     const field = line.match(/^-?\s*([^：:]{1,18})[：:]\s*(.+)$/)
@@ -112,10 +112,62 @@ function productTableBlocks(value) {
   ]
 }
 
-function formatAgentContent(value) {
-  const content = cleanMarkdown(value)
-  if (!content) return []
-  return sourceOrderTableBlocks(content) || productTableBlocks(content) || plainBlocks(content)
+function generalTableBlocks(value) {
+  const lines = value.split('\n')
+  const blocks = []
+  let pending = []
+  const flush = () => { blocks.push(...plainBlocks(pending.join('\n'))); pending = [] }
+  for (let index = 0; index < lines.length; index += 1) {
+    const headers = tableCells(lines[index])
+    const separator = tableCells(lines[index + 1])
+    if (headers.length < 2 || separator.length !== headers.length || !isSeparatorCells(separator)) {
+      pending.push(lines[index]); continue
+    }
+    const rows = []
+    let cursor = index + 2
+    while (cursor < lines.length) {
+      const cells = tableCells(lines[cursor])
+      if (cells.length !== headers.length || isSeparatorCells(cells)) break
+      rows.push(cells)
+      cursor += 1
+    }
+    flush()
+    const columns = headers.map((label, column) => ({
+      label,
+      numeric: /^(?:入库|出库|净增|数量|单价|金额|合计|库存|进货数量)$/.test(label.replace(/\s/g, '')),
+      width: column === 0 ? 240 : 112
+    }))
+    blocks.push({ type: 'table', columns, width: 240 + (headers.length - 1) * 112,
+      rows: rows.map((cells) => ({ cells: cells.map((text, column) => ({ text, ...columns[column] })) })) })
+    index = cursor - 1
+  }
+  flush()
+  return blocks
 }
 
-module.exports = { formatAgentContent }
+function formatAgentContent(value) {
+  const content = String(value || '').replace(/\r/g, '').trim()
+  if (!content) return []
+  return sourceOrderTableBlocks(content) || productTableBlocks(content) || generalTableBlocks(content)
+}
+
+function formatConversationPreview(value) {
+  let text = String(value || '').trim()
+  if (!text) return '暂无消息'
+  let payload = text.replace(/^操作已成功执行[。.]\s*结果[：:]\s*/, '')
+    .replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '')
+  if (/^[{\[]/.test(payload)) {
+    // Older servers may have cut the JSON in the middle of a field.
+    if (/["']kind["']\s*:\s*["']BILLING_DOCUM/.test(payload)) return '单据草稿已建立，待在编辑页核对确认。'
+    try {
+      const result = JSON.parse(payload)
+      if (typeof result.message !== 'string' || !result.message.trim()) return '请打开对话查看处理结果。'
+      text = result.message
+    } catch (_) { return '请打开对话查看处理结果。' }
+  }
+  text = cleanMarkdown(text.replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1'))
+    .replace(/\*\*|__|`/g, '').replace(/^\s*[-*+]\s+/gm, '').replace(/\s+/g, ' ').trim()
+  return text.length > 60 ? `${text.slice(0, 60)}…` : text
+}
+
+module.exports = { formatAgentContent, formatConversationPreview }

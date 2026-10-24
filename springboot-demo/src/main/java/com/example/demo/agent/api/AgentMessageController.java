@@ -124,11 +124,21 @@ public class AgentMessageController {
     }
 
     @DeleteMapping("/attachments/{attachmentId}")
-    public ApiResponse<Void> deleteAttachment(
+    public ApiResponse<Boolean> deleteAttachment(
             @PathVariable Long attachmentId,
             HttpServletRequest request) {
-        attachmentService.deleteUnsent(attachmentId, currentUserId(request));
-        return ApiResponse.ok("附件已删除", null);
+        return ApiResponse.ok("附件已移除", attachmentService.deleteUnsent(attachmentId, currentUserId(request)));
+    }
+
+    @GetMapping("/attachments/{attachmentId}/photo-source")
+    public ApiResponse<String> photoSource(@PathVariable Long attachmentId, HttpServletRequest request) {
+        return ApiResponse.ok(attachmentService.photoSource(attachmentId, currentUserId(request)));
+    }
+
+    @GetMapping("/attachments/{attachmentId}/photo-content")
+    public org.springframework.http.ResponseEntity<byte[]> photoContent(@PathVariable Long attachmentId, HttpServletRequest request) {
+        return org.springframework.http.ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(attachmentService.photoContent(attachmentId, currentUserId(request)));
     }
 
     @GetMapping("/conversations")

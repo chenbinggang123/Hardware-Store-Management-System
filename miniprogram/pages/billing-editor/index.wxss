@@ -231,4 +231,37 @@ page { background: #EEF2EF; color: #18231E; }
 .billing-summary-status { font-size: 19rpx; }
 .secondary-action, .primary-action { min-height: 64rpx; padding: 0 20rpx; border-radius: 10rpx; font-size: 25rpx; }
 .bottom-space { height: 140rpx; }
+.knowledge-review { margin-top: 18rpx; padding: 18rpx; border-left: 4rpx solid #7F9C8C; background: #EEF3EF; color: #263B30; }
+.knowledge-heading { font-size: 24rpx; font-weight: 700; }
+.knowledge-heading > text { color: #86521D; font-weight: 500; }
+.knowledge-original { margin-top: 8rpx; color: #52645A; font-size: 22rpx; overflow-wrap: anywhere; }
+.knowledge-entry { margin-top: 16rpx; }
+.knowledge-title { font-size: 23rpx; font-weight: 600; }
+.knowledge-reason { margin-top: 6rpx; font-size: 23rpx; line-height: 1.65; }
+.knowledge-actions { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 8rpx; }
+.knowledge-actions > view { min-height: 88rpx; display: flex; align-items: center; padding: 0 14rpx; color: #245E9B; font-size: 23rpx; }
+.knowledge-source { min-height: 88rpx; display: flex; align-items: center; padding-top: 6rpx; color: #426653; font-size: 21rpx; line-height: 1.5; overflow-wrap: anywhere; }
 @media (max-width: 340px) { .row-qty, .row-price { width: 84rpx; } .row-amount { width: 100rpx; } .line-row { font-size: 23rpx; } .secondary-action, .primary-action { padding: 0 14rpx; font-size: 23rpx; } }
+
+/* ===== 2026-10 拍照识别 ===== */
+.head-photo { flex: 0 0 auto; min-height: 56rpx; padding: 0 16rpx; display: flex; align-items: center; border-radius: 28rpx; color: #FFF; background: #247052; font-size: 23rpx; font-weight: 700; }
+.source-strip { margin: 6rpx 0 4rpx; padding: 8rpx; display: flex; align-items: center; gap: 12rpx; border: 1rpx solid #CFE0D6; border-radius: 10rpx; background: #F2F8F5; }
+.source-thumb { width: 84rpx; height: 84rpx; flex: 0 0 auto; border-radius: 8rpx; background: #E1E8E4; }
+.source-copy { min-width: 0; display: flex; flex-direction: column; gap: 2rpx; }
+.source-title { color: #236C4D; font-size: 24rpx; font-weight: 700; }
+.source-hint { color: #68756F; font-size: 21rpx; }
+.row-crop { width: 640rpx; max-width: 100%; margin: 8rpx 0 2rpx; overflow: hidden; border: 1rpx solid #CBD6D0; border-radius: 6rpx; background: #FFF; }
+.row-crop image { display: block; max-width: none; }
+.recognize-mask { position: fixed; z-index: 30; top: 0; right: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: center; padding: 0 40rpx; background: rgba(20, 30, 26, .45); }
+.recognize-card { width: 100%; padding: 28rpx 28rpx 22rpx; box-sizing: border-box; border-radius: 16rpx; background: #FFF; }
+.recognize-title { color: #17231E; font-size: 32rpx; font-weight: 760; }
+.recognize-step { margin-top: 16rpx; display: flex; align-items: center; gap: 12rpx; color: #9AA39F; font-size: 26rpx; }
+.recognize-step.doing { color: #245E9B; font-weight: 700; }
+.recognize-step.done { color: #236C4D; }
+.recognize-dot { width: 40rpx; height: 40rpx; display: inline-flex; align-items: center; justify-content: center; border-radius: 20rpx; background: #EEF2F0; font-size: 21rpx; }
+.recognize-step.doing .recognize-dot { color: #FFF; background: #245E9B; }
+.recognize-step.done .recognize-dot { color: #FFF; background: #247052; }
+.recognize-time { margin-top: 18rpx; color: #68756F; font-size: 22rpx; }
+.recognize-error { margin-top: 16rpx; color: #A83F32; font-size: 25rpx; line-height: 1.5; }
+.recognize-tip { margin-top: 14rpx; padding: 10rpx 12rpx; border-radius: 8rpx; color: #70551E; background: #FFF5DF; font-size: 21rpx; }
+.recognize-actions { margin-top: 20rpx; display: flex; justify-content: flex-end; gap: 12rpx; }

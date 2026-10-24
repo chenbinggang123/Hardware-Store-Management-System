@@ -152,8 +152,10 @@ public class TencentDocumentOcrClient implements DocumentOcrClient {
             if (!reviewSummaries.isEmpty()) {
                 output.insert(0, String.join("\n", reviewSummaries) + "\n\n");
             }
+            // 只有一张表时“第N行”是唯一的，才记录每行在原图上的位置，供开单页截图核对。
+            String layout = structuredTables.size() == 1 ? rowLayout(structuredTables.get(0)) : null;
             return new DocumentOcrResult("tencent-table-v3", text(payload, "RequestId"), output.toString().trim(),
-                    reviewWarnings());
+                    reviewWarnings(), layout);
         } catch (Exception exception) {
             throw new IllegalStateException("腾讯云表格 OCR 响应无法解析：" + safeMessage(exception), exception);
         }
@@ -386,9 +388,33 @@ public class TencentDocumentOcrClient implements DocumentOcrClient {
 
     private List<String> reviewWarnings() {
         return List.of(
-                "OCR结果仅生成待审核草稿，商品名称和单位必须保留原文，不得按常识擅自改写；连续同组只写规格的行可依据上一明确商品名补全名称，但须保留本行原文并标注名称沿用待确认，不复制数量、价格或单位",
+                "OCR结果仅生成待审核草稿，商品名称和单位必须保留原文，不得按常识擅自改写；连续同组只写规格的行可依据上一明确商品名补全名称，但须保留本行原文并标注名称沿用待确认，不复制数量、价格或单位" + com.example.demo.billing.HandwrittenItemContinuation.MODEL_RULE,
                 "数量、单价、行金额和合计需要显示给用户核对；验算金额是审核参考，不能静默覆盖OCR原值",
                 "金额格按十万千百十元角分排列；例如OCR原文504若与28×1.8吻合，应展示为50.40元而不是504元");
+    }
+
+    /** 每一行所有格子的外接矩形，行号与文字里的“第N行”一致。 */
+    String rowLayout(JsonNode table) {
+        Map<Integer, int[]> boxes = new TreeMap<>();
+        for (JsonNode cell : table.path("Cells")) {
+            int row = cell.path("RowTl").asInt(-1);
+            JsonNode polygon = cell.path("Polygon");
+            if (row < 0 || !polygon.isArray() || polygon.isEmpty()) continue;
+            int[] box = boxes.computeIfAbsent(row + 1, ignored -> new int[]{Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE});
+            for (JsonNode point : polygon) {
+                int x = point.path("X").asInt(), y = point.path("Y").asInt();
+                box[0] = Math.min(box[0], x); box[1] = Math.min(box[1], y);
+                box[2] = Math.max(box[2], x); box[3] = Math.max(box[3], y);
+            }
+        }
+        if (boxes.isEmpty()) return null;
+        Map<String, Object> rows = new TreeMap<>();
+        boxes.forEach((row, box) -> rows.put(String.valueOf(row), List.of(box[0], box[1], box[2], box[3])));
+        try {
+            return objectMapper.writeValueAsString(Map.of("rows", rows));
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private int topY(JsonNode cell) {

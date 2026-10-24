@@ -11,15 +11,22 @@ import java.util.*;
 public class PrepareBillingDocumentTool implements AgentTool {
     private final BillingService billing;
     private final ObjectMapper mapper;
-    public PrepareBillingDocumentTool(BillingService billing,ObjectMapper mapper){this.billing=billing;this.mapper=mapper;}
+    private final SpecificationKnowledgeCatalog knowledge;
+    public PrepareBillingDocumentTool(BillingService billing,ObjectMapper mapper){this(billing,mapper,new SpecificationKnowledgeCatalog());}
+    @org.springframework.beans.factory.annotation.Autowired
+    public PrepareBillingDocumentTool(BillingService billing,ObjectMapper mapper,SpecificationKnowledgeCatalog knowledge){this.billing=billing;this.mapper=mapper;this.knowledge=knowledge;}
     public AgentToolDefinition definition(){
         Map<String,Object> line=new LinkedHashMap<>();
         for(String key:List.of("name","specification","unit","remark","sourceAmount"))line.put(key,Map.of("type",List.of("string","null")));
+        line.put("rawName",Map.of("type",List.of("string","null"),"description","识别到的商品名称原文，整理或补全前保留，不放入推断值"));
+        line.put("rawSpecification",Map.of("type",List.of("string","null"),"description","规格原文，含中、P、顿号等疑似字符也原样保留；整理值另填specification"));
         line.put("quantity",Map.of("type",List.of("number","null"),"description","原始数量，未知留空，最多6位小数"));
         line.put("unit",Map.of("type",List.of("string","null"),"description","计量单位不得是11、1等纯数字；识别为数字时留空，原文写入remark并标注单位待核对，不能猜成个或支"));
         line.put("price",Map.of("type",List.of("number","null"),"description","原始单价，未知留空，最多2位小数"));
+        line.put("sourceRow",Map.of("type",List.of("integer","null"),"description","OCR第N行的N，不确定留空"));
         Map<String,Object> props=new LinkedHashMap<>();
         for(String key:List.of("companyName","phone","customerName","date","remark","sourceNote","sourceDocumentNumber"))props.put(key,Map.of("type",List.of("string","null")));
+        props.put("sourceAttachmentId",Map.of("type",List.of("integer","null"),"description","系统填写的原图附件ID，模型不要填写"));
         props.put("documentType",Map.of("type","string","enum",List.of("PURCHASE","RETURN","PROCUREMENT"),"description","拿货单用PURCHASE，客户退货用RETURN，从源头厂商采购进货用PROCUREMENT；采购单customerName填写源头厂商"));
         props.put("lines",Map.of("type","array","minItems",1,"maxItems",200,"items",Map.of("type","object","additionalProperties",false,"properties",line,"required",List.of("name"))));
         return new AgentToolDefinition("prepare_billing_document","先准备商品单据草稿，保留来源金额和待核对信息。在开单页手动修改、核对后再选择导出图片或 Excel；不会登记销售、欠款或库存。",AgentToolRisk.R1_DRAFT,
@@ -27,7 +34,20 @@ public class PrepareBillingDocumentTool implements AgentTool {
     }
     private BillingContent content(Map<String,Object> args){var c=mapper.convertValue(args,BillingContent.class);if(c==null)throw new IllegalArgumentException("开单内容不能为空");c.setRequestKey(null);c.setVersion(null);
         c.setCompanyName(RecognizedTextSanitizer.clean(c.getCompanyName()));c.setPhone(RecognizedTextSanitizer.clean(c.getPhone()));c.setCustomerName(RecognizedTextSanitizer.clean(c.getCustomerName()));c.setRemark(RecognizedTextSanitizer.clean(c.getRemark()));c.setSourceNote(RecognizedTextSanitizer.clean(c.getSourceNote()));
-        if(c.getLines()!=null)for(var line:c.getLines())if(line!=null){line.setName(RecognizedTextSanitizer.clean(line.getName()));line.setSpecification(RecognizedTextSanitizer.clean(line.getSpecification()));line.setUnit(RecognizedTextSanitizer.clean(line.getUnit()));line.setRemark(RecognizedTextSanitizer.clean(line.getRemark()));line.setSourceAmount(RecognizedTextSanitizer.clean(line.getSourceAmount()));line.setRemember(false);line.setAlias(null);}HandwrittenItemContinuation.repair(c);return billing.normalize(c,false);}
+        if(c.getLines()!=null)for(var line:c.getLines())if(line!=null){
+            if(line.getRawName()==null)line.setRawName(line.getName());
+            if(line.getRawSpecification()==null)line.setRawSpecification(line.getSpecification());
+            line.setName(RecognizedTextSanitizer.clean(line.getName()));line.setSpecification(RecognizedTextSanitizer.clean(line.getSpecification()));line.setUnit(RecognizedTextSanitizer.clean(line.getUnit()));line.setRemark(RecognizedTextSanitizer.clean(line.getRemark()));line.setSourceAmount(RecognizedTextSanitizer.clean(line.getSourceAmount()));line.setRemember(false);line.setAlias(null);
+        }
+        // Keep long model audit notes rather than rejecting the entire draft or truncating evidence.
+        StringBuilder audit = new StringBuilder(Objects.toString(c.getSourceNote(),""));
+        if(c.getRemark()!=null && c.getRemark().length()>200){audit.append("\n整单审核说明：").append(c.getRemark());c.setRemark("完整审核说明见来源说明");}
+        HandwrittenItemContinuation.repair(c);
+        if(c.getLines()!=null)for(int i=0;i<c.getLines().size();i++){
+            var row=c.getLines().get(i);if(row==null)continue;
+            if(row.getRemark()!=null && row.getRemark().length()>120){audit.append("\n第").append(i+1).append("行审核说明：").append(row.getRemark());row.setRemark("完整审核说明见来源说明");}
+        }
+        c.setSourceNote(audit.toString());knowledge.annotate(c);return billing.normalize(c,false);}
     /** 草稿只进入开单页，不登记销售、欠款、库存或商品记忆；用户在开单页点“保存并生成”才是唯一确认。 */
     @Override public boolean draftWithoutApproval(){return true;}
     @Override public boolean completesRun(){return true;}

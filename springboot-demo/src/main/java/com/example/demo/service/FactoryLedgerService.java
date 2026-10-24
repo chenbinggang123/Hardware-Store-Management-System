@@ -43,6 +43,9 @@ public class FactoryLedgerService {
     private final OperationLogRepository operationLogRepository;
     @org.springframework.beans.factory.annotation.Autowired
     private com.example.demo.billing.BillingDocumentRepository billingDocuments;
+    /** 翻账本时顺带单据原图（拍照开单保存的照片）。 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.example.demo.agent.service.BillingPhotoService billingPhotos;
 
     public FactoryLedgerService(
             FactoryLedgerRepository ledgerRepository,
@@ -104,11 +107,19 @@ public class FactoryLedgerService {
         result.put("month", month.toString());
         putCurrentAmount(result, ledger, allTransactions);
         result.put("summary", calculateSummary(ledger, allTransactions, month));
-        result.put("transactions", allTransactions.stream()
+        List<Map<String, Object>> views = allTransactions.stream()
                 .filter(transaction -> YearMonth.from(transaction.getTransactionDate()).equals(month))
                 .filter(transaction -> !"REVERSED".equals(transaction.getStatus()) && transaction.getReversalOfId() == null)
                 .map(transaction -> transactionView(transaction, kindOf(ledger)))
-                .toList());
+                .toList();
+        if (billingPhotos != null) {
+            var documentIds = views.stream().map(view -> view.get("documentId")).filter(Long.class::isInstance).map(Long.class::cast).toList();
+            if (!documentIds.isEmpty()) {
+                var photos = billingPhotos.forDocuments(documentIds);
+                views.forEach(view -> { Object photo = photos.get(view.get("documentId")); if (photo != null) view.put("sourcePhoto", photo); });
+            }
+        }
+        result.put("transactions", views);
         return result;
     }
 

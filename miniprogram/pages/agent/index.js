@@ -1,5 +1,5 @@
 const api = require('../../utils/api')
-const { formatAgentContent } = require('../../utils/agent-format')
+const { formatAgentContent, formatConversationPreview } = require('../../utils/agent-format')
 const { fileView, openAgentFile, confirmDeleteAgentFile } = require('../../utils/agent-files')
 const { openPage } = require('../../utils/router')
 
@@ -420,7 +420,7 @@ Page({
     const id = Number(event.currentTarget.dataset.id)
     const attachment = this.data.pendingAttachments.find((item) => Number(item.id) === id)
     if (!attachment || !isImageAttachment(attachment) || this.data.savingAttachmentId) return
-    if (attachment.savedToFiles) return wx.showToast({ title: '图片已保存到我的文件', icon: 'none' })
+    if (attachment.savedToFiles) return wx.showToast({ title: '照片已保存到文件中心', icon: 'none' })
     this.setData({ savingAttachmentId: id })
     api.organizeFile('ATTACHMENT', id, {
       purposeCode: 'UNCLASSIFIED', relatedType: 'NONE', manualUpload: true
@@ -428,7 +428,7 @@ Page({
       this.setData({
         pendingAttachments: this.data.pendingAttachments.map((item) => Number(item.id) === id ? { ...item, savedToFiles: true } : item)
       })
-      wx.showToast({ title: '原图已保存到我的文件', icon: 'success' })
+      wx.showToast({ title: '原图已保存到文件中心', icon: 'success' })
     }).catch((error) => {
       wx.showToast({ title: errorMessage(error, '保存失败，请重试'), icon: 'none', duration: 3000 })
     }).finally(() => this.setData({ savingAttachmentId: null }))
@@ -457,7 +457,7 @@ Page({
     this.setData({ loadingHistory: true })
     return api.getAgentConversations().then((items) => {
       const allConversations = (items || []).map((item) => ({
-        ...item, title: conversationTitle(item), timeText: historyTime(item.updateTime), active: Number(item.id) === Number(this.data.conversationId)
+        ...item, title: conversationTitle(item), preview: formatConversationPreview(item.preview), timeText: historyTime(item.updateTime), active: Number(item.id) === Number(this.data.conversationId)
       }))
       const conversations = filterConversations(allConversations, this.data.historyQuery)
       const active = allConversations.find((item) => item.active)

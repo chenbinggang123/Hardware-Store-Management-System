@@ -230,6 +230,171 @@ class BillingFlowIntegrationTest {
     }
 
     @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
+    @Autowired private com.example.demo.agent.repository.AgentAttachmentRepository attachments;
+    @Autowired private com.example.demo.agent.service.AgentAttachmentService attachmentService;
+
+    @Test
+    void photoDraftKeepsSourcePhotoAndRowBoxesOnlyForItsOwner() {
+        var photo = new com.example.demo.agent.entity.AgentAttachment();
+        photo.setOperatorId(OWNER); photo.setObjectKey("cloud://env/billing-photo/a.jpg"); photo.setOriginalName("a.jpg");
+        photo.setMimeType("image/jpeg"); photo.setFileSize(1L); photo.setParseStatus("PARSED"); photo.setSha256("0".repeat(64));
+        photo.setOcrLayout("{\"rows\":{\"3\":[10,50,160,84]}}");
+        photo.setCreateTime(java.time.LocalDateTime.now()); photo.setUpdateTime(java.time.LocalDateTime.now());
+        Long attachmentId = attachments.save(photo).getId();
+        try {
+            BillingContent content = new BillingContent();
+            content.setSourceAttachmentId(attachmentId);
+            content.setDate(java.time.LocalDate.now().toString());
+            BillingContent.Line line = new BillingContent.Line();
+            line.setName("原图测试"); line.setSourceRow(3);
+            content.setLines(List.of(line));
+            Long id = ((Number) billing.save(OWNER, null, content).get("id")).longValue();
+            BillingContent saved = (BillingContent) billing.get(OWNER, id).get("content");
+            assertThat(saved.getSourceAttachmentId()).isEqualTo(attachmentId);
+            assertThat(saved.getLines().get(0).getSourceRow()).isEqualTo(3);
+            Map<String, Object> source = attachmentService.billingSource(attachmentId, OWNER);
+            assertThat(source.get("cloudFileId")).isEqualTo("cloud://env/billing-photo/a.jpg");
+            assertThat(((Map<?, ?>) source.get("rows")).get("3")).isEqualTo(List.of(10, 50, 160, 84));
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> attachmentService.billingSource(attachmentId, 999L))
+                    .hasMessageContaining("原图不存在");
+            billingLedger.deleteDocument(OWNER, id);
+        } finally {
+            attachments.deleteById(attachmentId);
+        }
+    }
+
+    @Autowired private com.example.demo.agent.service.BillingPhotoService photos;
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void productPageAndLedgerShowTheSavedSourcePhoto() {
+        var photo = new com.example.demo.agent.entity.AgentAttachment();
+        photo.setOperatorId(OWNER); photo.setObjectKey("cloud://env/billing-photo/p.jpg"); photo.setOriginalName("p.jpg");
+        photo.setMimeType("image/jpeg"); photo.setFileSize(1L); photo.setParseStatus("PARSED"); photo.setSha256("1".repeat(64));
+        photo.setOcrLayout("{\"rows\":{\"3\":[10,50,160,84]},\"width\":1000,\"height\":800}");
+        photo.setCreateTime(java.time.LocalDateTime.now()); photo.setUpdateTime(java.time.LocalDateTime.now());
+        Long attachmentId = attachments.save(photo).getId();
+        String name = "原图商品" + UUID.randomUUID().toString().substring(0, 6);
+        FactoryLedgerCreateRequest ledgerRequest = new FactoryLedgerCreateRequest();
+        ledgerRequest.setFactoryName("原图账本" + UUID.randomUUID().toString().substring(0, 6));
+        Long ledgerId = ((Number) factoryLedgers.create(ledgerRequest, OWNER).get("id")).longValue();
+        try {
+            BillingContent content = new BillingContent();
+            content.setSourceAttachmentId(attachmentId);
+            content.setDate(java.time.LocalDate.now().toString());
+            BillingContent.Line line = new BillingContent.Line();
+            line.setName(name); line.setUnit("个"); line.setQuantity(new BigDecimal("2")); line.setPrice(new BigDecimal("3")); line.setSourceRow(3);
+            content.setLines(List.of(line));
+            Map<String, Object> draft = billing.save(OWNER, null, content);
+            Long id = ((Number) draft.get("id")).longValue();
+            billing.confirm(OWNER, id, (Long) draft.get("version"));
+            billingLedger.post(OWNER, id, ledgerId);
+
+            Long productId = jdbc.queryForObject("SELECT id FROM product WHERE name = ?", Long.class, name);
+            List<Map<String, Object>> found = photos.forProduct(productId);
+            assertThat(found).hasSize(1);
+            assertThat(found.get(0).get("documentId")).isEqualTo(id);
+            assertThat(found.get(0).get("cloudFileId")).isEqualTo("cloud://env/billing-photo/p.jpg");
+            assertThat(found.get(0).get("box")).isEqualTo(List.of(10, 50, 160, 84));
+            assertThat(found.get(0).get("width")).isEqualTo(1000);
+
+            List<Map<String, Object>> entries = (List<Map<String, Object>>) factoryLedgers.get(ledgerId, null).get("transactions");
+            assertThat(((Map<String, Object>) entries.get(0).get("sourcePhoto")).get("cloudFileId")).isEqualTo("cloud://env/billing-photo/p.jpg");
+            // posted photos are kept even when asked to discard
+            assertThat(photos.discard(List.of(attachmentId), OWNER)).isEmpty();
+            assertThat(attachments.findById(attachmentId)).isPresent();
+            List<String> cloud = billingLedger.deleteFromLedgerAndPhoto(OWNER, ledgerId, ((Number) entries.get(0).get("id")).longValue());
+            assertThat(cloud).containsExactly("cloud://env/billing-photo/p.jpg");
+            assertThat(attachments.findById(attachmentId)).isEmpty();
+        } finally {
+            removeTestProducts(name);
+            attachments.deleteById(attachmentId);
+        }
+    }
+
+    @Test
+    void photoOfADocumentThatWasNeverPostedIsNotSavedAndCanBeDiscarded() {
+        var photo = new com.example.demo.agent.entity.AgentAttachment();
+        photo.setOperatorId(OWNER); photo.setObjectKey("cloud://env/billing-photo/u.jpg"); photo.setOriginalName("u.jpg");
+        photo.setMimeType("image/jpeg"); photo.setFileSize(1L); photo.setParseStatus("PARSED"); photo.setSha256("2".repeat(64));
+        photo.setCreateTime(java.time.LocalDateTime.now()); photo.setUpdateTime(java.time.LocalDateTime.now());
+        Long attachmentId = attachments.save(photo).getId();
+        String name = "unposted" + UUID.randomUUID().toString().substring(0, 6);
+        try {
+            BillingContent content = new BillingContent();
+            content.setSourceAttachmentId(attachmentId);
+            content.setDate(java.time.LocalDate.now().toString());
+            BillingContent.Line line = new BillingContent.Line();
+            line.setName(name); line.setUnit("x"); line.setQuantity(new BigDecimal("1")); line.setPrice(new BigDecimal("1"));
+            content.setLines(List.of(line));
+            Map<String, Object> draft = billing.save(OWNER, null, content);
+            Long id = ((Number) draft.get("id")).longValue();
+            billing.confirm(OWNER, id, (Long) draft.get("version"));
+            // saved as a document but not posted to a ledger: the photo does not count as saved
+            assertThat(photos.forDocuments(List.of(id))).isEmpty();
+            Long productId = jdbc.queryForObject("SELECT id FROM product WHERE name = ?", Long.class, name);
+            assertThat(photos.forProduct(productId)).isEmpty();
+            // abandoning the photo removes it
+            assertThat(photos.discard(List.of(attachmentId), OWNER)).containsExactly("cloud://env/billing-photo/u.jpg");
+            assertThat(attachments.findById(attachmentId)).isEmpty();
+        } finally {
+            removeTestProducts(name);
+            attachments.deleteById(attachmentId);
+        }
+    }
+
+    @Test
+    void staleUnpostedPhotosAreSweptButPostedOnesStay() {
+        var old = new com.example.demo.agent.entity.AgentAttachment();
+        old.setOperatorId(OWNER); old.setObjectKey("cloud://env/billing-photo/old.jpg"); old.setOriginalName("old.jpg");
+        old.setMimeType("image/jpeg"); old.setFileSize(1L); old.setParseStatus("PARSED"); old.setSha256("3".repeat(64));
+        old.setCreateTime(java.time.LocalDateTime.now().minusDays(30)); old.setUpdateTime(old.getCreateTime());
+        Long oldId = attachments.save(old).getId();
+        var fresh = new com.example.demo.agent.entity.AgentAttachment();
+        fresh.setOperatorId(OWNER); fresh.setObjectKey("cloud://env/billing-photo/fresh.jpg"); fresh.setOriginalName("fresh.jpg");
+        fresh.setMimeType("image/jpeg"); fresh.setFileSize(1L); fresh.setParseStatus("PARSED"); fresh.setSha256("4".repeat(64));
+        fresh.setCreateTime(java.time.LocalDateTime.now()); fresh.setUpdateTime(fresh.getCreateTime());
+        Long freshId = attachments.save(fresh).getId();
+        try {
+            assertThat(photos.discardStale(OWNER, 14)).contains("cloud://env/billing-photo/old.jpg")
+                    .doesNotContain("cloud://env/billing-photo/fresh.jpg");
+            assertThat(attachments.findById(oldId)).isEmpty();
+            assertThat(attachments.findById(freshId)).isPresent();
+        } finally {
+            attachments.deleteById(oldId);
+            attachments.deleteById(freshId);
+        }
+    }
+
+    @Test
+    void oldConfirmedProcurementIsBackfilledIntoTheSupplierLedgerOnlyOnce() {
+        String factory = "backfill" + UUID.randomUUID().toString().substring(0, 6);
+        String name = "bfitem" + UUID.randomUUID().toString().substring(0, 6);
+        BillingContent content = new BillingContent();
+        content.setDocumentType("PROCUREMENT");
+        content.setCustomerName(factory);
+        content.setDate(java.time.LocalDate.now().toString());
+        BillingContent.Line line = new BillingContent.Line();
+        line.setName(name); line.setUnit("x"); line.setQuantity(new BigDecimal("2")); line.setPrice(new BigDecimal("5"));
+        content.setLines(List.of(line));
+        Map<String, Object> draft = billing.save(OWNER, null, content);
+        Long id = ((Number) draft.get("id")).longValue();
+        billing.confirm(OWNER, id, (Long) draft.get("version"));
+        try {
+            assertThat(billingLedger.unpostedProcurements(OWNER)).anyMatch(row -> id.equals(((Number) row.get("id")).longValue()));
+            billingLedger.backfillProcurements(OWNER);
+            assertThat(billingLedger.unpostedProcurements(OWNER)).noneMatch(row -> id.equals(((Number) row.get("id")).longValue()));
+            assertThat(billingLedger.backfillProcurements(OWNER).get("posted")).isEqualTo(0);
+            assertThat(billingLedger.status(OWNER, id).get("posted")).isEqualTo(true);
+        } finally {
+            Long ledgerId = (Long) billingLedger.status(OWNER, id).get("ledgerId");
+            Long txId = jdbc.queryForObject("SELECT id FROM factory_ledger_transaction WHERE ledger_id = ? AND source = 'BILLING' LIMIT 1", Long.class, ledgerId);
+            billingLedger.deleteFromLedger(OWNER, ledgerId, txId);
+            removeTestProducts(name);
+            jdbc.update("DELETE FROM factory_ledger_transaction WHERE ledger_id = ?", ledgerId);
+            jdbc.update("DELETE FROM factory_ledger WHERE id = ?", ledgerId);
+        }
+    }
 
     /** 采购单会新建商品和库存，测试库不回滚，用完删掉，免得影响库存预警类的统计。 */
     private void removeTestProducts(String namePattern) {

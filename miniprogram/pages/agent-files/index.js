@@ -32,9 +32,9 @@ function sizeText(value) {
 }
 
 function itemView(item) {
-  const stateText = { PENDING: '待处理', COMPLETED: '已完成', FAILED: '失败' }[item.state] || '处理中'
+  const stateText = item.manualUpload && String(item.mimeType || '').startsWith('image/') ? '已保存' : { PENDING: '待处理', COMPLETED: '已完成', FAILED: '失败' }[item.state] || '处理中'
   const mime = String(item.mimeType || '').toLowerCase()
-  const fileType = mime.includes('pdf') || String(item.name || '').toLowerCase().endsWith('.pdf') ? 'pdf' : 'xlsx'
+  const fileType = mime.startsWith('image/') ? 'image' : mime.includes('pdf') || String(item.name || '').toLowerCase().endsWith('.pdf') ? 'pdf' : 'xlsx'
   const mark = item.kind === 'OUTPUT' ? '成' : item.kind === 'TASK' ? '理' : mime.startsWith('image/') ? '图' : '原'
   return {
     ...item,
@@ -44,7 +44,7 @@ function itemView(item) {
     sizeText: sizeText(item.size),
     stateText,
     stateTone: item.state === 'FAILED' ? 'danger' : item.state === 'COMPLETED' ? 'success' : 'info',
-    openText: item.kind === 'TASK' ? '继续处理' : item.kind === 'ATTACHMENT' ? '查看对话' : '打开文件',
+    openText: fileType === 'image' ? '查看照片' : item.kind === 'TASK' ? '继续处理' : item.kind === 'ATTACHMENT' ? '查看对话' : '打开文件',
     ready: item.kind === 'OUTPUT' && item.sourceStatus === 'READY',
     failed: item.state === 'FAILED',
     relationText: item.relatedName ? `关联：${item.relatedName}` : '',
@@ -175,6 +175,21 @@ Page({
     if (!item || this.data.openingKey) return
     if (item.kind === 'TASK') return openPage(taskRoute({ status: item.sourceStatus }), { id: item.id })
     if (item.kind === 'ATTACHMENT') {
+      if (item.fileType === 'image') {
+        this.setData({ openingKey: item.key })
+        return api.getSavedPhotoSource(item.id).then((source) => {
+          if (String(source).startsWith('cloud://')) {
+            return wx.cloud.downloadFile({ fileID: source }).then((result) => result.tempFilePath)
+          }
+          const extension = { 'image/png': 'png', 'image/webp': 'webp' }[item.mimeType] || 'jpg'
+          const filePath = `${wx.env.USER_DATA_PATH}/saved-photo-${item.id}.${extension}`
+          return api.downloadSavedPhoto(item.id).then((data) => new Promise((resolve, reject) => {
+            wx.getFileSystemManager().writeFile({ filePath, data, success: () => resolve(filePath), fail: reject })
+          }))
+        }).then((path) => wx.previewImage({ current: path, urls: [path] }))
+          .catch((error) => showToast(errorText(error, '照片打开失败，请重试')))
+          .finally(() => this.setData({ openingKey: '' }))
+      }
       if (item.conversationId) wx.setStorageSync(ACTIVE_CONVERSATION_KEY, item.conversationId)
       return wx.reLaunch({ url: '/pages/agent/index' })
     }

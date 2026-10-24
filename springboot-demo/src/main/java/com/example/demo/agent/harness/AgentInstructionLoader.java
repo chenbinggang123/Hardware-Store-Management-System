@@ -18,6 +18,7 @@ public class AgentInstructionLoader {
             Map.entry("excel", "agent/skills/excel/SKILL.md"),
             Map.entry("inventory", "agent/skills/inventory/SKILL.md"),
             Map.entry("products", "agent/skills/products/SKILL.md"),
+            Map.entry("billing", "agent/skills/billing/SKILL.md"),
             Map.entry("sales", "agent/skills/sales/SKILL.md"),
             Map.entry("finance", "agent/skills/finance/SKILL.md"),
             Map.entry("suppliers", "agent/skills/suppliers/SKILL.md"),
@@ -33,6 +34,7 @@ public class AgentInstructionLoader {
     public LoadedInstructions load(List<AgentRoutingResult.Selection> selections) {
         Map<String, String> versions = new LinkedHashMap<>();
         StringBuilder snapshot = new StringBuilder();
+        append("agent/business-rules.txt", versions, snapshot);
         for (AgentRoutingResult.Selection selection : selections) {
             String common = COMMON.get(selection.capabilityId());
             if (common != null) append(common, versions, snapshot);

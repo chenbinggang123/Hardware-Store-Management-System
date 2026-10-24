@@ -48,7 +48,7 @@ class AgentBusinessToolsTest {
     void createProductAlsoCreatesInitialInventory() {
         ProductService productService = mock(ProductService.class);
         InventoryService inventoryService = mock(InventoryService.class);
-        when(productService.saveProduct(any(Product.class))).thenAnswer(invocation -> {
+        when(productService.saveProduct(any(Product.class), org.mockito.ArgumentMatchers.eq(context.getOperatorId()))).thenAnswer(invocation -> {
             Product product = invocation.getArgument(0);
             product.setId(9L);
             return product;
@@ -70,7 +70,7 @@ class AgentBusinessToolsTest {
         verify(inventoryService).saveInventory(inventoryCaptor.capture());
         assertEquals(6, inventoryCaptor.getValue().getQuantity());
         ArgumentCaptor<Product> productCaptor = ArgumentCaptor.forClass(Product.class);
-        verify(productService).saveProduct(productCaptor.capture());
+        verify(productService).saveProduct(productCaptor.capture(), org.mockito.ArgumentMatchers.eq(context.getOperatorId()));
         assertEquals(1, productCaptor.getValue().getStatus());
     }
 

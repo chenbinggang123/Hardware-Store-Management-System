@@ -18,6 +18,8 @@ public class BillingContent {
     private String remark;
     /** Readable source evidence; never used as a calculated or confirmed amount. */
     private String sourceNote;
+    /** 拍照开单时的原图附件，开单页据此显示原图和每行截图。 */
+    private Long sourceAttachmentId;
     private List<Line> lines=new ArrayList<>();
     @Data public static class Line {
         private String name;
@@ -29,6 +31,13 @@ public class BillingContent {
         private BigDecimal price;
         private BigDecimal amount;
         private String sourceAmount;
+        /** 这一行来自原图 OCR 的第几行，用来截图核对。 */
+        private Integer sourceRow;
+        /** Original recognition text and sourced advice; applying a suggestion is a user action. */
+        private String rawName;
+        private String rawSpecification;
+        private String knowledgeReviewValue;
+        private List<SpecificationKnowledgeCatalog.Advice> knowledgeAdvice=new ArrayList<>();
         /** Candidate identity used only for ranking after a confirmed document. */
         private String candidateKey;
         /** Preserved reference details from product memory, product master data, or the local encyclopedia. */

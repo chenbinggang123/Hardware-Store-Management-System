@@ -9,6 +9,12 @@ public interface BillingDocumentRepository extends JpaRepository<BillingDocument
             countQuery="select count(*) from billing_document d where d.operator_id=:owner and (:status='' or d.status=:status) and (:keyword='' or d.document_number like concat('%',:keyword,'%') or d.content_json like concat('%',:keyword,'%')) and (:documentType='' or coalesce(json_unquote(json_extract(d.content_json,'$.documentType')),'PURCHASE')=:documentType) and (:factory='' or json_unquote(json_extract(d.content_json,'$.customerName'))=:factory)",nativeQuery=true)
     org.springframework.data.domain.Page<BillingDocument> searchFiltered(@Param("owner") Long owner,@Param("keyword") String keyword,@Param("status") String status,@Param("documentType") String documentType,@Param("factory") String factory,org.springframework.data.domain.Pageable pageable);
     Optional<BillingDocument> findByDocumentNumber(String documentNumber);
+    /** 商品页找原图：已保存、带原图、内容里提到这个商品的单据，最近的在前。 */
+    @Query(value="select * from billing_document d where d.status='CONFIRMED' and d.content_json like '%sourceAttachmentId\":%' and d.content_json not like '%sourceAttachmentId\":null%' and (d.content_json like concat('%\"',:productKey,'\"%') or (:name<>'' and d.content_json like concat('%',:name,'%'))) order by d.id desc limit 60",nativeQuery=true)
+    List<BillingDocument> findConfirmedMentioning(@Param("productKey") String productKey,@Param("name") String name);
+    /** 引用某张原图的单据（含草稿），用来判断这张原图能不能清理。 */
+    @Query(value="select * from billing_document d where json_extract(d.content_json,'$.sourceAttachmentId')=:attachmentId",nativeQuery=true)
+    List<BillingDocument> findReferencing(@Param("attachmentId") Long attachmentId);
     List<BillingDocument> findTop5ByOperatorIdOrderByUpdateTimeDesc(Long operatorId);
     Optional<BillingDocument> findByOperatorIdAndRequestKey(Long operatorId,String requestKey);
     @Lock(LockModeType.PESSIMISTIC_WRITE)

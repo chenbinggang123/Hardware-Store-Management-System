@@ -30,7 +30,7 @@ public class CreateProductTool implements AgentTool {
     public AgentToolDefinition definition() {
         Map<String, Object> properties = new LinkedHashMap<>();
         properties.put("name", Map.of("type", "string", "description", "商品名称"));
-        properties.put("barcode", Map.of("type", "string", "description", "唯一商品条码"));
+        properties.put("barcode", Map.of("type", "string", "description", "可选商品条码；缺失时由商品服务生成内部编号，不要求用户提供，不编造厂商条码"));
         properties.put("spec", Map.of("type", "string", "description", "规格"));
         properties.put("unit", Map.of("type", "string", "description", "单位，如个、把、箱"));
         properties.put("retailPrice", Map.of("type", "number", "minimum", 0, "description", "零售价"));
@@ -45,7 +45,7 @@ public class CreateProductTool implements AgentTool {
                 "新增商品并建立初始库存记录",
                 AgentToolRisk.R2_WRITE,
                 Map.of("type", "object", "additionalProperties", false,
-                        "properties", properties, "required", List.of("name", "barcode")),
+                        "properties", properties, "required", List.of("name")),
                 "确认新增商品");
     }
 
@@ -60,7 +60,7 @@ public class CreateProductTool implements AgentTool {
     @Override
     @Transactional
     public Object execute(AgentToolContext context, Map<String, Object> arguments) {
-        Product product = productService.saveProduct(fromArguments(arguments));
+        Product product = productService.saveProduct(fromArguments(arguments), context.getOperatorId());
         Inventory inventory = new Inventory();
         inventory.setProductId(product.getId());
         inventory.setQuantity(product.getStock());
@@ -76,7 +76,7 @@ public class CreateProductTool implements AgentTool {
     private Product fromArguments(Map<String, Object> arguments) {
         Product product = new Product();
         product.setName(requiredText(arguments, "name"));
-        product.setBarcode(requiredText(arguments, "barcode"));
+        product.setBarcode(optionalText(arguments, "barcode"));
         product.setSpec(optionalText(arguments, "spec"));
         product.setUnit(optionalText(arguments, "unit"));
         product.setRetailPrice(decimal(arguments, "retailPrice"));

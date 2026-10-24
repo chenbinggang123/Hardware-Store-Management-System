@@ -12,6 +12,7 @@ import com.example.demo.agent.repository.AgentConversationRunRepository;
 import com.example.demo.agent.repository.AgentRunRepository;
 import com.example.demo.agent.repository.AgentAttachmentRepository;
 import com.example.demo.agent.service.attachment.AttachmentStorage;
+import com.example.demo.filecenter.repository.FileCenterMetadataRepository;
 import com.example.demo.agent.harness.AgentRunStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +27,12 @@ import java.util.List;
 @Service
 @Transactional
 public class AgentConversationService {
+    private FileCenterMetadataRepository fileMetadata;
+
+    @Autowired
+    public void setFileMetadata(FileCenterMetadataRepository fileMetadata) {
+        this.fileMetadata = fileMetadata;
+    }
     private static final int MAX_CONTEXT_RUNS = 10;
     private static final DateTimeFormatter TITLE_TIME = DateTimeFormatter.ofPattern("MM-dd HH:mm");
 
@@ -170,7 +177,7 @@ public class AgentConversationService {
                     String preview = latest == null ? "暂无消息"
                             : StringUtils.hasText(latest.getOutputText()) ? latest.getOutputText() : latest.getInputText();
                     return new AgentConversationSummary(conversation.getId(), displayTitle(conversation, runs),
-                            abbreviate(preview, 60), conversation.getUpdateTime());
+                            AgentConversationPreview.format(preview), conversation.getUpdateTime());
                 }).toList();
     }
 
@@ -210,6 +217,12 @@ public class AgentConversationService {
         List<String> cloudFileIds = List.of();
         if (attachmentRepository != null) {
             var attachments = attachmentRepository.findByConversationIdOrderByCreateTimeAsc(conversationId);
+            var retained = attachments.stream().filter(item -> fileMetadata != null
+                    && fileMetadata.findByOperatorIdAndSourceKindAndSourceId(operatorId, "ATTACHMENT", item.getId())
+                    .map(metadata -> Boolean.TRUE.equals(metadata.getManualUpload())).orElse(false)).toList();
+            retained.forEach(item -> { item.setConversationId(null); item.setRunId(null); });
+            attachmentRepository.saveAll(retained);
+            attachments = attachments.stream().filter(item -> !retained.contains(item)).toList();
             cloudFileIds = attachments.stream()
                     .map(item -> item.getObjectKey())
                     .filter(key -> key != null && key.startsWith("cloud://"))

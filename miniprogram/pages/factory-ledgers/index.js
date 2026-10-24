@@ -12,7 +12,7 @@ Page({
   data: {
     kind: 'CUSTOMER', copy: KINDS.CUSTOMER, kindNames: ['买的（工厂来拿货）', '进货的（我们去进货）'],
     month: ledgerStore.currentMonth(), keyword: '', ledgers: [],
-    totals: { factoryCount: 0, totalDueAmount: '0.00' }, loading: true, error: ''
+    totals: { factoryCount: 0, totalDueAmount: '0.00' }, loading: true, error: '', legacyCount: 0, backfilling: false
   },
   onLoad(options = {}) {
     const kind = options.kind === 'SUPPLIER' ? 'SUPPLIER' : 'CUSTOMER'
@@ -36,8 +36,30 @@ Page({
     return api.getFactoryLedgers({ month: this.data.month, keyword: this.data.keyword, kind }).then((result) => {
       if (kind !== this.data.kind) return
       this.setData({ ledgers: result.ledgers || [], totals: result.totals || this.data.totals, loading: false })
+      this.loadLegacy()
     }).catch((error) => {
       this.setData({ loading: false, error: (error && error.message) || '账本加载失败，请重试' })
+    })
+  },
+  // 旧版本保存的采购单没记入进货账本：有的话在“进货的”顶部提示，确认后一次补记
+  loadLegacy() {
+    if (this.data.kind !== 'SUPPLIER') return this.setData({ legacyCount: 0 })
+    return api.getUnpostedProcurements().then((rows) => this.setData({ legacyCount: (rows || []).length })).catch(() => {})
+  },
+  backfillLegacy() {
+    if (this.data.backfilling) return
+    wx.showModal({
+      title: '补记旧采购单',
+      content: `有 ${this.data.legacyCount} 张已保存的采购单还没记入进货账本，补记后会按厂商记入各自账本，应付金额会增加。已记过账的不会重复。`,
+      confirmText: '补记'
+    }).then((answer) => {
+      if (!answer.confirm) return null
+      this.setData({ backfilling: true })
+      return api.backfillProcurements().then((result) => {
+        wx.showToast({ title: `已补记 ${result.posted} 张`, icon: 'none' })
+        return this.loadData()
+      }).catch((error) => wx.showToast({ title: (error && error.message) || '补记失败', icon: 'none' }))
+        .finally(() => this.setData({ backfilling: false }))
     })
   },
   openCreate() { openPage('/pages/factory-ledger-form/index', { kind: this.data.kind }) },

@@ -1,5 +1,7 @@
 # 商品百科
 
+规格与识别疑点的分类资料另存于 `product-knowledge/specification-rules.json`，按名称和类别检索少量相关条目，不将全部百科加入模型上下文。查询工具现支持 `category`、`originalSpecification`、`issue`，可返回规格建议、解释和来源；识别草稿也会自动附上相关资料。详见项目 `docs/百科核对接入说明.md`。
+
 本目录用简单 Markdown 记录本店已确认的商品资料，供整理收据、采购单、报价表和商品清单时查询名称、规格、单位及常见写法。
 
 ## 使用规则

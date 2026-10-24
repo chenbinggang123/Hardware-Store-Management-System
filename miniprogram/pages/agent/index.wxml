@@ -80,6 +80,16 @@
                 <view class="answer-paragraph" wx:if="{{block.type === 'text'}}">{{block.text}}</view>
                 <view class="answer-heading" wx:elif="{{block.type === 'heading'}}">{{block.text}}</view>
                 <view class="answer-list" wx:elif="{{block.type === 'list'}}"><text class="answer-list-marker">{{block.marker}}</text><text>{{block.text}}</text></view>
+                <scroll-view class="answer-table-scroll" wx:elif="{{block.type === 'table'}}" scroll-x="{{true}}" enhanced="{{true}}" aria-label="明细表，可左右滑动查看更多列">
+                  <view class="answer-table" style="min-width: {{block.width}}rpx;">
+                    <view class="answer-table-row answer-table-head">
+                      <view class="answer-table-cell {{column.numeric ? 'numeric' : ''}}" wx:for="{{block.columns}}" wx:for-item="column" wx:for-index="columnIndex" wx:key="columnIndex" style="width: {{column.width}}rpx;">{{column.label}}</view>
+                    </view>
+                    <view class="answer-table-row" wx:for="{{block.rows}}" wx:for-item="row" wx:for-index="rowIndex" wx:key="rowIndex">
+                      <view class="answer-table-cell {{cell.numeric ? 'numeric' : ''}}" wx:for="{{row.cells}}" wx:for-item="cell" wx:for-index="cellIndex" wx:key="cellIndex" style="width: {{cell.width}}rpx;">{{cell.text}}</view>
+                    </view>
+                  </view>
+                </scroll-view>
                 <view class="answer-field" wx:elif="{{block.type === 'field'}}">
                   <text class="answer-field-label">{{block.label}}</text>
                   <text class="answer-field-value">{{block.value}}</text>

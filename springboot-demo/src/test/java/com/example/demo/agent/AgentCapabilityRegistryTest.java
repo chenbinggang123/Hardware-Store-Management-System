@@ -25,7 +25,7 @@ class AgentCapabilityRegistryTest {
     @Test
     void procurementRouteCanPrepareEditableDocumentWithoutPostingPurchase() {
         AgentCapabilityRegistry registry = new AgentCapabilityRegistry();
-        List<AgentToolDefinition> tools = List.of(definition("read_billing_documents"), definition("prepare_billing_document"));
+        List<AgentToolDefinition> tools = List.of(definition("read_billing_documents"), definition("prepare_billing_document"), definition("search_products"), definition("search_product_encyclopedia"));
         assertTrue(registry.toolsFor(
                 List.of(new AgentRoutingResult.Selection("procurement", "record")), tools)
                 .contains("prepare_billing_document"));
@@ -56,7 +56,8 @@ class AgentCapabilityRegistryTest {
                 List.of(new AgentRoutingResult.Selection("inventory", "query")));
 
         assertTrue(excel.snapshot().contains("QUANTITY"));
-        assertTrue(excel.versions().keySet().stream().allMatch(path -> path.contains("/excel/")));
+        assertTrue(excel.versions().containsKey("agent/business-rules.txt"));
+        assertTrue(excel.versions().keySet().stream().allMatch(path -> path.contains("/excel/") || path.equals("agent/business-rules.txt")));
         assertTrue(inventory.snapshot().contains("库存"));
         assertTrue(inventory.versions().keySet().stream().noneMatch(path -> path.contains("/excel/")));
     }

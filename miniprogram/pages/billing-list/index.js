@@ -42,6 +42,7 @@ Page({
 
   onShow() {
     this.load(true)
+    api.cleanupBillingPhotos()
   },
 
   onPullDownRefresh() {
@@ -189,6 +190,10 @@ Page({
     if (this.data.managing) return this.toggleSelection(event)
     const id = event.currentTarget.dataset.id
     if (id) openPage('/pages/billing-editor/index', { id })
+  },
+
+  openPhoto() {
+    openPage('/pages/billing-editor/index', { photo: '1' })
   },
 
   openCreate() {

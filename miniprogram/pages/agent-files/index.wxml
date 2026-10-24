@@ -18,5 +18,5 @@
     </view>
   </view>
 
-  <view class="empty-state" wx:if="{{!loading && !loadError && !visible.length}}"><view class="empty-title">{{items.length ? '没有符合条件的文件' : '还没有文件'}}</view><view class="empty-desc">{{items.length ? '换个状态或关键词试试。' : '对话里的附件仅供本次识别；需要长期保存原件，请点右上角“新增”主动上传。'}}</view><view class="btn btn-primary btn-block" wx:if="{{!items.length}}" bindtap="openAgent">交给小五处理</view></view>
+  <view class="empty-state" wx:if="{{!loading && !loadError && !visible.length}}"><view class="empty-title">{{items.length ? '没有符合条件的文件' : '还没有文件'}}</view><view class="empty-desc">{{items.length ? '换个状态或关键词试试。' : '这里保存生成的文件和你主动保存的照片。在对话中点“保存原图”，或点右上角“新增”上传。'}}</view><view class="btn btn-primary btn-block" wx:if="{{!items.length}}" bindtap="openAgent">交给小五处理</view></view>
 </view>

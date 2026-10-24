@@ -218,9 +218,9 @@ public class FileCenterService {
     private FileCenterItem applyMetadata(FileCenterItem item, FileCenterMetadata metadata) {
         if (metadata == null) return item;
         String state = Boolean.TRUE.equals(metadata.getManualUpload()) && "ATTACHMENT".equals(item.kind())
-                && !"FAILED".equals(item.state()) ? "COMPLETED" : item.state();
+                && (safe(item.mimeType()).startsWith("image/") || !"FAILED".equals(item.state())) ? "COMPLETED" : item.state();
         return new FileCenterItem(item.key(), item.id(), item.kind(), item.name(), item.mimeType(), item.size(),
-                state, item.sourceStatus(), PURPOSES.getOrDefault(metadata.getPurposeCode(), "其他文件"),
+                state, item.sourceStatus(), metadata.getPurposeCode() == null ? "其他文件" : PURPOSES.getOrDefault(metadata.getPurposeCode(), "其他文件"),
                 item.conversationId(), item.runId(), item.createTime(), latest(metadata.getUpdateTime(), item.updateTime()),
                 item.errorMessage(), item.downloadable(), metadata.getRelatedType(), metadata.getRelatedId(),
                 metadata.getRelatedName(), true, Boolean.TRUE.equals(metadata.getManualUpload()));

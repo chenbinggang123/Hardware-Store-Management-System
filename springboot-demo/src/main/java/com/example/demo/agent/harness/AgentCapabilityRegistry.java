@@ -25,11 +25,13 @@ public class AgentCapabilityRegistry {
         add("inventory", "receipts", "query_procurement_receipts", "read_billing_documents");
         add("inventory", "adjust", "search_products", "check_inventory", "adjust_inventory");
         add("products", "search", "search_products", "search_product_encyclopedia");
-        add("products", "create", "create_product");
+        add("products", "create", "search_products", "create_product");
+        add("billing", "prepare", "search_products", "search_product_encyclopedia", "prepare_billing_document");
+        add("billing", "read", "read_billing_documents");
         add("finance", "summary", "read_monthly_summary");
         add("suppliers", "list", "list_suppliers");
         add("procurement", "search", "read_billing_documents");
-        add("procurement", "record", "read_billing_documents", "prepare_billing_document");
+        add("procurement", "record", "read_billing_documents", "prepare_billing_document", "search_products", "search_product_encyclopedia");
         add("factory_ledger", "search", "search_factory_ledgers");
         add("factory_ledger", "detail", "search_factory_ledgers", "get_factory_ledger", "read_billing_documents");
         add("factory_ledger", "write", "search_factory_ledgers", "get_factory_ledger", "create_factory_ledger", "record_ledger_payment");

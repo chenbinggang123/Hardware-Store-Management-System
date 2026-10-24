@@ -29,6 +29,9 @@ public class AgentAttachment {
     @Lob
     private String extractedText;
     private String errorMessage;
+    /** OCR 行位置 JSON，开单页用来截取原图上的一行。 */
+    @Lob
+    private String ocrLayout;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

@@ -40,3 +40,6 @@
 .record-actions > view { min-height: 48rpx; }
 .draft-check { padding: 2rpx 10rpx; font-size: 21rpx; }
 .record-end { padding: 16rpx 0 30rpx; font-size: 20rpx; }
+
+.list-top .list-photo { margin-left: auto; }
+.list-top .list-photo + .btn { margin-left: 0; }

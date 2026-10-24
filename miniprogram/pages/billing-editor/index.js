@@ -3,6 +3,7 @@ const { fileView, openAgentFile } = require('../../utils/agent-files')
 const { renderAndSave } = require('../../utils/billing-image')
 const localDraft = require('../../utils/billing-local-draft')
 const { openPage } = require('../../utils/router')
+const sourcePhotos = require('../../utils/source-photo')
 
 function today() {
   const date = new Date()
@@ -55,6 +56,13 @@ function lineView(line, index) {
   const unitUncertain = !validUnit(line.unit) || /单位.*(?:未识别|待确认|疑)/.test(caution)
   const quantityUncertain = q === null || q <= 0
   const priceUncertain = p === null || p < 0 || amountMismatch
+  const knowledgeCards = (line.knowledgeAdvice || []).map((advice) => ({
+    ...advice,
+    canApply: Boolean(advice.suggestedSpecification) && advice.productName === line.name
+      && advice.originalSpecification === line.specification && advice.suggestedSpecification !== line.specification
+  }))
+  const knowledgeReviewKey = JSON.stringify([line.name || '', line.specification || ''])
+  const specificationUncertain = knowledgeCards.some((advice) => advice.canApply) && line.knowledgeReviewValue !== knowledgeReviewKey
   return {
     ...blankLine(), ...line, quantity, price, index: index + 1,
     remarkOpen: line.remarkOpen === undefined ? Boolean(line.remark) : Boolean(line.remarkOpen),
@@ -62,7 +70,8 @@ function lineView(line, index) {
     amountText: calculated === null ? '—' : money(calculated),
     unitChoices: (line.unitCandidates || []).slice(0, 4),
     nameUncertain, unitUncertain, quantityUncertain, priceUncertain, amountMismatch,
-    needsReview: nameUncertain || unitUncertain || quantityUncertain || priceUncertain,
+    knowledgeCards, specificationUncertain,
+    needsReview: nameUncertain || unitUncertain || quantityUncertain || priceUncertain || specificationUncertain,
     inCatalog: String(line.candidateKey || '').indexOf('product:') === 0,
     expanded: Boolean(line.expanded)
   }
@@ -79,9 +88,23 @@ function formView(content) {
     date: source.date === undefined || source.date === null ? today() : source.date,
     remark: source.remark || '',
     sourceNote: source.sourceNote || '',
-    sourceDocumentNumber: source.sourceDocumentNumber || ''
+    sourceDocumentNumber: source.sourceDocumentNumber || '',
+    sourceAttachmentId: source.sourceAttachmentId || null
   }
 }
+
+const RECOGNIZE_STEPS = ['上传照片并识别文字', '整理商品明细', '打开草稿']
+const TYPE_NAMES = { PURCHASE: '拿货单', RETURN: '退货单', PROCUREMENT: '采购单' }
+
+function recognizedDocumentId(run) {
+  if (!run) return null
+  if (run.billingDocumentId) return Number(run.billingDocumentId)
+  const output = String(run.output || '')
+  if (!/BILLING_DOCUMENT/.test(output)) return null
+  const matched = output.match(/["']documentId["']\s*:\s*(\d+)/)
+  return matched ? Number(matched[1]) : null
+}
+
 
 function errorText(error, fallback) {
   const raw = typeof error === 'string'
@@ -110,11 +133,16 @@ Page({
     candidateTitle: '最近常用', activeLineIndex: null, evidenceOpen: false,
     typeNames: ['拿货单', '退货单', '采购单'], lineActionNames: ['备注', '复制这一行', '删除这一行'],
     fixAllNames: ['修改这张单', '复制为新单', '作废'], fixCopyNames: ['复制为新单'],
+    recognizing: false, recognizeSteps: RECOGNIZE_STEPS, recognizeStep: 0, recognizeElapsed: 0, recognizeError: '', recognizeTypeName: '',
+    sourcePhoto: null, rowCrops: {},
     statusText: '', actionError: '', actionRetry: '', actionRetryText: '', imageBusy: false, generatedFile: null
   },
 
   onLoad(options = {}) {
     const id = Number(options.id)
+    // 从拍照识别跳过来：记住用户选的类型和原图，打开草稿后以此为准。
+    this.recognizedType = TYPE_NAMES[options.recognized] ? options.recognized : ''
+    this.recognizedAttachmentId = Number(options.attachmentId) || null
     this.localStorageKey = localDraft.key(id)
     this.newRequestKey = `mini-billing-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
     if (id) { this.setData({ documentId: id }); this.loadDocument(id) }
@@ -126,6 +154,7 @@ Page({
         this.recalculate()
         if (options.productId) this.prefillProduct(options.productId)
         if (options.copyFrom) this.copyFrom(options.copyFrom)
+        if (options.photo === '1') setTimeout(() => this.pickPhotoWithType(), 300)
       })
     })
     this.searchProducts('')
@@ -389,7 +418,7 @@ Page({
     this.setData({ 'form.ledgerId': ledger.id, ledgerIndex: index, ledgerName: ledger.factoryName }, () => this.postToLedger())
   },
 
-  onUnload() { clearTimeout(this.searchTimer); this.persistLocalDraft() },
+  onUnload() { clearTimeout(this.searchTimer); clearInterval(this.recognizeClock); clearTimeout(this.recognizePoll); this.persistLocalDraft() },
 
   loadDocument(id) {
     this.setData({ loading: true, error: '' })
@@ -442,7 +471,159 @@ Page({
       this.syncLedgerIndex(fresh)
       if (confirmed) this.loadLedgerPosting(document.id)
       else this.setData({ ledgerPosting: null })
+      if (fresh) { this.applyRecognizedChoice(document); this.loadSourcePhoto(document.id) }
+      else this.updateRowCrops()
     })
+  },
+
+  // 拍照识别生成的草稿：单据类型以用户拍照前选的为准，并记住原图。
+  applyRecognizedChoice(document) {
+    if (!document || document.status !== 'DRAFT') return
+    const type = this.recognizedType
+    this.recognizedType = ''
+    if (type && this.data.form.documentType !== type) this.changeDocumentType({ currentTarget: { dataset: { type } } })
+    if (this.recognizedAttachmentId && !this.data.form.sourceAttachmentId) {
+      this.updateDraft({ 'form.sourceAttachmentId': this.recognizedAttachmentId, dirty: true })
+    }
+  },
+
+  // 原图：云存储临时地址 + 每行在图上的位置，核对时不用再翻纸单或聊天记录。
+  loadSourcePhoto(documentId) {
+    const attachmentId = this.data.form.sourceAttachmentId || this.recognizedAttachmentId
+    if (!documentId || !attachmentId) { this.setData({ sourcePhoto: null, rowCrops: {} }); return Promise.resolve() }
+    return api.getBillingSource(documentId, attachmentId).then((source) => {
+      if (!source || !source.cloudFileId) return null
+      return sourcePhotos.tempUrls([source.cloudFileId]).then((urls) => {
+        const url = urls[source.cloudFileId]
+        if (!url) return
+        this.setData({ sourcePhoto: { url, rows: source.rows || {}, width: source.width || 0, height: source.height || 0 } }, () => this.updateRowCrops())
+      })
+    }).catch(() => this.setData({ sourcePhoto: null }))
+  },
+
+  onSourcePhotoLoad(event) {
+    if (!this.data.sourcePhoto || this.data.sourcePhoto.width) return
+    this.setData({ 'sourcePhoto.width': event.detail.width, 'sourcePhoto.height': event.detail.height }, () => this.updateRowCrops())
+  },
+
+  updateRowCrops() {
+    const photo = this.data.sourcePhoto
+    if (!photo || !photo.width) return
+    if (!this.cropWidth) this.cropWidth = sourcePhotos.pxFromRpx(640)
+    const rowCrops = {}
+    this.data.lines.forEach((line) => {
+      const row = line.sourceRow
+      if (row && photo.rows[row] && !rowCrops[row]) {
+        const crop = sourcePhotos.rowCrop(photo.rows[row], photo.width, photo.height, this.cropWidth)
+        if (crop) rowCrops[row] = crop
+      }
+    })
+    this.setData({ rowCrops })
+  },
+
+  previewSourcePhoto() {
+    if (this.data.sourcePhoto) sourcePhotos.preview(this.data.sourcePhoto.url)
+  },
+
+  // ===== 拍照识别：先选好单据类型再拍，不经过聊天、不靠关键词猜 =====
+  // 从开单记录点“拍照开单”进来：先按序号选拍的是哪种单，再拍照。
+  pickPhotoWithType() {
+    const types = ['PURCHASE', 'RETURN', 'PROCUREMENT']
+    wx.showActionSheet({ itemList: ['拍拿货单（客户来拿货）', '拍退货单（客户退货）', '拍采购单（我们去进货）'] })
+      .then((choice) => {
+        const type = types[choice.tapIndex] || 'PURCHASE'
+        if (type !== this.data.form.documentType) this.changeDocumentType({ currentTarget: { dataset: { type } } })
+        this.pickPhoto()
+      }).catch(() => {})
+  },
+
+  pickPhoto() {
+    if (this.data.recognizing) return
+    const hasContent = this.data.lines.some((line) => String(line.name || '').trim())
+    const ask = hasContent
+      ? wx.showModal({ title: '拍照识别', content: `会按“${TYPE_NAMES[this.data.form.documentType]}”另开一张新草稿，当前这张不受影响。`, confirmText: '去拍照' })
+      : Promise.resolve({ confirm: true })
+    ask.then((answer) => answer.confirm ? wx.showActionSheet({ itemList: ['拍照', '从相册选'] }) : Promise.reject(new Error('cancel')))
+      .then((choice) => wx.chooseMedia({ count: 1, mediaType: ['image'], sizeType: ['compressed'], sourceType: [choice.tapIndex === 0 ? 'camera' : 'album'] }))
+      .then((result) => { const file = result.tempFiles && result.tempFiles[0]; if (file) this.recognizePhoto(file) })
+      .catch(() => {})
+  },
+
+  recognizePhoto(file) {
+    const type = this.data.form.documentType
+    clearInterval(this.recognizeClock)
+    clearTimeout(this.recognizePoll)
+    this.recognizeStarted = Date.now()
+    this.recognizeRunId = null
+    this.recognizeAttachmentId = null
+    this.recognizeFile = file
+    this.setData({ recognizing: true, recognizeStep: 0, recognizeElapsed: 0, recognizeError: '', recognizeTypeName: TYPE_NAMES[type] })
+    this.recognizeClock = setInterval(() => this.setData({ recognizeElapsed: Math.round((Date.now() - this.recognizeStarted) / 1000) }), 1000)
+    api.uploadBillingPhoto(file).then((attachment) => {
+      if (attachment && attachment.id) this.recognizeAttachmentId = attachment.id
+      if (!attachment || attachment.parseStatus !== 'PARSED') {
+        throw new Error((attachment && attachment.errorMessage) || '照片没有识别出文字，请拍正、拍全、光线亮一点再试')
+      }
+      if (!this.data.recognizing) return null
+      this.recognizeAttachmentId = attachment.id
+      this.setData({ recognizeStep: 1 })
+      return api.startBillingRecognition(attachment.id, type).then((run) => {
+        this.recognizeRunId = run && run.runId
+        if (!this.recognizeRunId) throw new Error('识别没有开始，请重试')
+        this.pollRecognition(type)
+      })
+    }).catch((error) => this.failRecognition(errorText(error, '识别失败，请重试')))
+  },
+
+  pollRecognition(type) {
+    if (!this.data.recognizing || !this.recognizeRunId) return
+    if (Date.now() - this.recognizeStarted > 240000) {
+      return this.failRecognition('识别时间较长，稍后可在“开单记录”里找到这张草稿')
+    }
+    api.getAgentRun(this.recognizeRunId).then((run) => {
+      if (!this.data.recognizing) return
+      const status = run && run.status
+      if (status === 'COMPLETED') {
+        const id = recognizedDocumentId(run)
+        if (!id) return this.failRecognition('没有整理出商品，请重拍或手动填写')
+        this.setData({ recognizeStep: 2 })
+        clearInterval(this.recognizeClock)
+        wx.redirectTo({ url: `/pages/billing-editor/index?id=${id}&recognized=${type}&attachmentId=${this.recognizeAttachmentId || ''}` })
+        return
+      }
+      if (['FAILED', 'CANCELLED', 'EXPIRED', 'PARTIAL'].includes(status)) {
+        return this.failRecognition((run && run.output && String(run.output).slice(0, 80)) || '识别失败，请重拍')
+      }
+      this.recognizePoll = setTimeout(() => this.pollRecognition(type), 2000)
+    }).catch(() => { this.recognizePoll = setTimeout(() => this.pollRecognition(type), 3000) })
+  },
+
+  // 识别没成功、取消或重拍：这张原图不会入账，直接丢掉（服务端只会删没入账的）
+  dropRecognizedPhoto() {
+    const id = this.recognizeAttachmentId
+    this.recognizeAttachmentId = null
+    if (id) api.discardBillingPhoto(id)
+  },
+
+  failRecognition(message) {
+    clearInterval(this.recognizeClock)
+    clearTimeout(this.recognizePoll)
+    this.dropRecognizedPhoto()
+    this.setData({ recognizeError: message })
+  },
+
+  cancelRecognition() {
+    clearInterval(this.recognizeClock)
+    clearTimeout(this.recognizePoll)
+    if (this.recognizeRunId && !this.data.recognizeError) api.cancelAgentRun(this.recognizeRunId).catch(() => {})
+    this.recognizeRunId = null
+    this.dropRecognizedPhoto()
+    this.setData({ recognizing: false, recognizeError: '' })
+  },
+
+  retakePhoto() {
+    this.cancelRecognition()
+    this.pickPhoto()
   },
 
   setMode(event) {
@@ -495,6 +676,32 @@ Page({
       clearTimeout(this.searchTimer)
       this.searchTimer = setTimeout(() => this.searchProducts(), 220)
     }
+  },
+
+  applyKnowledgeSuggestion(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    const cardIndex = Number(event.currentTarget.dataset.card)
+    const line = this.data.lines[index]
+    const card = line && (lineView(line, index).knowledgeCards || [])[cardIndex]
+    if (!card || !card.canApply || (this.data.document && this.data.document.status !== 'DRAFT')) return
+    const lines = this.data.lines.slice()
+    lines[index] = { ...line, specification: card.suggestedSpecification, remember: false,
+      knowledgeReviewValue: JSON.stringify([line.name || '', card.suggestedSpecification]) }
+    this.updateDraft({ lines, dirty: true, statusText: '建议已采用，请核对后保存' }, () => this.recalculate())
+  },
+
+  keepKnowledgeSpecification(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    const line = this.data.lines[index]
+    if (!line || (this.data.document && this.data.document.status !== 'DRAFT')) return
+    const lines = this.data.lines.slice()
+    lines[index] = { ...line, knowledgeReviewValue: JSON.stringify([line.name || '', line.specification || '']) }
+    this.updateDraft({ lines, dirty: true, statusText: '已保留当前规格' }, () => this.recalculate())
+  },
+
+  copyKnowledgeSource(event) {
+    const url = event.currentTarget.dataset.url
+    if (url) wx.setClipboardData({ data: url })
   },
 
   focusLineName(event) {
@@ -595,7 +802,7 @@ Page({
       const p = decimal(next.price)
       if (q !== null && p !== null) total += q * p
       if (!next.name.trim() || !validUnit(next.unit) || q === null || q <= 0 || p === null || p < 0) incompleteCount += 1
-      reviewCount += [next.nameUncertain, next.unitUncertain, next.quantityUncertain, next.priceUncertain].filter(Boolean).length
+      reviewCount += [next.nameUncertain, next.unitUncertain, next.quantityUncertain, next.priceUncertain, next.specificationUncertain].filter(Boolean).length
       if (next.needsReview) reviewLineCount += 1
       return next
     })
@@ -697,7 +904,7 @@ Page({
         specificationFocus: undefined, unitFocus: undefined, remarkFocus: undefined,
         nameUncertain: undefined, unitUncertain: undefined, quantityUncertain: undefined,
         priceUncertain: undefined, amountMismatch: undefined, remarkOpen: undefined, remarkToggleText: undefined,
-        needsReview: undefined, expanded: undefined, inCatalog: undefined,
+        needsReview: undefined, expanded: undefined, inCatalog: undefined, knowledgeCards: undefined, specificationUncertain: undefined,
         name: line.name.trim(), specification: line.specification.trim(), unit: line.unit.trim(),
         quantity: line.quantity === '' ? null : line.quantity,
         price: line.price === '' ? null : line.price

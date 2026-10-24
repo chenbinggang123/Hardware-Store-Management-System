@@ -130,6 +130,8 @@ public class BillingService {
         c.setVersion(null);c.setRequestKey(null);c.setCompanyName(text(c.getCompanyName(),80));c.setPhone(text(c.getPhone(),80));c.setCustomerName(text(c.getCustomerName(),80));c.setRemark(text(c.getRemark(),200));c.setSourceNote(text(c.getSourceNote(),20000));
         normalizeDate(c,complete);
         c.setSourceDocumentNumber(text(c.getSourceDocumentNumber(),80));
+        if(c.getSourceAttachmentId()!=null&&c.getSourceAttachmentId()<=0)c.setSourceAttachmentId(null);
+        if(c.getLines()!=null)for(var row:c.getLines())if(row!=null&&row.getSourceRow()!=null&&(row.getSourceRow()<=0||row.getSourceRow()>2000))row.setSourceRow(null);
         if(complete&&"PROCUREMENT".equals(c.getDocumentType())&&c.getCustomerName().isBlank())throw new IllegalArgumentException("采购单请填写源头厂商");
         if(c.getLines()==null||c.getLines().isEmpty()||c.getLines().size()>200)throw new IllegalArgumentException("每张单据需要1至200行明细");
         int index=0;for(var line:c.getLines()) {

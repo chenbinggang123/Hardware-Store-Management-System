@@ -45,3 +45,11 @@
 .document-note { padding-top: 8rpx; font-size: 21rpx; }
 .document-controls { margin-top: 4rpx; }
 .document-controls > view { min-height: 60rpx; font-size: 23rpx; }
+
+/* ===== 2026-10 单据原图 ===== */
+.photo-flag { color: #236C4D; }
+.document-photo { margin-top: 10rpx; padding: 8rpx; display: flex; align-items: center; gap: 12rpx; border: 1rpx solid #CFE0D6; border-radius: 8rpx; background: #F2F8F5; }
+.document-photo image { width: 96rpx; height: 96rpx; flex: 0 0 auto; border-radius: 6rpx; background: #E1E8E4; }
+.document-photo > view { display: flex; flex-direction: column; gap: 2rpx; }
+.document-photo-title { color: #236C4D; font-size: 23rpx; font-weight: 700; }
+.document-photo-hint { color: #68756F; font-size: 20rpx; }

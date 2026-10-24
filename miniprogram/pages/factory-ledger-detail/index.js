@@ -1,6 +1,7 @@
 const ledgerStore = require('../../utils/factory-ledger')
 const api = require('../../utils/api')
 const { openPage, showToast } = require('../../utils/router')
+const sourcePhotos = require('../../utils/source-photo')
 
 const CUSTOMER_FILTERS = [{ value: '', label: '全部' }, { value: 'PURCHASE', label: '拿货单' }, { value: 'RETURN', label: '退货单' }, { value: 'PAYMENT', label: '收款' }]
 const SUPPLIER_FILTERS = [{ value: '', label: '全部' }, { value: 'PURCHASE', label: '进货单' }, { value: 'PAYMENT', label: '付款' }]
@@ -38,12 +39,26 @@ Page({
       if (supplier) wx.setNavigationBarTitle({ title: '进货账本' })
       const filters = supplier ? SUPPLIER_FILTERS : CUSTOMER_FILTERS
       this.setData({ ledger, supplier, filters, filterNames: filters.map(item => item.label), filterIndex: Math.max(0, filters.findIndex(item => item.value === this.data.type)), documents, visibleDocuments: documents.filter(item => !this.data.type || item.type === this.data.type), loading: false })
+      this.loadPhotos(documents)
     }).catch(error => this.setData({ loading: false, error: error.message || '账本加载失败，请重试' }))
   },
   // 下拉选择单据类型（按序号）
   pickFilter(event) {
     const item = this.data.filters[Number(event.detail.value)]
     this.filterDocuments({ currentTarget: { dataset: { type: item ? item.value : '' } } })
+  },
+  // 单据原图：拍照开单保存过照片的单据，展开后可以直接看原图
+  loadPhotos(documents) {
+    const ids = documents.map(item => item.sourcePhoto && item.sourcePhoto.cloudFileId).filter(Boolean)
+    if (!ids.length) return
+    sourcePhotos.tempUrls(ids).then(urls => {
+      const withPhoto = this.data.documents.map(item => ({ ...item, photoUrl: item.sourcePhoto ? urls[item.sourcePhoto.cloudFileId] || '' : '' }))
+      this.setData({ documents: withPhoto, visibleDocuments: withPhoto.filter(item => !this.data.type || item.type === this.data.type) })
+    })
+  },
+  previewPhoto(event) {
+    const url = event.currentTarget.dataset.url
+    sourcePhotos.preview(url, this.data.visibleDocuments.map(item => item.photoUrl).filter(Boolean))
   },
   filterDocuments(event) {
     const type = event.currentTarget.dataset.type || ''

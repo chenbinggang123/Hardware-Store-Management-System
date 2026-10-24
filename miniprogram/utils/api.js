@@ -124,6 +124,13 @@ function removeCloudFile(fileID) {
   return wx.cloud.deleteFile({ fileList: [fileID] }).catch(() => null)
 }
 
+// 服务端确认没有入账的原图会把云文件 ID 返回来，由这里去云存储删除。
+function dropCloudFiles(result) {
+  const files = result && result.cloudFiles
+  if (!files || !files.length || !wx.cloud || !wx.cloud.deleteFile) return Promise.resolve(result)
+  return wx.cloud.deleteFile({ fileList: files }).catch(() => null).then(() => result)
+}
+
 function updateTemporaryCleanupQueue(updater) {
   const current = wx.getStorageSync(TEMP_AGENT_CLEANUP_KEY) || []
   wx.setStorageSync(TEMP_AGENT_CLEANUP_KEY, updater(Array.isArray(current) ? current : []))
@@ -167,7 +174,7 @@ function cleanupTerminalTemporaryAgentFiles() {
     .catch(() => false)))
 }
 
-function uploadAgentFile(file, conversationId, saveToFiles = false) {
+function uploadAgentFile(file, conversationId, saveToFiles = false, category = '') {
   if (!wx.cloud || !wx.cloud.uploadFile || !wx.cloud.getTempFileURL) {
     return Promise.reject({ message: '当前微信基础库不支持 CloudBase 文件上传' })
   }
@@ -176,7 +183,7 @@ function uploadAgentFile(file, conversationId, saveToFiles = false) {
   let uploadedFileID = ''
   return localFileSize(file, filePath)
     .then((fileSize) => wx.cloud.uploadFile({
-      cloudPath: cloudPathFor(originalName, saveToFiles ? 'agent-files' : 'agent-temp'), filePath
+      cloudPath: cloudPathFor(originalName, category || (saveToFiles ? 'agent-files' : 'agent-temp')), filePath
     })
       .then((uploadResult) => {
         uploadedFileID = uploadResult.fileID
@@ -189,7 +196,7 @@ function uploadAgentFile(file, conversationId, saveToFiles = false) {
         }
         return agentRequest('/agent/attachments/cloud', {
           method: 'POST',
-          data: { cloudFileId: uploadedFileID, downloadUrl: item.tempFileURL, originalName, fileSize, conversationId }
+          data: { cloudFileId: uploadedFileID, downloadUrl: item.tempFileURL, originalName, fileSize, conversationId, saveToFiles }
         })
       })
       .then((attachment) => ({ ...attachment, cloudFileId: uploadedFileID })))
@@ -296,6 +303,19 @@ module.exports = {
   uploadAgentAttachment(filePath, conversationId, saveToFiles = false) {
     return uploadAgentFile(filePath, conversationId, saveToFiles)
   },
+  // 拍照开单：原图单独放在 billing-photo 目录，识别后不删除，开单页核对时要看。
+  uploadBillingPhoto(file) {
+    return uploadAgentFile(file, null, false, 'billing-photo')
+  },
+  startBillingRecognition(attachmentId, documentType) {
+    return agentRequest('/billing/recognitions', { method: 'POST', data: { attachmentId, documentType } })
+  },
+  getProductPhotos(productId) {
+    return request('/billing/product-photos', { data: { productId } })
+  },
+  getBillingSource(id, attachmentId) {
+    return request(`/billing/documents/${id}/source`, { data: attachmentId ? { attachmentId } : {} })
+  },
   queueTemporaryAgentFiles(runId, attachments) {
     queueTemporaryAgentFiles(runId, attachments)
   },
@@ -309,7 +329,13 @@ module.exports = {
     const attachmentId = typeof attachment === 'object' ? attachment.id : attachment
     const cloudFileId = typeof attachment === 'object' ? attachment.cloudFileId : ''
     return agentRequest(`/agent/attachments/${attachmentId}`, { method: 'DELETE' })
-      .then((result) => removeCloudFile(cloudFileId).then(() => result))
+      .then((result) => result === false ? result : removeCloudFile(cloudFileId).then(() => result))
+  },
+  getSavedPhotoSource(id) {
+    return agentRequest(`/agent/attachments/${id}/photo-source`)
+  },
+  downloadSavedPhoto(id) {
+    return agentRequest(`/agent/attachments/${id}/photo-content`, { responseType: 'arraybuffer' })
   },
   getAgentConversations() {
     return agentRequest('/agent/conversations')
@@ -349,13 +375,28 @@ module.exports = {
     return request('/reports/monthly-summary', { query: month ? { month } : {} })
   },
   deleteBillingDocument(id) {
-    return request(`/billing/documents/${id}`, { method: 'DELETE' })
+    return request(`/billing/documents/${id}`, { method: 'DELETE' }).then(dropCloudFiles)
   },
   deleteLedgerBillingDocument(ledgerId, transactionId) {
-    return request(`/billing/ledgers/${ledgerId}/transactions/${transactionId}/document`, { method: 'DELETE' })
+    return request(`/billing/ledgers/${ledgerId}/transactions/${transactionId}/document`, { method: 'DELETE' }).then(dropCloudFiles)
+  },
+  // 放弃没有入账的原图：服务端只删没入账的，已入账的会保留
+  discardBillingPhoto(attachmentId) {
+    if (!attachmentId) return Promise.resolve(null)
+    return request(`/billing/photos/${attachmentId}`, { method: 'DELETE' }).then(dropCloudFiles).catch(() => null)
+  },
+  getUnpostedProcurements() {
+    return request('/billing/procurements/unposted')
+  },
+  backfillProcurements() {
+    return request('/billing/procurements/backfill', { method: 'POST' })
+  },
+  // 打开开单记录时顺带清理 14 天还没入账的原图
+  cleanupBillingPhotos() {
+    return request('/billing/photos/cleanup', { method: 'POST' }).then(dropCloudFiles).catch(() => null)
   },
   deleteBillingDrafts(ids) {
-    return request('/billing/documents/drafts', { method: 'DELETE', data: { ids } })
+    return request('/billing/documents/drafts', { method: 'DELETE', data: { ids } }).then(dropCloudFiles)
   },
   getBillingRecords(params = {}) {
     return request('/billing/records', { query: params })

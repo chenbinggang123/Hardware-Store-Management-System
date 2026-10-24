@@ -4,6 +4,7 @@ import lombok.Data;
 
 @Data
 public class CloudAttachmentRequest {
+    private Boolean saveToFiles;
     private String cloudFileId;
     private String downloadUrl;
     private String originalName;

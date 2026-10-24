@@ -1,0 +1,28 @@
+[
+  {
+    "documentType": "PROCUREMENT", "customerName": "辉达工量具", "sourceDocumentNumber": "0002050",
+    "sourceNote": "采购单样例一，人工摘录部分行用于回归，非完整OCR结果；名称沿用待核对，票面日期不清。",
+    "lines": [
+      {"name":"镀钛钻头", "specification":"Φ1", "unit":"支", "quantity":100, "price":0.86},
+      {"name":"P5.5", "unit":"支", "quantity":100, "price":3.9},
+      {"name":"中5、8", "unit":"支", "quantity":100, "price":4.2}
+    ]
+  },
+  {
+    "documentType": "PROCUREMENT", "customerName": "厦门市林光工贸有限公司", "sourceDocumentNumber": "0000855",
+    "sourceNote": "采购单样例二，人工摘录部分行用于回归；票头送货单，本店买入。手写加项340及票面合计差异待核对。",
+    "lines": [
+      {"name":"磨棒", "specification":"3×1-3", "unit":"支", "quantity":1000, "price":0.67},
+      {"name":"3×6-8", "unit":"支", "quantity":400, "price":1.65}
+    ]
+  },
+  {
+    "documentType": "PROCUREMENT", "customerName": "厦门市林光工贸有限公司", "sourceDocumentNumber": "0000863",
+    "sourceNote": "采购单样例三，人工摘录部分行用于回归；票面3014，加项900后3914，旁注3900，差异待核对，不反推单价。",
+    "lines": [
+      {"name":"磨棒", "specification":"3×1-3", "unit":"支", "quantity":200, "price":0.67, "sourceAmount":"134"},
+      {"name":"3×6-8", "unit":"支", "quantity":600, "price":1.65, "sourceAmount":"990"},
+      {"name":null, "unit":null, "quantity":null, "price":null, "remark":"额外商品名称数量不清，原文待核对"}
+    ]
+  }
+]

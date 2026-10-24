@@ -17,6 +17,8 @@ public class AgentRunContext {
     private final String userInput;
     private final List<AgentChatMessage> conversationHistory;
     private final List<Map<String, Object>> toolResults = new ArrayList<>();
+    /** Request sizes/timings only; never credentials or model content. */
+    private final List<Map<String, Object>> modelMeasurements = new ArrayList<>();
     private Set<String> allowedTools = Set.of();
     private String executionInstructions = "";
     private boolean routedPlan;

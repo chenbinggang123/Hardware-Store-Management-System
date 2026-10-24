@@ -198,6 +198,8 @@ public class AttachmentContentParser {
     }
 
     private AttachmentParseResult parseImage(String fileName, String mimeType, byte[] content) throws Exception {
+        long started = System.nanoTime();
+        try {
         if (!ocrClient.isConfigured()) {
             return AttachmentParseResult.waiting("图片已保存；配置腾讯云 OCR 密钥或 HTTP OCR 服务后即可识别");
         }
@@ -209,7 +211,26 @@ public class AttachmentContentParser {
         if (StringUtils.hasText(result.provider())) append(output, "\n[OCR Provider] " + result.provider());
         if (StringUtils.hasText(result.requestId())) append(output, "\n[OCR RequestId] " + result.requestId());
         for (String warning : result.warnings()) append(output, "\n[审核提醒] " + warning);
-        return AttachmentParseResult.parsed(limit(output.toString()));
+        return AttachmentParseResult.parsed(limit(output.toString()), withImageSize(result.layout(), content));
+        } finally {
+            org.slf4j.LoggerFactory.getLogger(AttachmentContentParser.class).info("Image OCR elapsedMs={}",(System.nanoTime()-started)/1_000_000);
+        }
+    }
+
+    /** 给行位置补上原图宽高，商品页、账本页不用先加载整张图就能截出那一行。 */
+    static String withImageSize(String layout, byte[] content) {
+        if (!StringUtils.hasText(layout)) return layout;
+        try {
+            var image = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(content));
+            if (image == null) return layout;
+            var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            var node = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(layout);
+            node.put("width", image.getWidth());
+            node.put("height", image.getHeight());
+            return mapper.writeValueAsString(node);
+        } catch (Exception ignored) {
+            return layout;
+        }
     }
 
     private AttachmentParseResult parseVideo(String fileName, byte[] content) throws Exception {

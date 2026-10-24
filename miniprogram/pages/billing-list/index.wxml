@@ -1,5 +1,5 @@
 <view class="screen">
-  <view class="list-top"><text class="list-top-title">{{selecting ? '选一张给小五' : (documentType === 'PROCUREMENT' ? (factory ? factory + ' 进货' : '采购进货') : '开单记录')}}</text><text class="list-top-count">{{total}} 张</text><view class="btn btn-primary btn-sm" bindtap="openCreate">＋ 开单</view></view>
+  <view class="list-top"><text class="list-top-title">{{selecting ? '选一张给小五' : (documentType === 'PROCUREMENT' ? (factory ? factory + ' 进货' : '采购进货') : '开单记录')}}</text><text class="list-top-count">{{total}} 张</text><view class="btn btn-outline btn-sm list-photo" wx:if="{{!selecting}}" bindtap="openPhoto">拍照开单</view><view class="btn btn-primary btn-sm" bindtap="openCreate">＋ 开单</view></view>
 
   <!-- 状态用下拉选，和搜索框放一行 -->
   <view class="pick-row record-tools"><picker range="{{filterNames}}" value="{{filterIndex}}" bindchange="pickStatus"><view class="pick {{status ? 'on' : ''}}">{{filterNames[filterIndex]}}</view></picker><view class="record-search"><input value="{{keyword}}" placeholder="搜单号、客户或商品" bindinput="changeKeyword" confirm-type="search" /><text wx:if="{{keyword}}" bindtap="clearKeyword">×</text></view></view>

@@ -6,6 +6,40 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class HandwrittenItemContinuationTest {
+    @Test void continuesAcrossManyOcrDiameterAndNumericRowsUntilNewProduct() {
+        var c = new BillingContent();
+        var first = line("镀钛钻头", "Φ1");
+        var a = line("P5.5", ""); var b = line("中5、8", "");
+        var d = line("无法识别：8.5", ""); var e = line("？巾10", "");
+        var f = line("未识别", "12");
+        var newProduct = line("合金铰刀巾16", ""); var next = line("巾20", "");
+        a.setQuantity(new BigDecimal("100")); a.setPrice(new BigDecimal("3.9")); a.setUnit("支");
+        c.setLines(List.of(first, a, b, d, e, f, newProduct, next));
+        HandwrittenItemContinuation.repair(c);
+        for (var row : List.of(a, b, d, e, f)) {
+            assertThat(row.getName()).isEqualTo("镀钛钻头");
+            assertThat(row.getRemark()).contains("名称沿用第1行", "待确认");
+            assertThat(row.isRemember()).isFalse();
+        }
+        assertThat(b.getSpecification()).isEqualTo("中5、8");
+        assertThat(d.getSpecification()).isEqualTo("8.5");
+        assertThat(d.getRemark()).contains("无法识别：8.5");
+        assertThat(a.getQuantity()).isEqualByComparingTo("100");
+        assertThat(a.getPrice()).isEqualByComparingTo("3.9");
+        assertThat(b.getQuantity()).isNull(); assertThat(b.getUnit()).isNull();
+        assertThat(next.getName()).isEqualTo("合金铰刀");
+        assertThat(next.getRemark()).contains("第7行");
+        String evidence = b.getRemark(); HandwrittenItemContinuation.repair(c);
+        assertThat(b.getRemark()).isEqualTo(evidence);
+    }
+
+    @Test void unknownWithoutNumbersBreaksChainRatherThanCopyingValues() {
+        var c = new BillingContent(); var first = line("钻头", "Φ1");
+        var unknown = line("未识别", ""); var next = line("P5.5", "");
+        c.setLines(List.of(first, unknown, next)); HandwrittenItemContinuation.repair(c);
+        assertThat(next.getName()).isEmpty();
+        assertThat(next.getSpecification()).isEqualTo("P5.5");
+    }
     private BillingContent.Line line(String name,String spec) {
         var line=new BillingContent.Line();line.setName(name);line.setSpecification(spec);return line;
     }

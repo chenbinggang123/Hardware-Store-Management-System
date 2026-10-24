@@ -205,7 +205,7 @@ CREATE TABLE IF NOT EXISTS agent_conversation_run (
 
 CREATE TABLE IF NOT EXISTS agent_attachment (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    conversation_id BIGINT NOT NULL,
+    conversation_id BIGINT NULL,
     run_id BIGINT,
     operator_id BIGINT NOT NULL,
     object_key VARCHAR(500) NOT NULL,
@@ -222,6 +222,17 @@ CREATE TABLE IF NOT EXISTS agent_attachment (
     KEY idx_agent_attachment_run (run_id),
     KEY idx_agent_attachment_operator (operator_id)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- Saved originals survive conversation deletion and can be detached from it.
+SET @detach_saved_attachment = (
+    SELECT IF(COUNT(*) > 0, 'ALTER TABLE agent_attachment MODIFY COLUMN conversation_id BIGINT NULL', 'SELECT 1')
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'agent_attachment'
+        AND column_name = 'conversation_id' AND is_nullable = 'NO'
+);
+PREPARE detach_saved_attachment_stmt FROM @detach_saved_attachment;
+EXECUTE detach_saved_attachment_stmt;
+DEALLOCATE PREPARE detach_saved_attachment_stmt;
 
 CREATE TABLE IF NOT EXISTS agent_tool_call (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -939,3 +950,16 @@ SET @add_factory_ledger_kind_name_key = (
 PREPARE add_factory_ledger_kind_name_key_stmt FROM @add_factory_ledger_kind_name_key;
 EXECUTE add_factory_ledger_kind_name_key_stmt;
 DEALLOCATE PREPARE add_factory_ledger_kind_name_key_stmt;
+
+-- 2026-10-24 拍照开单：保存 OCR 每一行在原图上的位置，开单页点开商品时截出原图上的那一行。
+-- schema.sql 启动时会自动执行同样的语句；生产环境若设置了 SPRING_SQL_INIT_MODE=never，请发布前手动执行。可重复执行。
+SET @add_agent_attachment_ocr_layout = (
+    SELECT IF(COUNT(*) = 0,
+              'ALTER TABLE agent_attachment ADD COLUMN ocr_layout LONGTEXT NULL',
+              'SELECT 1')
+    FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'agent_attachment' AND column_name = 'ocr_layout'
+);
+PREPARE add_agent_attachment_ocr_layout_stmt FROM @add_agent_attachment_ocr_layout;
+EXECUTE add_agent_attachment_ocr_layout_stmt;
+DEALLOCATE PREPARE add_agent_attachment_ocr_layout_stmt;

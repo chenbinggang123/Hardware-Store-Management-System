@@ -161,6 +161,21 @@ class AgentConversationServiceTest {
     }
 
     @Test
+    void historyFormatsOriginalResultBeforeTruncatingIt() {
+        AgentConversation conversation = new AgentConversation();
+        conversation.setId(3L); conversation.setTitle("保存采购单");
+        when(conversationRepository.findTop50ByOperatorIdOrderByUpdateTimeDesc(7L)).thenReturn(List.of(conversation));
+        AgentConversationRun link = new AgentConversationRun();
+        link.setConversationId(3L); link.setRunId(20L);
+        when(linkRepository.findByConversationIdOrderByCreateTimeAsc(3L)).thenReturn(List.of(link));
+        AgentRun run = new AgentRun(); run.setId(20L);
+        run.setOutputText("操作已成功执行。结果：{\"kind\":\"BILLING_DOCUMENT\",\"documentId\":123,\"message\":\"已准备好草稿\"}");
+        when(runRepository.findAllById(any())).thenReturn(List.of(run));
+        assertEquals("单据草稿已建立，待在编辑页核对确认。", service.list(7L).get(0).getPreview());
+        assertEquals(true, run.getOutputText().contains("documentId"));
+    }
+
+    @Test
     void deletesConversationLinksButKeepsCompletedRunAudit() {
         AgentConversation conversation = new AgentConversation();
         conversation.setId(3L);

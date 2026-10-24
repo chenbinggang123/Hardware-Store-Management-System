@@ -13,3 +13,16 @@
 .inventory-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16rpx; }
 .inventory-source { color: #75817B; font-size: 19rpx; }
 .inventory-actions { display: flex; gap: 16rpx; margin-top: 20rpx; }
+
+/* ===== 2026-10 单据原图 ===== */
+.photo-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12rpx; }
+.photo-count { color: #66746E; font-size: 21rpx; }
+.photo-item { margin-top: 14rpx; padding-top: 12rpx; border-top: 1rpx solid #E6ECE9; }
+.photo-item:first-of-type { border-top: 0; padding-top: 0; }
+.photo-caption { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; }
+.photo-title { min-width: 0; overflow: hidden; color: #17231E; font-size: 24rpx; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.photo-open { flex: 0 0 auto; color: #245E9B; font-size: 22rpx; }
+.photo-detail { margin-top: 2rpx; color: #66746E; font-size: 21rpx; }
+.photo-crop { width: 640rpx; max-width: 100%; margin-top: 8rpx; overflow: hidden; border: 1rpx solid #CBD6D0; border-radius: 6rpx; background: #FFF; }
+.photo-crop image { display: block; max-width: none; }
+.photo-thumb { width: 220rpx; height: 220rpx; margin-top: 8rpx; border-radius: 8rpx; background: #E8EFEB; }

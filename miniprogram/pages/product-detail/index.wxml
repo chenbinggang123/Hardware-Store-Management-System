@@ -32,6 +32,17 @@
     <view class="stat-item"><view class="stat-value" style="font-size: 24rpx;">{{product.stockStateText}}</view><view class="stat-label">库存状态</view></view>
   </view>
 
+  <!-- 这个商品出现过的纸单原图：有位置就只显示它那一行，点开看整张 -->
+  <view class="form-card" wx:if="{{photos.length}}">
+    <view class="photo-heading"><view class="form-section-title">单据原图</view><text class="photo-count">最近 {{photos.length}} 张 · 点图看整张</text></view>
+    <view class="photo-item" wx:for="{{photos}}" wx:key="key">
+      <view class="photo-caption"><text class="photo-title">{{item.title}}</text><text class="photo-open" data-id="{{item.documentId}}" bindtap="openPhotoDocument">看单据 ›</text></view>
+      <view class="photo-detail" wx:if="{{item.detail}}">{{item.detail}}</view>
+      <view class="photo-crop" wx:if="{{item.crop}}" style="height:{{item.crop.height}}px" data-index="{{index}}" bindtap="previewPhoto"><image src="{{item.url}}" style="{{item.crop.imageStyle}}" /></view>
+      <image wx:else class="photo-thumb" src="{{item.url}}" mode="aspectFill" data-index="{{index}}" bindtap="previewPhoto" />
+    </view>
+  </view>
+
   <view class="form-card">
     <view class="form-section-title">基础信息</view>
     <view class="detail-grid">

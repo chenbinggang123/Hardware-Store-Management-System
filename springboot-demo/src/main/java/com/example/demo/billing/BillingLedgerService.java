@@ -34,6 +34,8 @@ import java.util.Optional;
 public class BillingLedgerService {
     private BillingProductSyncService productSync;
     @org.springframework.beans.factory.annotation.Autowired public void setProductSync(BillingProductSyncService sync) { this.productSync=sync; }
+    private com.example.demo.agent.service.BillingPhotoService photos;
+    @org.springframework.beans.factory.annotation.Autowired(required = false) public void setPhotos(com.example.demo.agent.service.BillingPhotoService photos) { this.photos=photos; }
     static final String SOURCE = "BILLING";
 
     private final BillingDocumentRepository documents;
@@ -158,6 +160,39 @@ public class BillingLedgerService {
         return view(posted(document));
     }
 
+    /** 旧版本保存的采购单没有记入进货账本：已保存、有厂商和明细、还没记过账的采购单。 */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> unpostedProcurements(Long owner) {
+        if (owner == null || owner <= 0) throw new IllegalArgumentException("请先登录");
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (BillingDocument document : documents.findByOperatorIdAndStatusIn(owner, List.of("CONFIRMED"))) {
+            BillingContent content;
+            try { content = content(document); } catch (RuntimeException exception) { continue; }
+            if (!"PROCUREMENT".equals(content.getDocumentType()) || !StringUtils.hasText(document.getDocumentNumber())) continue;
+            if (!StringUtils.hasText(content.getCustomerName()) || request(document, content).getItems().isEmpty()) continue;
+            if (!postings(document).isEmpty()) continue;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", document.getId());
+            row.put("number", document.getDocumentNumber());
+            row.put("factoryName", content.getCustomerName());
+            row.put("date", content.getDate());
+            row.put("total", document.getTotalAmount());
+            result.add(row);
+        }
+        return result;
+    }
+
+    /** 把上面这些采购单一次记入各自厂商的进货账本；已记过账的会被跳过，所以重复点击不会重复记账。 */
+    public Map<String, Object> backfillProcurements(Long owner) {
+        List<Map<String, Object>> pending = unpostedProcurements(owner);
+        for (Map<String, Object> row : pending) {
+            post(owner, ((Number) row.get("id")).longValue(), null);
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("posted", pending.size());
+        return result;
+    }
+
     /**
      * 修改已保存的单据：退回草稿。如果已经记入厂家账本，先红字冲销那一笔；
      * 改完再“保存并记账”时，会按修订号（单号-R2、-R3…）重新记一笔，账本里新旧两笔都能查到。
@@ -218,6 +253,13 @@ public class BillingLedgerService {
 
     /** 先锁定并校验全部选择，再一起删除，避免混入已保存单据或出现部分删除。 */
     public int deleteDrafts(Long owner, List<Long> ids) {
+        return deleteDraftsAndPhotos(owner, ids).deleted();
+    }
+
+    /** 删除结果：删掉的张数，以及没有入账、需要到云存储清理的原图文件。 */
+    public record Deleted(int deleted, List<String> cloudFiles) { }
+
+    public Deleted deleteDraftsAndPhotos(Long owner, List<Long> ids) {
         if (owner == null || owner <= 0) throw new IllegalArgumentException("请先登录");
         if (ids == null || ids.isEmpty() || ids.size() > 100 || ids.stream().anyMatch(id -> id == null || id <= 0)) {
             throw new IllegalArgumentException("请选择 1 到 100 张草稿");
@@ -232,20 +274,31 @@ public class BillingLedgerService {
             requireUnposted(document);
             selected.add(document);
         }
+        List<Long> photoIds = selected.stream().map(this::sourcePhotoId).filter(java.util.Objects::nonNull).toList();
         documents.deleteAll(selected);
         documents.flush();
-        return selected.size();
+        return new Deleted(selected.size(), photos == null ? List.of() : photos.discard(photoIds, owner));
+    }
+
+    private Long sourcePhotoId(BillingDocument document) {
+        try { return content(document).getSourceAttachmentId(); } catch (RuntimeException exception) { return null; }
     }
 
     /** 开单记录只管理未记入账本的单据。 */
     public void deleteDocument(Long owner, Long documentId) {
+        deleteDocumentAndPhoto(owner, documentId);
+    }
+
+    public List<String> deleteDocumentAndPhoto(Long owner, Long documentId) {
         if (owner == null || owner <= 0) throw new IllegalArgumentException("请先登录");
         BillingDocument document = documents.lockOwned(documentId, owner)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "单据不存在"));
         if (productSync != null) productSync.reverse(owner, documentId);
         requireUnposted(document);
+        Long photoId = sourcePhotoId(document);
         documents.delete(document);
         documents.flush();
+        return photos == null || photoId == null ? List.of() : photos.discard(List.of(photoId), owner);
     }
 
     private void requireUnposted(BillingDocument document) {
@@ -254,6 +307,11 @@ public class BillingLedgerService {
 
     /** 从账本删除来源单据；服务端核对账本和来源，原流水及抵消记录保留。 */
     public void deleteFromLedger(Long owner, Long ledgerId, Long transactionId) {
+        deleteFromLedgerAndPhoto(owner, ledgerId, transactionId);
+    }
+
+    /** 从账本删除单据后，原图不再属于任何入账单据，一并清理，返回需要删的云文件。 */
+    public List<String> deleteFromLedgerAndPhoto(Long owner, Long ledgerId, Long transactionId) {
         if (owner == null || owner <= 0) throw new IllegalArgumentException("请先登录");
         FactoryLedgerTransaction selected = transactions.findById(transactionId)
                 .filter(t -> ledgerId.equals(t.getLedgerId()) && SOURCE.equals(t.getSource()))
@@ -274,8 +332,10 @@ public class BillingLedgerService {
         }
         // 采购单删除时把加过的库存一并退回。
         if (productSync != null) productSync.reverse(owner, document.getId());
+        Long photoId = sourcePhotoId(document);
         documents.delete(document);
         documents.flush();
+        return photos == null || photoId == null ? List.of() : photos.discard(List.of(photoId), owner);
     }
 
     private FactoryLedgerTransactionRequest request(BillingDocument document, BillingContent content) {

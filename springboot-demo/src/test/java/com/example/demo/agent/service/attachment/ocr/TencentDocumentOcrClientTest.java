@@ -44,6 +44,22 @@ class TencentDocumentOcrClientTest {
     }
 
     @Test
+    void recordsEachRowBoxSoTheEditorCanCropTheOriginalPhoto() throws Exception {
+        String response = """
+                {"Response":{"TableDetections":[{"Cells":[
+                  {"RowTl":0,"ColTl":0,"Text":"项目","Polygon":[{"X":10,"Y":20},{"X":90,"Y":20},{"X":90,"Y":50},{"X":10,"Y":50}]},
+                  {"RowTl":1,"ColTl":0,"Text":"螺丝","Polygon":[{"X":10,"Y":50},{"X":90,"Y":50},{"X":90,"Y":82},{"X":10,"Y":82}]},
+                  {"RowTl":1,"ColTl":1,"Text":"10","Polygon":[{"X":90,"Y":51},{"X":160,"Y":51},{"X":160,"Y":84},{"X":90,"Y":84}]}
+                ]}]}}
+                """;
+        DocumentOcrResult result = client.parseTableResponse(response);
+        assertThat(result.text()).contains("第2行");
+        var rows = new ObjectMapper().readTree(result.layout()).path("rows");
+        assertThat(rows.path("2").toString()).isEqualTo("[10,50,160,84]");
+        assertThat(rows.path("1").toString()).isEqualTo("[10,20,90,50]");
+    }
+
+    @Test
     void treatsMergedAmountDigitsAsYuanJiaoFenAndProvidesArithmeticReviewValue() {
         String response = """
                 {"Response":{"RequestId":"amount-grid","TableDetections":[{"Cells":[

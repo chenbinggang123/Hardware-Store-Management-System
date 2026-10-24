@@ -1,6 +1,23 @@
 const api = require('../../utils/api')
 const { modifyQuantity } = require('../../utils/product-quantity')
 const { openPage, showToast } = require('../../utils/router')
+const sourcePhotos = require('../../utils/source-photo')
+
+const TYPE_NAMES = { PURCHASE: '拿货单', RETURN: '退货单', PROCUREMENT: '采购单' }
+
+// 单据原图：有行位置就截出这个商品那一行，没有就显示整张缩略图。
+function photoView(item, url, cropWidth) {
+  const amount = item.quantity !== null && item.quantity !== undefined
+    ? `${item.quantity}${item.unit || ''}${item.price !== null && item.price !== undefined ? ' × ¥' + item.price : ''}` : ''
+  return {
+    key: `${item.documentId}`,
+    documentId: item.documentId,
+    url,
+    crop: sourcePhotos.rowCrop(item.box, item.width, item.height, cropWidth),
+    title: [item.date, TYPE_NAMES[item.documentType] || '单据', item.customerName].filter(Boolean).join(' · '),
+    detail: [amount, item.documentNumber].filter(Boolean).join(' · ')
+  }
+}
 
 function normalizeProduct(product, inventory) {
   if (!product) {
@@ -40,7 +57,8 @@ Page({
     id: '',
     product: null,
     loading: true,
-    loadError: ''
+    loadError: '',
+    photos: []
   },
 
   onLoad(options) {
@@ -67,7 +85,30 @@ Page({
       this.setData({
         product: normalizeProduct(product, inventory), loading: false
       })
+      this.loadPhotos()
     }).catch((error) => this.setData({ product: null, loading: false, loadError: (error && (error.message || error.errMsg)) || '商品详情加载失败' }))
+  },
+
+  // 这个商品出现过的单据原图（拍照开单时保存的纸单照片）
+  loadPhotos() {
+    return api.getProductPhotos(this.data.id).then((items) => {
+      const list = (items || []).filter((item) => item.cloudFileId)
+      if (!list.length) { this.setData({ photos: [] }); return }
+      return sourcePhotos.tempUrls(list.map((item) => item.cloudFileId)).then((urls) => {
+        const cropWidth = sourcePhotos.pxFromRpx(640)
+        this.setData({ photos: list.filter((item) => urls[item.cloudFileId]).map((item) => photoView(item, urls[item.cloudFileId], cropWidth)) })
+      })
+    }).catch(() => this.setData({ photos: [] }))
+  },
+
+  previewPhoto(event) {
+    const photo = this.data.photos[Number(event.currentTarget.dataset.index)]
+    if (photo) sourcePhotos.preview(photo.url, this.data.photos.map((item) => item.url))
+  },
+
+  openPhotoDocument(event) {
+    const id = event.currentTarget.dataset.id
+    if (id) openPage('/pages/billing-editor/index', { id })
   },
 
   openEdit() {
