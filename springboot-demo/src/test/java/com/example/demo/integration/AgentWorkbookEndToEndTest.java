@@ -124,7 +124,7 @@ class AgentWorkbookEndToEndTest {
         assertThat(file.path("status").asText()).isEqualTo("READY");
         assertThat(file.path("expiresAt").isMissingNode() || file.path("expiresAt").isNull()).isTrue();
         assertThat(file.path("downloadPath").asText()).isEqualTo("/agent/outputs/" + outputId + "/download");
-        assertThat(file.path("name").asText()).startsWith("恒迪模具五金收款收据0002766-").endsWith(".xlsx");
+        assertThat(file.path("name").asText()).startsWith("恒迪模具五金收款收据0002766_").endsWith(".xlsx");
 
         // 3. The file is visible wherever the client looks: run, conversation history, my-files list.
         JsonNode run = data(perform(get("/agent/runs/" + runId).header("Authorization", "Bearer " + token)));
@@ -147,11 +147,11 @@ class AgentWorkbookEndToEndTest {
         try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
             Sheet sheet = workbook.getSheet("商品明细");
             assertThat(sheet).isNotNull();
-            assertThat(sheet.getRow(1).getCell(1).getStringCellValue()).isEqualTo("钻头 2.2");
-            assertThat(sheet.getRow(7).getCell(5).getNumericCellValue()).isEqualTo(504d);
-            assertThat(sheet.getRow(7).getCell(6).getStringCellValue()).contains("28×1.8=50.40");
-            assertThat(sheet.getRow(8).getCell(0).getStringCellValue()).isEqualTo("合计");
-            assertThat(sheet.getRow(8).getCell(5).getNumericCellValue()).isEqualTo(699d);
+            assertThat(sheet.getRow(4).getCell(1).getStringCellValue()).isEqualTo("钻头 2.2");
+            assertThat(sheet.getRow(10).getCell(5).getNumericCellValue()).isEqualTo(504d);
+            assertThat(sheet.getRow(10).getCell(7).getStringCellValue()).contains("28\u00d71.8=50.40");
+            assertThat(sheet.getRow(11).getCell(0).getStringCellValue()).isEqualTo("合计");
+            assertThat(sheet.getRow(11).getCell(5).getNumericCellValue()).isEqualTo(699d);
             assertThat(workbook.getSheet("单据信息").getRow(2).getCell(1).getStringCellValue()).isEqualTo("0002766");
             assertThat(workbook.getSheet("生成说明")).isNotNull();
         }

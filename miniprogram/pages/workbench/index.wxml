@@ -18,7 +18,7 @@
   <view class="daily-ledger">
     <view class="daily-row" bindtap="openPage" data-path="/pages/billing-list/index"><view class="daily-mark">单</view><text>销售单</text><view class="daily-value">{{businessSummary.orderCount}} 笔</view><view class="daily-arrow">›</view></view>
     <view class="daily-row" bindtap="openPage" data-path="/pages/billing-list/index"><view class="daily-mark money">¥</view><text>销售金额</text><view class="daily-value">¥{{businessSummary.salesAmount}}</view><view class="daily-arrow">›</view></view>
-    <view class="daily-row warning" bindtap="openPage" data-path="/pages/inventories/index"><view class="daily-mark">货</view><text>库存预警</text><view class="daily-value">{{inventoryWarning}} 件</view><view class="daily-arrow">›</view></view>
+    <view class="daily-row warning" bindtap="openPage" data-path="/pages/products/index"><view class="daily-mark">货</view><text>库存预警</text><view class="daily-value">{{inventoryWarning}} 件</view><view class="daily-arrow">›</view></view>
   </view>
 
   <view class="file-entry" role="button" aria-label="开始处理业务文件" bindtap="openUpload"><view class="file-entry-mark">文</view><view class="file-entry-copy"><view class="file-entry-title">处理业务文件</view><view class="file-entry-desc">支持表格、Word、PDF 和价格表图片；先核对再写入</view></view><view class="file-entry-action">开始处理</view></view>

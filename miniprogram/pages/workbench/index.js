@@ -5,8 +5,7 @@ const { openPage } = require('../../utils/router')
 const quickActions = [
   { title: '开销售单', desc: '选客户和商品', mark: '单', tone: 'blue', path: '/pages/billing-editor/index' },
   { title: '查商品', desc: '看价格和库存', mark: '查', tone: 'green', path: '/pages/products/index' },
-  { title: '采购进货', desc: '登记采购到货', mark: '入', tone: 'amber', path: '/pages/products/index?mode=factories' },
-  { title: '库存盘点', desc: '核对实际数量', mark: '盘', tone: 'purple', path: '/pages/inventories/index' }
+  { title: '采购进货', desc: '登记采购到货', mark: '入', tone: 'amber', path: '/pages/products/index?mode=factories' }
 ]
 
 const toolActions = [

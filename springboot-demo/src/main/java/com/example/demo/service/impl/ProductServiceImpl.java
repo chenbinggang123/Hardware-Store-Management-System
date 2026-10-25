@@ -121,9 +121,9 @@ public class ProductServiceImpl implements ProductService {
     public void deleteProduct(Long id) {
         Product product = getProductById(id)
                 .orElseThrow(() -> new IllegalArgumentException("商品不存在，无法删除"));
-        // 有出入库或盘点记录的商品不能删，否则历史流水会找不到商品。
-        if (inventoryLogRepository != null && !inventoryLogRepository.findByProductIdOrderByCreateTimeDesc(id).isEmpty()) {
-            throw new IllegalArgumentException("这个商品已有出入库或盘点记录，不能删除；不再卖可以不管它");
+        // stock in/out and stocktake records belong to the product itself: delete them together with it
+        if (inventoryLogRepository != null) {
+            inventoryLogRepository.deleteAll(inventoryLogRepository.findByProductIdOrderByCreateTimeDesc(id));
         }
         if (inventoryRepository != null) {
             inventoryRepository.findByProductId(id).ifPresent(inventoryRepository::delete);

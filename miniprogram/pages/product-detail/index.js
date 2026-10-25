@@ -138,10 +138,6 @@ Page({
       .finally(() => { this.adjustingQuantity = false })
   },
 
-  openInventoryLogs() {
-    if (!this.data.product || !this.data.product.inventoryId) return showToast('这个商品还没有库存记录')
-    openPage('/pages/inventory-detail/index', { id: this.data.product.inventoryId })
-  },
 
   deleteProduct() {
     const product = this.data.product

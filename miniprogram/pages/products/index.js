@@ -139,12 +139,10 @@ Page({
 
   manageProduct(event) {
     const data = event.currentTarget.dataset
-    wx.showActionSheet({ itemList: ['查看详情', '编辑资料', '查看库存流水', '删除商品'] }).then((result) => {
+    wx.showActionSheet({ itemList: ['查看详情', '编辑资料', '删除商品'] }).then((result) => {
       if (result.tapIndex === 0) this.openDetail({ currentTarget: { dataset: data } })
       if (result.tapIndex === 1) this.openEdit({ currentTarget: { dataset: data } })
-      if (result.tapIndex === 2 && data.inventoryId) openPage('/pages/inventory-detail/index', { id: data.inventoryId })
-      if (result.tapIndex === 2 && !data.inventoryId) showToast('这个商品还没有库存记录')
-      if (result.tapIndex === 3) this.deleteProduct({ currentTarget: { dataset: data } })
+      if (result.tapIndex === 2) this.deleteProduct({ currentTarget: { dataset: data } })
     }).catch(() => {})
   },
 

@@ -1,4 +1,5 @@
 const api = require('../../utils/api')
+const { modifyQuantity } = require('../../utils/product-quantity')
 const { showToast, openPage } = require('../../utils/router')
 
 function createDefaultForm() {
@@ -49,8 +50,8 @@ Page({
   },
 
   openAdjust() {
-    api.ensureInventory(this.data.id).then((inventory) => openPage('/pages/inventory-adjust/index', { id: inventory.id }))
-      .catch((error) => showToast(error.message || '数量读取失败'))
+    modifyQuantity({ id: this.data.id, stock: this.data.form.stock }).then((saved) => { if (saved) { showToast('数量已更新', 'success'); this.loadProduct() } })
+      .catch((error) => showToast(error.message || '数量修改失败'))
   },
 
   onUnload() {

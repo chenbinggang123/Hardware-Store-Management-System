@@ -67,6 +67,11 @@ public class ProductRenameService {
             jdbc.update("UPDATE inventory_log SET product_name = ? WHERE product_id = ?", newName, productId);
         } catch (DataAccessException ignored) { /* 没有这张表或这一列时不影响改名 */ }
         try {
+            // 开单记忆里的候选商品名也要改，否则搜索会还出旧名字，选中后又重新建一个旧名商品
+            // 记忆按名称+规格+单位识别，改名后旧的那条已经失效，直接删掉，下次开单会按新名字重新记
+            jdbc.update("DELETE FROM billing_product_memory WHERE product_id = ? OR (lower(trim(name)) = lower(trim(?)) AND lower(trim(coalesce(specification,''))) = (SELECT lower(trim(coalesce(spec,''))) FROM product WHERE id = ?))", productId, oldName, productId);
+        } catch (DataAccessException ignored) { /* 同上 */ }
+        try {
             jdbc.update("UPDATE product_price_history SET product_name = ? WHERE product_id = ?", newName, productId);
         } catch (DataAccessException ignored) { /* 同上 */ }
         return changedDocuments;

@@ -39,7 +39,7 @@
       <view class="home-result-copy"><view class="home-result-title">今天卖了多少</view><view class="home-result-desc">查看今天的销售情况</view></view>
       <view class="home-result-value">¥{{report.sales || 0}}</view><view class="home-result-arrow">›</view>
     </view>
-    <view class="home-result warning" bindtap="openModule" data-path="/pages/inventories/index">
+    <view class="home-result warning" bindtap="openModule" data-path="/pages/products/index">
       <view class="home-result-mark">货</view>
       <view class="home-result-copy"><view class="home-result-title">快没货的商品</view><view class="home-result-desc">建议今天看一下</view></view>
       <view class="home-result-value">{{stats.warningCount}} 件</view><view class="home-result-arrow">›</view>

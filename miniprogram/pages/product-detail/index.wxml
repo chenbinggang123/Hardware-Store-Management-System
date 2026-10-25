@@ -77,7 +77,7 @@
       <view class="detail-item"><view class="detail-label">预警线</view><view class="detail-value">{{product.warningThreshold}}</view></view>
       <view class="detail-item"><view class="detail-label">库位</view><view class="detail-value">{{product.locationText}}</view></view>
     </view>
-    <view class="inventory-actions" ><view class="btn btn-primary btn-sm" bindtap="openInventoryAdjust">修改数量</view><view class="btn btn-secondary btn-sm" bindtap="openInventoryLogs">查看流水</view></view>
+    <view class="inventory-actions" ><view class="btn btn-primary btn-sm" bindtap="openInventoryAdjust">修改数量</view></view>
     <view class="banner banner-warning" wx:if="{{product.lowStock}}" style="margin-top: 16rpx;">
       <text class="banner-icon">!</text>
       <view><view class="banner-title">库存预警</view><view class="banner-desc">当前库存已进入低库存区间，建议尽快补货。</view></view>

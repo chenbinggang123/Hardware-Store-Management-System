@@ -14,7 +14,7 @@ const DRAWER_ROUTES = Object.freeze({
   files: '/pages/agent-files/index',
   sales: '/pages/billing-list/index',
   purchases: '/pages/factory-ledgers/index?kind=SUPPLIER',
-  inventory: '/pages/inventories/index',
+  inventory: '/pages/products/index',
   finance: '/pages/finance-ledger/index',
   customers: '/pages/customers/index',
   suppliers: '/pages/suppliers/index',
@@ -747,7 +747,7 @@ Page({
     const params = event.currentTarget.dataset.params || {}
     const routes = {
       WORKBENCH: '/pages/factory-ledgers/index', PRODUCT_LIST: '/pages/products/index', PRODUCT_DETAIL: '/pages/product-detail/index',
-      INVENTORY_LIST: '/pages/inventories/index',
+      INVENTORY_LIST: '/pages/products/index',
       PURCHASE_ORDER_DETAIL: '/pages/purchase-detail/index', EXCEL_TASK_DETAIL: '/pages/excel-task-detail/index',
       PRICE_HISTORY: '/pages/price-history/index', BILLING_DOCUMENT: '/pages/billing-editor/index'
     }
