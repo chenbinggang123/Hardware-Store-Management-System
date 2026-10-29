@@ -10,3 +10,19 @@ springboot-demo/.m2repo/
 springboot-demo/data/
 **/__pycache__/
 *.pyc
+
+# Personal configuration, caches, tool distributions and crash dumps
+.m2/
+.m2repo/
+tools/apache-maven-*/
+tools/apache-maven-*-bin.zip
+miniprogram/project.private.config.json
+**/hs_err_pid*.log
+**/replay_pid*.log
+**/deploy.env
+**/credentials*.json
+.env
+.env.local
+.idea/
+.vscode/
+node_modules/

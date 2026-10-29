@@ -26,13 +26,13 @@ function page(name, api) {
 }
 test('catalog defaults to all products, supports supplier ledgers and uses the unified editor', async () => {
   let params
-  const state = page('products', { getCatalog: async (value) => { params = value; return { items: [] } }, getCatalogSuppliers: async () => [{ factory: '源头厂A' }] })
+  const state = page('products', { getCatalog: async (value) => { params = value; return { items: [] } }, getCatalogSuppliers: async () => [{ factory: '源头厂A', productCount: 1 }] })
   state.page.onLoad({ factory: '源头厂A' }); await state.page.loadProducts(false)
   assert.equal(params.factory, '源头厂A'); assert.equal(params.view, 'all')
   state.page.openProcurement()
   assert.equal(state.routes[0][0], '/pages/billing-editor/index')
   assert.equal(state.routes[0][1].documentType, 'PROCUREMENT')
-  state.page.setData({ mode: 'factories' }); await state.page.loadProducts(false)
+  await state.page.loadFactories()
   assert.equal(state.page.data.factories[0].factory, '源头厂A')
   assert.equal(state.page.openSale, undefined)
   assert.ok(!fs.readFileSync(path.join(root, 'pages/products/index.wxml'), 'utf8').includes('bindtap="openSale"'))

@@ -1,29 +1,28 @@
 // 单据原图（拍照开单时保存的照片）：换临时链接、截出商品所在的那一行。
 // 开单页、商品详情、工厂账本共用。
 
-const cache = {}
-const URL_TTL = 60 * 60 * 1000 // 云存储临时链接有时效，缓存一小时后重新换
-
+const config = require('../config/cloud')
+let cache = {}, cacheToken = ''
 function tempUrls(fileIds) {
+  const session = wx.getStorageSync('auth_session') || {}
+  if (cacheToken !== session.token) { cache = {}; cacheToken = session.token }
   const wanted = Array.from(new Set((fileIds || []).filter(Boolean)))
-  const now = Date.now()
-  const missing = wanted.filter((id) => !cache[id] || cache[id].expires < now)
-  if (!missing.length || !wx.cloud || !wx.cloud.getTempFileURL) {
-    return Promise.resolve(urlMap(wanted))
-  }
-  const batches = []
-  for (let i = 0; i < missing.length; i += 50) batches.push(missing.slice(i, i + 50))
-  return Promise.all(batches.map((fileList) => wx.cloud.getTempFileURL({ fileList })
-    .then((result) => (result.fileList || []).forEach((file) => {
-      if (file && file.tempFileURL) cache[file.fileID] = { url: file.tempFileURL, expires: now + URL_TTL }
+  return Promise.all(wanted.map(id => {
+    if (cache[id]) return null
+    let path
+    if (id.startsWith('attachment://')) path = '/agent/attachments/' + encodeURIComponent(id.slice(13)) + '/image'
+    else if (id.startsWith('server://media/product-images/')) path = '/media/product-images/' + id.split('/').slice(-2).map(encodeURIComponent).join('/')
+    else return null
+    return new Promise((resolve, reject) => wx.request({
+      url: config.baseURL + config.apiPrefix + path, responseType: 'arraybuffer',
+      header: { Authorization: 'Bearer ' + (session.token || '') },
+      success(result) {
+        if (result.statusCode !== 200) { reject(new Error('图片读取失败（' + result.statusCode + '）')); return }
+        const filePath = wx.env.USER_DATA_PATH + '/server-photo-' + Date.now() + '-' + Math.random().toString(36).slice(2) + '.jpg'
+        wx.getFileSystemManager().writeFile({ filePath, data: result.data, success() { cache[id] = filePath; resolve() }, fail: reject })
+      }, fail: reject
     }))
-    .catch(() => null))).then(() => urlMap(wanted))
-}
-
-function urlMap(ids) {
-  const map = {}
-  ids.forEach((id) => { if (cache[id]) map[id] = cache[id].url })
-  return map
+  })).then(() => Object.fromEntries(wanted.filter(id => cache[id]).map(id => [id, cache[id]])))
 }
 
 // 把原图上某一行截出来：外层容器按行的高度裁剪，里面放大后的整张图负偏移。

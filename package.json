@@ -1,0 +1,12 @@
+{
+  "name": "hardware-store-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "engines": { "node": ">=22.8.0" },
+  "scripts": {
+    "check": "node tools/check-project.cjs",
+    "test": "node --test --test-isolation=none tools/agent-history-preview.test.cjs tools/agent-reply-table.test.cjs tools/billing-features.test.cjs tools/billing-knowledge.test.cjs tools/factory-ledger-documents.test.cjs tools/product-catalog.test.cjs tools/saved-photos.test.cjs tools/server-storage.test.cjs",
+    "verify": "npm run check && npm test",
+    "smoke:live": "node tools/live-smoke.cjs"
+  }
+}

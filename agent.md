@@ -39,7 +39,8 @@
 - 小程序优先用于开发联调和页面验收
 - 小程序业务请求使用真实后端，不再回退到内置模拟数据；当前业务与接口见 `docs/当前实现与前后端修正说明.md`
 - 后端默认接口根路径：`http://localhost:8084/api`
-- 小程序接口：通过 `wx.cloud.callContainer` 调用 CloudBase 云托管服务 `hardware-store-api`，不依赖自定义域名。
+- 小程序接口：通过 `wx.request` 调用 `https://hardware.plain-cookie.com/api`；图片和附件使用 `wx.uploadFile`。不再依赖 CloudBase，`config/cloud.js` 只保留历史文件名。
+- 两人协作入口：`docs/collaboration/FRONTEND_HANDOFF.md`、`API_CONTRACT.md` 和根目录 `CONTRIBUTING.md`。不要把演示默认账号当作正式环境凭据。
 
 ### 2.4 当前工作重点
 

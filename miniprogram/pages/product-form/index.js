@@ -44,7 +44,7 @@ Page({
 
   loadProduct() {
     this.setData({ loading: true, loadError: '' })
-    return api.getProduct(this.data.id).then((product) => this.setData({ form: { ...createDefaultForm(), ...product }, originalImageUrl: product.imageUrl || '' }))
+    return api.getProduct(this.data.id).then((product) => this.setData({ form: { ...createDefaultForm(), ...product }, originalImageUrl: product.storedImageUrl || product.imageUrl || '' }))
       .catch((error) => this.setData({ loadError: error.message || '商品读取失败，请重试' }))
       .finally(() => this.setData({ loading: false }))
   },
@@ -55,7 +55,7 @@ Page({
   },
 
   onUnload() {
-    if (this.data.pendingImageUrl) wx.cloud.deleteFile({ fileList: [this.data.pendingImageUrl] }).catch(() => null)
+    if (this.data.pendingImageUrl) api.removeProductImage(this.data.pendingImageUrl).catch(() => null)
   },
 
   updateField(event) {
@@ -75,10 +75,13 @@ Page({
       const operatorId = (getApp().globalData.currentOperatorId || 'unknown')
       const cloudPath = `product-images/${operatorId}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${extension}`
       this.setData({ uploadingImage: true })
-      return wx.cloud.uploadFile({ cloudPath, filePath: file.tempFilePath }).then((uploaded) => {
+      return api.uploadProductImage(file.tempFilePath).then((uploaded) => {
         const previousPending = this.data.pendingImageUrl
-        this.setData({ 'form.imageUrl': uploaded.fileID, pendingImageUrl: uploaded.fileID })
-        if (previousPending && previousPending !== uploaded.fileID) wx.cloud.deleteFile({ fileList: [previousPending] }).catch(() => null)
+        this.setData({ pendingImageUrl: uploaded.fileID })
+        return require('../../utils/source-photo').tempUrls([uploaded.fileID]).then(urls => {
+          this.setData({ 'form.imageUrl': urls[uploaded.fileID] || '', pendingImageUrl: uploaded.fileID })
+          if (previousPending && previousPending !== uploaded.fileID) return api.removeProductImage(previousPending)
+        })
       })
     }).catch((error) => showToast((error && (error.message || error.errMsg)) || '图片上传失败')).finally(() => this.setData({ uploadingImage: false }))
   },
@@ -86,7 +89,7 @@ Page({
   removeImage() {
     const pending = this.data.pendingImageUrl
     this.setData({ 'form.imageUrl': '', pendingImageUrl: '' })
-    if (pending) wx.cloud.deleteFile({ fileList: [pending] }).catch(() => null)
+    if (pending) api.removeProductImage(pending).catch(() => null)
   },
 
   validateForm(payload) {
@@ -129,7 +132,7 @@ Page({
       stock: Number(this.data.form.stock || 0),
       locationId: `${this.data.form.locationId || ''}`.trim(),
       sourceFactory: `${this.data.form.sourceFactory || ''}`.trim(),
-      imageUrl: `${this.data.form.imageUrl || ''}`.trim()
+      imageUrl: `${this.data.pendingImageUrl || (this.data.form.imageUrl ? this.data.originalImageUrl || this.data.form.imageUrl : '')}`.trim()
     }
 
     if (!this.validateForm(payload)) {
@@ -140,7 +143,7 @@ Page({
     const action = this.data.id ? api.updateProduct(this.data.id, payload) : api.saveProduct(payload)
     return action.then((savedProduct) => {
       const original = this.data.originalImageUrl
-      if (original && original !== payload.imageUrl && String(original).startsWith('cloud://')) wx.cloud.deleteFile({ fileList: [original] }).catch(() => null)
+      if (original && original !== payload.imageUrl && String(original).startsWith('server://')) api.removeProductImage(original).catch(() => null)
       this.setData({ pendingImageUrl: '', originalImageUrl: payload.imageUrl })
       showToast('商品已保存', 'success')
       wx.redirectTo({ url: '/pages/product-detail/index?id=' + savedProduct.id })

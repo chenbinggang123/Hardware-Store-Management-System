@@ -28,6 +28,10 @@ import java.util.Objects;
 @Service
 @Transactional(readOnly = true)
 public class BillingPhotoService {
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.example.demo.agent.service.attachment.AttachmentStorage localStorage;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.example.demo.filecenter.repository.FileCenterMetadataRepository fileMetadata;
     private static final int PRODUCT_PHOTO_LIMIT = 12;
 
     private final AgentAttachmentRepository attachments;
@@ -68,7 +72,13 @@ public class BillingPhotoService {
             if (attachment == null || attachment.getMimeType() == null || !attachment.getMimeType().startsWith("image/")) continue;
             boolean kept = documents.findReferencing(id).stream().anyMatch(document -> hasPosting(document));
             if (kept) continue;
+            if (fileMetadata != null && fileMetadata.findByOperatorIdAndSourceKindAndSourceId(operatorId, "ATTACHMENT", id)
+                    .map(item -> Boolean.TRUE.equals(item.getManualUpload())).orElse(false)) continue;
             if (attachment.getObjectKey() != null && attachment.getObjectKey().startsWith("cloud://")) cloudFiles.add(attachment.getObjectKey());
+            if (attachment.getObjectKey() != null && !attachment.getObjectKey().startsWith("cloud://") && localStorage != null) {
+                localStorage.delete(attachment.getObjectKey());
+                cloudFiles.add(attachment.getObjectKey());
+            }
             attachments.delete(attachment);
         }
         return cloudFiles;
@@ -81,6 +91,10 @@ public class BillingPhotoService {
         List<Long> ids = attachments.findByOperatorIdAndObjectKeyContainingAndCreateTimeBefore(operatorId, "billing-photo/", before)
                 .stream().map(AgentAttachment::getId).toList();
         return discard(ids, operatorId);
+    }
+
+    public boolean isPostedPhoto(Long attachmentId) {
+        return documents.findReferencing(attachmentId).stream().anyMatch(this::hasPosting);
     }
 
     private boolean hasPosting(BillingDocument document) {
@@ -137,9 +151,9 @@ public class BillingPhotoService {
         if (attachmentId == null) return null;
         AgentAttachment attachment = attachments.findById(attachmentId).orElse(null);
         if (attachment == null || attachment.getMimeType() == null || !attachment.getMimeType().startsWith("image/")
-                || attachment.getObjectKey() == null || !attachment.getObjectKey().startsWith("cloud://")) return null;
+                || attachment.getObjectKey() == null) return null;
         Map<String, Object> photo = new LinkedHashMap<>();
-        photo.put("cloudFileId", attachment.getObjectKey());
+        photo.put("cloudFileId", "attachment://" + attachment.getId());
         photo.put("width", null);
         photo.put("height", null);
         photo.put("rows", Map.of());

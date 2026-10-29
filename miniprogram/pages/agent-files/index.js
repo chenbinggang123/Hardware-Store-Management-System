@@ -178,9 +178,6 @@ Page({
       if (item.fileType === 'image') {
         this.setData({ openingKey: item.key })
         return api.getSavedPhotoSource(item.id).then((source) => {
-          if (String(source).startsWith('cloud://')) {
-            return wx.cloud.downloadFile({ fileID: source }).then((result) => result.tempFilePath)
-          }
           const extension = { 'image/png': 'png', 'image/webp': 'webp' }[item.mimeType] || 'jpg'
           const filePath = `${wx.env.USER_DATA_PATH}/saved-photo-${item.id}.${extension}`
           return api.downloadSavedPhoto(item.id).then((data) => new Promise((resolve, reject) => {

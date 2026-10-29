@@ -110,9 +110,13 @@ public class AgentMessageController {
     public ApiResponse<AgentAttachmentResponse> uploadAttachment(
             @RequestPart("file") MultipartFile file,
             @RequestParam(required = false) Long conversationId,
+            @RequestParam(defaultValue = "false") boolean saveToFiles,
+            @RequestParam(defaultValue = "agent") String category,
+            @RequestParam(required = false) String originalName,
             HttpServletRequest request) {
-        return ApiResponse.ok("附件上传完成",
-                attachmentService.upload(file, conversationId, currentUserId(request)));
+        var result = attachmentService.upload(com.example.demo.common.NamedUploadFile.of(file, originalName), conversationId, currentUserId(request), category);
+        if (saveToFiles) attachmentService.markSaved(result.getId(), currentUserId(request));
+        return ApiResponse.ok("附件上传完成", result);
     }
 
     @PostMapping("/attachments/cloud")

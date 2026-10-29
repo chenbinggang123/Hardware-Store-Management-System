@@ -1,1 +1,7 @@
-404: Not Found
+#!/bin/sh
+# Compatibility launcher, not a downloading Maven wrapper.
+if ! command -v mvn >/dev/null 2>&1; then
+  echo 'Install Maven 3.9.x and Java 17+ first.' >&2
+  exit 1
+fi
+exec mvn "$@"

@@ -57,12 +57,13 @@ public class ExcelTaskController {
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<ExcelTaskDetail> upload(@RequestPart("file") MultipartFile file,
+                                               @RequestParam(required = false) String originalName,
                                                @RequestParam(required = false) String purpose,
                                                @RequestParam(required = false) Long supplierId,
                                                @RequestParam(required = false) LocalDate priceEffectiveDate,
                                                HttpServletRequest request) {
         return ApiResponse.ok("文件任务创建完成",
-                service.upload(file, purpose, supplierId, priceEffectiveDate, currentUserId(request)));
+                service.upload(com.example.demo.common.NamedUploadFile.of(file, originalName), purpose, supplierId, priceEffectiveDate, currentUserId(request)));
     }
 
     @PostMapping("/cloud")

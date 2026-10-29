@@ -65,7 +65,7 @@ public class AgentAttachmentService {
         }
         java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
         result.put("attachmentId", attachment.getId());
-        result.put("cloudFileId", attachment.getObjectKey() != null && attachment.getObjectKey().startsWith("cloud://") ? attachment.getObjectKey() : null);
+        result.put("cloudFileId", "attachment://" + attachment.getId());
         result.put("rows", java.util.Map.of());
         if (StringUtils.hasText(attachment.getOcrLayout())) {
             try {
@@ -127,11 +127,15 @@ public class AgentAttachmentService {
         byte[] content = cloudFileDownloader.download(request.getCloudFileId(), request.getDownloadUrl(), maxSize);
         String mimeType = detectedMime(extension, content);
         AgentAttachmentResponse result = saveAttachment(request.getConversationId(), operatorId, request.getCloudFileId(), originalName, mimeType, content);
-        if (Boolean.TRUE.equals(request.getSaveToFiles())) {
+        if (Boolean.TRUE.equals(request.getSaveToFiles())) markSaved(result.getId(), operatorId);
+        return result;
+    }
+
+    public void markSaved(Long id, Long operatorId) {
             var metadata = new FileCenterMetadata();
             metadata.setOperatorId(operatorId);
             metadata.setSourceKind("ATTACHMENT");
-            metadata.setSourceId(result.getId());
+            metadata.setSourceId(id);
             metadata.setManualUpload(true);
             metadata.setPurposeCode("UNCLASSIFIED");
             metadata.setRelatedType("NONE");
@@ -139,10 +143,11 @@ public class AgentAttachmentService {
             metadata.setUpdateTime(LocalDateTime.now());
             fileMetadata.save(metadata);
         }
-        return result;
-    }
 
     public AgentAttachmentResponse upload(MultipartFile file, Long conversationId, Long operatorId) {
+        return upload(file, conversationId, operatorId, "agent");
+    }
+    public AgentAttachmentResponse upload(MultipartFile file, Long conversationId, Long operatorId, String category) {
         if (file == null || file.isEmpty()) throw new IllegalArgumentException("请选择要上传的文件");
         if (file.getSize() > maxSize) throw new IllegalArgumentException("单个附件不能超过 " + maxSize / 1024 / 1024 + "MB");
         String originalName = cleanName(file.getOriginalFilename());
@@ -154,7 +159,7 @@ public class AgentAttachmentService {
             throw new IllegalArgumentException("无法读取上传文件", exception);
         }
         String mimeType = detectedMime(extension, content);
-        String objectKey = "agent/" + operatorId + "/" + LocalDate.now() + "/" + UUID.randomUUID() + "." + extension;
+        String objectKey = ("billing-photo".equals(category) ? "billing-photo/" : "agent/") + operatorId + "/" + LocalDate.now() + "/" + UUID.randomUUID() + "." + extension;
         storage.put(objectKey, content, mimeType);
         return saveAttachment(conversationId, operatorId, objectKey, originalName, mimeType, content);
     }

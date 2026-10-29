@@ -48,9 +48,7 @@ function shouldFallback(error) {
 }
 
 function request(path, options = {}) {
-  if (!cloudConfig.envId || !cloudConfig.serviceName || !wx.cloud || !wx.cloud.callContainer) {
-    return Promise.reject({ message: 'CloudBase 云托管环境尚未配置' })
-  }
+
   return cloudRequest(path, options)
 }
 
@@ -59,22 +57,31 @@ function cloudRequest(path, options = {}) {
   const session = getAuthSession()
   const header = {
     'content-type': 'application/json',
-    'X-WX-SERVICE': cloudConfig.serviceName,
     ...(options.header || {})
   }
   if (session && session.token) header.Authorization = `Bearer ${session.token}`
-  return wx.cloud.callContainer({
-    config: { env: cloudConfig.envId },
+  const requestOptions = {
     path: `${cloudConfig.apiPrefix}${path}`,
     method,
     data: options.data || options.query || {},
     header,
     ...(options.responseType ? { responseType: options.responseType } : {})
-  }).then((response) => {
+  }
+  const pending = new Promise((resolve, reject) => wx.request({
+      url: cloudConfig.baseURL + requestOptions.path,
+      method: requestOptions.method,
+      data: requestOptions.data,
+      header: requestOptions.header,
+      timeout: 180000,
+      ...(options.responseType ? { responseType: options.responseType } : {}),
+      success: resolve,
+      fail: reject
+    }))
+  return pending.then((response) => {
     const payload = response.data
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'success')) {
-        return payload.success ? payload.data : Promise.reject(payload)
+        return payload.success ? hydrateImages(payload.data) : Promise.reject(payload)
       }
       return payload
     }
@@ -82,15 +89,12 @@ function cloudRequest(path, options = {}) {
       clearAuthSession()
       redirectToLogin()
     }
-    return Promise.reject(payload || { message: '云托管请求失败', statusCode: response.statusCode })
+    return Promise.reject(payload || { message: '服务器请求失败', statusCode: response.statusCode })
   })
 }
 
 function agentRequest(path, options = {}) {
-  if (!cloudConfig.envId || !cloudConfig.serviceName || !wx.cloud || !wx.cloud.callContainer) {
-    return Promise.reject({ message: '经营助手尚未配置云托管环境' })
-  }
-  return cloudRequest(path, options)
+  return request(path, options)
 }
 
 function localFileName(file) {
@@ -110,26 +114,36 @@ function localFileSize(file, filePath) {
   })
 }
 
-function cloudPathFor(fileName, category = 'agent') {
+function hydrateImages(value) {
+  if (!value || typeof value !== 'object' || value instanceof ArrayBuffer) return value
+  if (Array.isArray(value)) return Promise.all(value.map(hydrateImages))
+  if (typeof value.imageUrl === 'string' && value.imageUrl.startsWith('server://')) {
+    return require('./source-photo').tempUrls([value.imageUrl]).then(urls => ({ ...value, storedImageUrl: value.imageUrl, imageUrl: urls[value.imageUrl] || '' }))
+  }
+  return Promise.all(Object.entries(value).map(async ([key, item]) => [key, await hydrateImages(item)])).then(Object.fromEntries)
+}
+
+function uploadFile(path, file, formData = {}) {
   const session = getAuthSession()
-  const operatorId = session && session.user && session.user.id ? session.user.id : 'unknown'
-  const now = new Date()
-  const extension = fileName.includes('.') ? `.${fileName.split('.').pop().toLowerCase()}` : ''
-  const datePath = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('/')
-  return `${category}/${operatorId}/${datePath}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}${extension}`
+  return new Promise((resolve, reject) => wx.uploadFile({
+    url: cloudConfig.baseURL + cloudConfig.apiPrefix + path,
+    filePath: localFilePath(file), name: 'file',
+    formData: Object.fromEntries(Object.entries({ ...formData, originalName: localFileName(file) }).filter(([,v]) => v !== null && v !== undefined && v !== '').map(([k,v]) => [k, String(v)])),
+    header: session ? { Authorization: `Bearer ${session.token}` } : {}, timeout: 180000,
+    success(response) {
+      let body
+      try { body = typeof response.data === 'string' ? JSON.parse(response.data) : response.data } catch (_) { reject({ message: '上传响应格式错误' }); return }
+      if (response.statusCode >= 200 && response.statusCode < 300 && body && body.success) resolve(body.data)
+      else { if (response.statusCode === 401) { clearAuthSession(); redirectToLogin() } reject(body || { message: '文件上传失败' }) }
+    }, fail: reject
+  }))
 }
 
 function removeCloudFile(fileID) {
-  if (!fileID || !wx.cloud || !wx.cloud.deleteFile) return Promise.resolve()
-  return wx.cloud.deleteFile({ fileList: [fileID] }).catch(() => null)
+  if (!fileID || !String(fileID).startsWith('server://media/product-images/')) return Promise.resolve()
+  return request('/media/product-images/' + fileID.split('/').slice(-2).join('/'), { method: 'DELETE' })
 }
-
-// 服务端确认没有入账的原图会把云文件 ID 返回来，由这里去云存储删除。
-function dropCloudFiles(result) {
-  const files = result && result.cloudFiles
-  if (!files || !files.length || !wx.cloud || !wx.cloud.deleteFile) return Promise.resolve(result)
-  return wx.cloud.deleteFile({ fileList: files }).catch(() => null).then(() => result)
-}
+function dropCloudFiles(result) { return Promise.resolve(result) }
 
 function updateTemporaryCleanupQueue(updater) {
   const current = wx.getStorageSync(TEMP_AGENT_CLEANUP_KEY) || []
@@ -138,30 +152,15 @@ function updateTemporaryCleanupQueue(updater) {
 
 function queueTemporaryAgentFiles(runId, attachments) {
   if (!runId) return
-  const cloudFileIds = (attachments || []).map((item) => item && item.cloudFileId).filter(Boolean)
-  if (!cloudFileIds.length) return
-  updateTemporaryCleanupQueue((items) => {
-    const kept = items.filter((item) => String(item.runId) !== String(runId))
-    return kept.concat({ runId, cloudFileIds: Array.from(new Set(cloudFileIds)) })
-  })
+  const attachmentIds = (attachments || []).map(item => item && item.id).filter(Boolean)
+  if (!attachmentIds.length) return
+  updateTemporaryCleanupQueue(items => items.filter(item => String(item.runId) !== String(runId)).concat({ runId, attachmentIds }))
 }
 
 function cleanupTemporaryAgentFiles(runId) {
-  const current = wx.getStorageSync(TEMP_AGENT_CLEANUP_KEY) || []
-  const item = (Array.isArray(current) ? current : []).find((entry) => String(entry.runId) === String(runId))
-  if (!item || !item.cloudFileIds || !item.cloudFileIds.length) return Promise.resolve(true)
-  if (!wx.cloud || !wx.cloud.deleteFile) return Promise.resolve(false)
-  return Promise.all(item.cloudFileIds.map((fileID) => wx.cloud.deleteFile({ fileList: [fileID] })
-    .then((result) => {
-      const files = result && result.fileList
-      return Array.isArray(files) && files.length > 0 && files.every((file) => !file.status) ? null : fileID
-    })
-    .catch(() => fileID))).then((failed) => {
-    const remaining = failed.filter(Boolean)
-    updateTemporaryCleanupQueue((items) => remaining.length
-      ? items.map((entry) => String(entry.runId) === String(runId) ? { ...entry, cloudFileIds: remaining } : entry)
-      : items.filter((entry) => String(entry.runId) !== String(runId)))
-    return remaining.length === 0
+  return request(`/agent/runs/${runId}/attachments/cleanup`, { method: 'POST' }).then(() => {
+    updateTemporaryCleanupQueue(items => items.filter(item => String(item.runId) !== String(runId)))
+    return true
   })
 }
 
@@ -175,66 +174,10 @@ function cleanupTerminalTemporaryAgentFiles() {
 }
 
 function uploadAgentFile(file, conversationId, saveToFiles = false, category = '') {
-  if (!wx.cloud || !wx.cloud.uploadFile || !wx.cloud.getTempFileURL) {
-    return Promise.reject({ message: '当前微信基础库不支持 CloudBase 文件上传' })
-  }
-  const filePath = localFilePath(file)
-  const originalName = localFileName(file)
-  let uploadedFileID = ''
-  return localFileSize(file, filePath)
-    .then((fileSize) => wx.cloud.uploadFile({
-      cloudPath: cloudPathFor(originalName, category || (saveToFiles ? 'agent-files' : 'agent-temp')), filePath
-    })
-      .then((uploadResult) => {
-        uploadedFileID = uploadResult.fileID
-        return wx.cloud.getTempFileURL({ fileList: [uploadedFileID] })
-      })
-      .then((urlResult) => {
-        const item = urlResult.fileList && urlResult.fileList[0]
-        if (!item || !item.tempFileURL || (item.status && item.status !== 0)) {
-          return Promise.reject({ message: (item && item.errMsg) || '无法获取附件临时读取地址' })
-        }
-        return agentRequest('/agent/attachments/cloud', {
-          method: 'POST',
-          data: { cloudFileId: uploadedFileID, downloadUrl: item.tempFileURL, originalName, fileSize, conversationId, saveToFiles }
-        })
-      })
-      .then((attachment) => ({ ...attachment, cloudFileId: uploadedFileID })))
-    .catch((error) => removeCloudFile(uploadedFileID).then(() => Promise.reject(error)))
+  return uploadFile('/agent/attachments', file, { conversationId, saveToFiles, category })
 }
-
 function uploadExcelFile(file, purpose, context = {}) {
-  if (!wx.cloud || !wx.cloud.uploadFile || !wx.cloud.getTempFileURL) {
-    return Promise.reject({ message: '当前微信基础库不支持文件上传' })
-  }
-  const filePath = localFilePath(file)
-  const originalName = localFileName(file)
-  let uploadedFileID = ''
-  return localFileSize(file, filePath)
-    .then((fileSize) => wx.cloud.uploadFile({ cloudPath: cloudPathFor(originalName, 'excel-tasks'), filePath })
-      .then((uploadResult) => {
-        uploadedFileID = uploadResult.fileID
-        return wx.cloud.getTempFileURL({ fileList: [uploadedFileID] })
-      })
-      .then((urlResult) => {
-        const item = urlResult.fileList && urlResult.fileList[0]
-        if (!item || !item.tempFileURL || (item.status && item.status !== 0)) {
-          return Promise.reject({ message: (item && item.errMsg) || '无法获取文件临时读取地址' })
-        }
-        return request('/excel-tasks/cloud', {
-          method: 'POST',
-          data: {
-            cloudFileId: uploadedFileID,
-            downloadUrl: item.tempFileURL,
-            originalName,
-            fileSize,
-            purpose,
-            supplierId: context.supplierId || null,
-            priceEffectiveDate: context.priceEffectiveDate || null
-          }
-        })
-      }))
-    .catch((error) => removeCloudFile(uploadedFileID).then(() => Promise.reject(error)))
+  return uploadFile('/excel-tasks', file, { purpose, supplierId: context.supplierId, priceEffectiveDate: context.priceEffectiveDate })
 }
 
 function sanitizeUser(user) {
@@ -251,6 +194,8 @@ function sanitizeUser(user) {
 }
 
 module.exports = {
+  uploadProductImage(file) { return uploadFile('/media/product-images', file) },
+  removeProductImage: removeCloudFile,
   login(data) {
     return request('/auth/login', { method: 'POST', data }).catch((error) => {
       if (shouldFallback(error)) {

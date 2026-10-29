@@ -20,7 +20,7 @@ function setup(pageName, overrides = {}, storage = new Map()) {
   }
   const api = { searchBillingProducts: async () => [], getFactoryLedgers: async () => ({ ledgers: [] }), getBillingLedgerPosting: async () => ({ posted: false }), ...overrides }
   let page
-  const sandbox = { wx, Page: (value) => { page = value }, setTimeout, clearTimeout, console }
+  const sandbox = { wx, Page: (value) => { page = value }, setTimeout, clearTimeout, setInterval, clearInterval, console }
   const localModule = { exports: {} }
   vm.runInNewContext(fs.readFileSync(path.join(miniRoot, 'utils/billing-local-draft.js'), 'utf8'), { ...sandbox, module: localModule })
   vm.runInNewContext(fs.readFileSync(path.join(miniRoot, 'pages', pageName, 'index.js'), 'utf8'), {
